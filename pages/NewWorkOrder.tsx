@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronRight, UploadCloud, AlertTriangle, CheckCircle2, Info, User, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { NotificationService } from '../services/NotificationService';
 
 interface Asset {
   id: string;
@@ -71,9 +72,28 @@ const NewWorkOrder = () => {
 
       console.log('Enviando payload:', payload);
 
-      const { error } = await supabase.from('work_orders').insert([payload]);
+      const { data: newOrder, error } = await supabase
+        .from('work_orders')
+        .insert([payload])
+        .select()
+        .single();
 
       if (error) throw error;
+
+      // Trigger Notification
+      if (newOrder) {
+        await NotificationService.notifyWorkOrderCreated({
+          id: newOrder.id,
+          title: `Nova OS: ${orderNumber}`,
+          description: issueDescription,
+          priority: priority,
+          status: 'Pendente',
+          assetId: selectedAssetId,
+          locationId: '', // Todo: fetch location if needed
+          assignedTo: selectedTechId,
+          requesterId: user?.id
+        });
+      }
 
       alert('Chamado aberto com sucesso!');
       navigate('/work-orders');

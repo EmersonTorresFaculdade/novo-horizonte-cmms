@@ -18,6 +18,8 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 
+
+
 const Sidebar = () => {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -46,19 +48,13 @@ const Sidebar = () => {
       {/* Logo Section */}
       <div className="h-20 flex items-center px-8 border-b border-slate-800/50">
         <div className="flex items-center gap-3">
-          {settings.companyLogo ? (
-            <div className="size-10 rounded-lg overflow-hidden bg-white/10 flex items-center justify-center">
-              <img
-                src={settings.companyLogo}
-                alt={settings.companyName}
-                className="w-full h-full object-contain"
-              />
-            </div>
-          ) : (
-            <div className="size-10 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-              <Factory size={24} />
-            </div>
-          )}
+          <div className="size-16 flex items-center justify-center">
+            <img
+              src={settings.companyLogo || '/logo.png'}
+              alt={settings.companyName}
+              className="w-full h-full object-contain"
+            />
+          </div>
           <div className="flex flex-col">
             <span className="text-base font-bold tracking-wide text-white">{settings.companyName}</span>
             <span className="text-xs text-slate-400 font-medium">{getRoleLabel()}</span>

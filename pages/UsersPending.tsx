@@ -200,7 +200,7 @@ const UsersPending = () => {
                                     )}
                                     {user.phone && (
                                         <div className="text-sm">
-                                            <span className="text-slate-500 block text-xs">Telefone</span>
+                                            <span className="text-slate-500 block text-xs">WhatsApp</span>
                                             <span className="text-slate-800">{user.phone}</span>
                                         </div>
                                     )}

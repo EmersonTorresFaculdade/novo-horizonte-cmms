@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { NotificationService } from '../services/NotificationService';
 
 interface WorkOrder {
    id: string;
@@ -73,9 +74,8 @@ const WorkOrderDetails = () => {
    const { user } = useAuth();
    const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
 
-   // Determine mode
-   const isReadOnlyInitial = location.state?.readOnly ?? false;
-   const [isEditing, setIsEditing] = useState(!isReadOnlyInitial);
+   // Determine mode based on URL
+   const isEditing = location.pathname.endsWith('/edit');
 
    const [loading, setLoading] = useState(true);
    const [workOrder, setWorkOrder] = useState<WorkOrder | null>(null);
@@ -178,7 +178,24 @@ const WorkOrderDetails = () => {
 
          if (error) throw error;
 
+         // Trigger Notification
+         if (workOrder) {
+            await NotificationService.notifyWorkOrderUpdated({
+               id: workOrder.id,
+               title: `Atualização OS: ${workOrder.order_number}`,
+               description: editIssue,
+               priority: editPriority,
+               status: status,
+               assetId: workOrder.asset_id,
+               locationId: '',
+               assignedTo: selectedTechId || undefined,
+               requesterId: workOrder.requester_id || undefined
+            });
+         }
+
          alert('Alterações salvas com sucesso!');
+         // Navigate back to details view
+         navigate(`/work-orders/${id}`);
          fetchOrderDetails();
       } catch (error) {
          console.error('Error updating order:', error);
@@ -244,13 +261,24 @@ const WorkOrderDetails = () => {
                }
             </div>
             <div className="flex items-center gap-2">
-               <button
-                  onClick={() => setIsEditing(!isEditing)}
-                  className={`p-2 rounded-full transition-colors ${isEditing ? 'bg-primary/10 text-primary' : 'hover:bg-slate-100 text-slate-500'}`}
-                  title={isEditing ? 'Modo Edição Ativo' : 'Habilitar Edição'}
-               >
-                  <Pencil size={20} />
-               </button>
+               {isEditing ? (
+                  <button
+                     onClick={() => navigate(`/work-orders/${id}`)}
+                     className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg text-sm font-bold transition-colors"
+                  >
+                     Cancelar Edição
+                  </button>
+               ) : (
+                  isAdmin && (
+                     <button
+                        onClick={() => navigate(`/work-orders/${id}/edit`)}
+                        className="p-2 rounded-full hover:bg-slate-100 text-slate-500 hover:text-primary transition-colors"
+                        title="Editar Ordem de Serviço"
+                     >
+                        <Pencil size={20} />
+                     </button>
+                  )
+               )}
                <button onClick={() => navigate('/work-orders')} className="rounded-full hover:bg-slate-100 p-2 text-slate-500 transition-colors">
                   <ChevronRight size={24} />
                </button>

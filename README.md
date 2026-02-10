@@ -1,20 +1,33 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Novo Horizonte CMMS
 
-# Run and deploy your AI Studio app
+Sistema de Gerenciamento de Manutenção Computadorizada (CMMS) para a indústria Novo Horizonte.
 
-This contains everything you need to run your app locally.
+## Funcionalidades
 
-View your app in AI Studio: https://ai.studio/apps/drive/1VRtN58W9gUMZof9h29MhrSSMF_htxzj5
+- Gestão de Ordens de Serviço
+- Controle de Ativos e Máquinas
+- Gerenciamento de Estoque
+- Controle de Técnicos
+- Relatórios e Dashboards
+- Configurações do Sistema (Logo, Tema, etc.)
 
-## Run Locally
+## Como Rodar Localmente
 
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
+1. Instale as dependências:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+
+2. Configure as variáveis de ambiente:
+   Crie um arquivo `.env` na raiz do projeto com as chaves necessárias (Supabase, etc).
+
+3. Rode o projeto:
    `npm run dev`
+
+## Deploy na Vercel
+
+Este projeto já está configurado para deploy na Vercel.
+
+1. Faça o push do código para o GitHub.
+2. Importe o projeto na Vercel.
+3. A Vercel detectará automaticamente que é um projeto Vite.
+4. Configure as variáveis de ambiente no painel da Vercel.
+5. O arquivo `vercel.json` incluído garante que o roteamento SPA funcione corretamente.

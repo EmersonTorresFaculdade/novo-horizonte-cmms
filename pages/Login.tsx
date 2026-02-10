@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LogIn, Factory, Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus, X, User, Phone, Shield, AlertTriangle } from 'lucide-react';
+import { WhatsappIcon } from '../components/WhatsappIcon';
 import { IMAGES } from '../constants';
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+
+
 
 const Login = () => {
   const navigate = useNavigate();
@@ -122,20 +125,11 @@ const Login = () => {
         <div className="w-full max-w-[440px] space-y-8">
           <div className="flex flex-col items-center text-center">
             <div className="flex justify-center mb-6">
-              {settings.companyLogo ? (
-                <img
-                  src={settings.companyLogo}
-                  alt={settings.companyName}
-                  className="h-20 w-auto object-contain"
-                />
-              ) : (
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 text-primary">
-                    <Factory size={40} />
-                  </div>
-                  <span className="text-xl font-bold tracking-tight text-slate-900">{settings.companyName}</span>
-                </div>
-              )}
+              <img
+                src="/logo.png"
+                alt="Novo Horizonte"
+                className="h-20 w-auto object-contain"
+              />
             </div>
             <h2 className="text-2xl font-bold leading-9 tracking-tight text-slate-900">Acesse sua conta</h2>
             <p className="mt-2 text-sm leading-6 text-slate-500">
@@ -374,11 +368,11 @@ const Login = () => {
 
                   <div>
                     <label htmlFor="registerPhone" className="block text-sm font-medium text-slate-900 mb-2">
-                      Telefone
+                      Número WhatsApp
                     </label>
                     <div className="relative">
                       <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                        <Phone size={18} />
+                        <WhatsappIcon size={18} />
                       </div>
                       <input
                         id="registerPhone"

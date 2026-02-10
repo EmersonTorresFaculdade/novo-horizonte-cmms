@@ -21,6 +21,7 @@ import { useProfile } from '../contexts/ProfileContext';
 
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, BellRing, Smartphone } from 'lucide-react';
+import { WhatsappIcon } from '../components/WhatsappIcon';
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -335,7 +336,7 @@ const Profile = () => {
                                 </div>
                             </div>
 
-                            {/* Email e Telefone */}
+                            {/* Email e WhatsApp */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
@@ -356,8 +357,8 @@ const Profile = () => {
 
                                 <div>
                                     <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                                        <Phone size={16} />
-                                        Telefone
+                                        <WhatsappIcon size={16} />
+                                        Número WhatsApp
                                     </label>
                                     <input
                                         type="tel"

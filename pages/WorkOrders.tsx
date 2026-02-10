@@ -230,7 +230,7 @@ const WorkOrders = () => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredOrders.map((order) => (
-                        <tr key={order.id} onClick={() => navigate(`/work-orders/${order.id}`, { state: { readOnly: true } })} className="group hover:bg-slate-50 transition-colors cursor-pointer">
+                        <tr key={order.id} onClick={() => navigate(`/work-orders/${order.id}`)} className="group hover:bg-slate-50 transition-colors cursor-pointer">
                           <td className="p-4 text-sm font-medium text-primary">#{order.order_number}</td>
                           <td className="p-4">
                             <div className="flex flex-col">
@@ -269,7 +269,7 @@ const WorkOrders = () => {
                               {isAdmin && (
                                 <>
                                   <button
-                                    onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${order.id}`, { state: { readOnly: false } }); }}
+                                    onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${order.id}/edit`); }}
                                     className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
                                     title="Editar"
                                   >
@@ -307,13 +307,13 @@ const WorkOrders = () => {
                   </div>
                   <div className="p-3 flex-1 overflow-y-auto space-y-3 min-h-[200px]">
                     {filteredOrders.filter(o => o.status === status).map(card => (
-                      <div key={card.id} onClick={() => navigate(`/work-orders/${card.id}`, { state: { readOnly: true } })} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-shadow relative group">
+                      <div key={card.id} onClick={() => navigate(`/work-orders/${card.id}`)} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-shadow relative group">
                         <div className="flex justify-between items-start">
                           <span className="font-mono text-xs font-bold text-slate-400">#{card.order_number}</span>
                           {isAdmin && (
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded-md shadow-sm border border-slate-100 absolute top-2 right-2">
                               <button
-                                onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${card.id}`, { state: { readOnly: false } }); }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${card.id}/edit`); }}
                                 className="text-slate-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50"
                                 title="Editar"
                               >

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
+import bcrypt from 'bcryptjs';
 
 // Tipos
 export type UserRole = 'admin_root' | 'admin' | 'user';
@@ -102,10 +103,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return { success: false, error: 'Conta aguardando aprovação ou inativa' };
             }
 
-            // Verificar senha (comparação simples para desenvolvimento)
-            // TODO: Em produção, usar bcrypt
-            // Por enquanto, password_hash é a senha em texto plano
-            if (userData.password_hash !== password) {
+            // Verificar senha usando bcrypt
+            const isPasswordValid = await bcrypt.compare(password, userData.password_hash);
+
+            if (!isPasswordValid) {
                 return { success: false, error: 'Usuário ou senha inválidos' };
             }
 
@@ -167,6 +168,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return { success: false, error: 'Este nome de usuário já está em uso' };
             }
 
+            // Hash da senha
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash(password, salt);
+
             // Criar novo usuário com status pending
             const { data: newUser, error: insertError } = await supabase
                 .from('users')
@@ -174,7 +179,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     name,
                     username,
                     email,
-                    password_hash: password,
+                    password_hash: passwordHash, // Salva o hash
                     phone,
                     role: 'user', // Sempre criar como 'user' inicialmente (segurança)
                     requested_role: requestedRole, // O role desejado fica em requested_role

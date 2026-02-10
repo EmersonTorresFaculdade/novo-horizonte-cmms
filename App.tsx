@@ -11,7 +11,7 @@ import Technicians from './pages/Technicians';
 import Inventory from './pages/Inventory';
 import Calendar from './pages/Calendar';
 import Profile from './pages/Profile';
-import SearchResults from './pages/SearchResults';
+
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import UsersPending from './pages/UsersPending';
@@ -43,6 +43,7 @@ const App = () => {
                   <Route path="/work-orders" element={<WorkOrders />} />
                   <Route path="/work-orders/new" element={<NewWorkOrder />} />
                   <Route path="/work-orders/:id" element={<WorkOrderDetails />} />
+                  <Route path="/work-orders/:id/edit" element={<WorkOrderDetails />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/calendar" element={<Calendar />} />
 

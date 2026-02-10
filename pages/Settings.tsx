@@ -14,17 +14,86 @@ import {
     Shield,
     Check,
     Image,
-    X
+    X,
+    Webhook
 } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
+import { supabase } from '../lib/supabase';
 
 const Settings = () => {
-    const { settings, updateSettings, saveSettings, isSaving } = useSettings();
+    const { settings, updateSettings, saveSettings, uploadLogo, isSaving } = useSettings();
     const [activeTab, setActiveTab] = useState('general');
+    const [testingWebhook, setTestingWebhook] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleSave = () => {
         saveSettings();
+    };
+
+    const handleTestWebhook = async () => {
+        if (!settings.webhookUrl) {
+            alert('Por favor, preencha a URL do Webhook antes de testar.');
+            return;
+        }
+
+        setTestingWebhook(true);
+        try {
+            // First, save the settings to ensure DB is up to date for the Edge Function
+            await saveSettings();
+
+            // Invoke Supabase Edge Function
+            const { data, error } = await supabase.functions.invoke('send-notification', {
+                body: {
+                    event: 'test_notification',
+                    // Mock work order data
+                    workOrder: {
+                        id: 'test-id',
+                        title: 'Teste de Integração',
+                        description: 'Este é um teste de verificação de webhook.',
+                        priority: 'Média',
+                        status: 'Teste',
+                        assetId: '',
+                        locationId: '',
+                        url: window.location.origin
+                    },
+                    company: settings.companyName
+                }
+            });
+
+            if (error) {
+                console.error('Edge Function Error:', error);
+                throw error;
+            }
+
+            alert('Teste enviado via Servidor Supabase! Verifique seu n8n.');
+
+        } catch (error: any) {
+            console.error('Test Error:', error);
+
+            let errorMessage = error.message || 'Erro desconhecido';
+
+            // Try to extract detailed error from Edge Function response
+            if (error && typeof error === 'object') {
+                try {
+                    // Check if it's a Supabase FunctionsHttpError with context
+                    if ('context' in error && typeof error.context.json === 'function') {
+                        const errorContext = await error.context.json();
+                        if (errorContext && errorContext.error) {
+                            errorMessage = errorContext.error;
+                            if (errorContext.stack) {
+                                console.error('Edge Function Stack:', errorContext.stack);
+                            }
+                        }
+                    }
+                } catch (e) {
+                    console.log('Could not parse error context');
+                }
+            }
+
+            alert(`Falha ao enviar teste: ${errorMessage}`);
+        } finally {
+            setTestingWebhook(false);
+        }
     };
 
     const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -35,29 +104,32 @@ const Settings = () => {
                 alert('Por favor, selecione apenas arquivos de imagem.');
                 return;
             }
-            // Validar tamanho (máximo 2MB)
+            // Validar tamanho (máximo 2MB para upload)
             if (file.size > 2 * 1024 * 1024) {
                 alert('A imagem deve ter no máximo 2MB.');
                 return;
             }
 
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                updateSettings({ companyLogo: reader.result as string });
-            };
-            reader.readAsDataURL(file);
+            uploadLogo(file);
         }
     };
 
     const handleRemoveLogo = () => {
-        updateSettings({ companyLogo: null });
+        uploadLogo(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
     };
 
+
+
+
+
+
+
     const tabs = [
         { id: 'general', label: 'Geral', icon: Building2 },
+        { id: 'integrations', label: 'Integrações', icon: Webhook },
         { id: 'notifications', label: 'Notificações', icon: Bell },
         { id: 'appearance', label: 'Aparência', icon: Palette },
         { id: 'security', label: 'Segurança', icon: Shield },
@@ -173,7 +245,7 @@ const Settings = () => {
                                                     Carregar Logo
                                                 </label>
                                                 <p className="text-xs text-slate-500 mt-2">
-                                                    Formatos aceitos: PNG, JPG, SVG. Tamanho máximo: 2MB
+                                                    Formatos aceitos: PNG, JPG, SVG. Tamanho máximo: 500KB (Salvo no Banco)
                                                 </p>
                                             </div>
                                         </div>
@@ -241,6 +313,70 @@ const Settings = () => {
                             </div>
                         )}
 
+                        {/* Integrations Settings */}
+                        {activeTab === 'integrations' && (
+                            <div className="p-6">
+                                <h3 className="text-lg font-bold text-slate-900 mb-6">Integrações (n8n)</h3>
+                                <div className="space-y-6">
+                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                                        <div className="flex gap-4">
+                                            <div className="p-2 bg-blue-100 rounded-lg h-fit">
+                                                <Webhook size={24} className="text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-slate-900">Webhook de Notificações</h4>
+                                                <p className="text-sm text-slate-600 mt-1">
+                                                    Configure a URL do seu fluxo no n8n. O sistema enviará dados para este endereço sempre que uma Ordem de Serviço for criada ou atualizada.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+                                        <div>
+                                            <h4 className="font-semibold text-slate-900">Habilitar Integração</h4>
+                                            <p className="text-sm text-slate-500 mt-1">Ativar o envio de dados para o Webhook</p>
+                                        </div>
+                                        <button
+                                            onClick={() => updateSettings({ webhookEnabled: !settings.webhookEnabled })}
+                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.webhookEnabled ? 'bg-primary' : 'bg-slate-200'
+                                                }`}
+                                        >
+                                            <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.webhookEnabled ? 'translate-x-6' : 'translate-x-1'
+                                                    }`}
+                                            />
+                                        </button>
+                                    </div>
+
+                                    <div className={`transition-opacity ${!settings.webhookEnabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                            URL do Webhook (POST)
+                                        </label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="url"
+                                                placeholder="https://seu-n8n.com/webhook/..."
+                                                value={settings.webhookUrl || ''}
+                                                onChange={(e) => updateSettings({ webhookUrl: e.target.value })}
+                                                className="flex-1 px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                                            />
+                                            <button
+                                                onClick={handleTestWebhook}
+                                                disabled={!settings.webhookUrl || testingWebhook}
+                                                className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium shadow-lg shadow-slate-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                                            >
+                                                {testingWebhook ? 'Enviando...' : 'Testar Integração'}
+                                            </button>
+                                        </div>
+                                        <p className="text-xs text-slate-500 mt-2">
+                                            O sistema enviará um JSON com os dados da OS para esta URL.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Notifications Settings */}
                         {activeTab === 'notifications' && (
                             <div className="p-6">
@@ -248,7 +384,7 @@ const Settings = () => {
                                 <div className="space-y-4">
                                     {[
                                         { key: 'emailNotifications', label: 'Notificações por Email', description: 'Receba atualizações importantes por email' },
-                                        { key: 'smsNotifications', label: 'Notificações por SMS', description: 'Receba alertas críticos via SMS' },
+                                        { key: 'whatsappNotifications', label: 'Notificações por WhatsApp', description: 'Receba alertas críticos via WhatsApp' },
                                         { key: 'workOrderAlerts', label: 'Alertas de Ordem de Serviço', description: 'Notificações sobre novas ordens e atualizações' },
                                         { key: 'criticalAlerts', label: 'Alertas Críticos', description: 'Notificações para situações urgentes' },
                                         { key: 'dailyReport', label: 'Relatório Diário', description: 'Resumo diário enviado por email' }

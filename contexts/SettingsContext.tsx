@@ -1,6 +1,19 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 
+interface UpdateAppSettingsParams {
+    p_company_name: string;
+    p_company_logo: string | null;
+    p_theme: string;
+    p_webhook_url: string;
+    p_webhook_enabled: boolean;
+    p_email_notifications: boolean;
+    p_whatsapp_notifications: boolean;
+    p_work_order_alerts: boolean;
+    p_critical_alerts: boolean;
+    p_daily_report: boolean;
+}
+
 interface AppSettings {
     companyName: string;
     companyEmail: string;
@@ -8,7 +21,7 @@ interface AppSettings {
     timezone: string;
     language: string;
     emailNotifications: boolean;
-    smsNotifications: boolean;
+    whatsappNotifications: boolean; // Renamed from smsNotifications
     workOrderAlerts: boolean;
     criticalAlerts: boolean;
     dailyReport: boolean;
@@ -18,6 +31,8 @@ interface AppSettings {
     twoFactorAuth: boolean;
     sessionTimeout: number;
     passwordExpiry: number;
+    webhookUrl?: string;
+    webhookEnabled: boolean;
 }
 
 const defaultSettings: AppSettings = {
@@ -27,7 +42,7 @@ const defaultSettings: AppSettings = {
     timezone: 'America/Sao_Paulo',
     language: 'pt-BR',
     emailNotifications: true,
-    smsNotifications: false,
+    whatsappNotifications: true, // Default true for WhatsApp as requested
     workOrderAlerts: true,
     criticalAlerts: true,
     dailyReport: true,
@@ -36,13 +51,16 @@ const defaultSettings: AppSettings = {
     compactMode: false,
     twoFactorAuth: false,
     sessionTimeout: 30,
-    passwordExpiry: 90
+    passwordExpiry: 90,
+    webhookUrl: '',
+    webhookEnabled: true
 };
 
 interface SettingsContextType {
     settings: AppSettings;
     updateSettings: (newSettings: Partial<AppSettings>) => Promise<void>;
-    saveSettings: () => Promise<void>;
+    saveSettings: (currentSettings?: AppSettings) => Promise<void>;
+    uploadLogo: (file: File | string | null) => Promise<void>;
     isSaving: boolean;
     loading: boolean;
 }
@@ -89,29 +107,22 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
 
             if (data) {
                 setSettings(prev => {
-                    // Check if we need to migrate local logo to DB
-                    let effectiveLogo = data.company_logo;
-                    if (!effectiveLogo && prev.companyLogo) {
-                        console.log('Migrating local logo to database...');
-                        effectiveLogo = prev.companyLogo;
-
-                        // Async update to DB
-                        supabase.from('app_settings')
-                            .update({
-                                company_logo: effectiveLogo,
-                                updated_at: new Date().toISOString()
-                            })
-                            .eq('id', data.id)
-                            .then(({ error }) => {
-                                if (error) console.error('Error migrating logo:', error);
-                            });
-                    }
+                    // Logic: Use DB logo if exists. If not, use '/logo.png' as default fallback.
+                    const dbData = data as any;
+                    let effectiveLogo = dbData.company_logo || '/logo.png';
 
                     const dbSettings: Partial<AppSettings> = {
-                        companyName: data.company_name,
+                        companyName: dbData.company_name,
                         companyLogo: effectiveLogo,
-                        theme: data.theme,
-                        // Map other fields as we add them to the DB schema
+                        theme: dbData.theme,
+                        webhookUrl: dbData.webhook_url || '',
+                        webhookEnabled: dbData.webhook_enabled ?? true,
+                        // Map new preference columns
+                        emailNotifications: dbData.email_notifications ?? true,
+                        whatsappNotifications: dbData.whatsapp_notifications ?? false, // Map from DB
+                        workOrderAlerts: dbData.work_order_alerts ?? true,
+                        criticalAlerts: dbData.critical_alerts ?? true,
+                        dailyReport: dbData.daily_report ?? true
                     };
 
                     const next = { ...prev, ...dbSettings };
@@ -133,53 +144,93 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
             return next;
         });
-
-        // We defer the DB save to saveSettings or handle it here if requested
-        // For now, let's auto-save to DB if it's a critical change
     };
 
-    const saveSettings = async () => {
+    const saveSettings = async (currentSettings?: AppSettings) => {
         setIsSaving(true);
+        const settingsToSave = currentSettings || settings;
+        console.log('Attempting to save settings (RPC):', settingsToSave);
+
         try {
             // Save to Local Storage
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(settingsToSave));
 
-            // Save to Database
-            // First check if we have a row
-            const { data: existing } = await supabase
-                .from('app_settings')
-                .select('id')
-                .single();
-
-            const dbPayload = {
-                company_name: settings.companyName,
-                company_logo: settings.companyLogo,
-                theme: settings.theme,
-                updated_at: new Date().toISOString()
+            // Save to Database using RPC to bypass RLS complexity
+            const rpcParams: UpdateAppSettingsParams = {
+                p_company_name: settingsToSave.companyName,
+                p_company_logo: settingsToSave.companyLogo,
+                p_theme: settingsToSave.theme,
+                p_webhook_url: settingsToSave.webhookUrl || '',
+                p_webhook_enabled: settingsToSave.webhookEnabled,
+                p_email_notifications: settingsToSave.emailNotifications,
+                p_whatsapp_notifications: settingsToSave.whatsappNotifications,
+                p_work_order_alerts: settingsToSave.workOrderAlerts,
+                p_critical_alerts: settingsToSave.criticalAlerts,
+                p_daily_report: settingsToSave.dailyReport
             };
 
-            if (existing) {
-                await supabase
-                    .from('app_settings')
-                    .update(dbPayload)
-                    .eq('id', existing.id);
-            } else {
-                await supabase
-                    .from('app_settings')
-                    .insert(dbPayload);
+            const { error } = await supabase.rpc('update_app_settings' as any, rpcParams as any);
+
+            if (error) {
+                console.error('Error saving to DB (RPC):', error);
+                throw error;
             }
+
+            // Force state update to ensure consistency
+            setSettings(settingsToSave);
 
             setTimeout(() => {
                 setIsSaving(false);
             }, 500);
-        } catch (e) {
-            console.error('Error saving settings:', e);
+        } catch (e: unknown) {
+            console.error('Unexpected error saving settings:', e);
+            const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
+            alert(`Erro ao salvar configurações: ${errorMessage}`);
             setIsSaving(false);
         }
     };
 
+    const uploadLogo = async (file: File | string | null) => {
+        try {
+            let logoUrl: string | null = null;
+
+            if (file instanceof File) {
+                // Upload to Supabase Storage
+                const fileExt = file.name.split('.').pop();
+                const fileName = `company-logo-${Date.now()}.${fileExt}`;
+                const filePath = `${fileName}`;
+
+                const { error: uploadError } = await supabase.storage
+                    .from('logos')
+                    .upload(filePath, file);
+
+                if (uploadError) {
+                    throw uploadError;
+                }
+
+                const { data } = supabase.storage
+                    .from('logos')
+                    .getPublicUrl(filePath);
+
+                logoUrl = data.publicUrl;
+            } else {
+                logoUrl = file; // Handle null or string case
+            }
+
+            const newSettings = { ...settings, companyLogo: logoUrl };
+            setSettings(newSettings);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+
+            // Immediately save to DB
+            await saveSettings(newSettings);
+        } catch (error) {
+            console.error('Error uploading logo:', error);
+            alert('Erro ao fazer upload da logo. Tente novamente.');
+        }
+    };
+
     return (
-        <SettingsContext.Provider value={{ settings, updateSettings, saveSettings, isSaving, loading }}>
+        <SettingsContext.Provider value={{ settings, updateSettings, saveSettings, uploadLogo, isSaving, loading }}>
             {children}
         </SettingsContext.Provider>
     );

@@ -566,7 +566,7 @@ const Dashboard = () => {
                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
                       <td className="px-6 py-4 font-mono text-slate-500">#OS-{order.id}</td>
                       <td className="px-6 py-4 font-medium text-slate-900">{order.asset_name}</td>
-                      <td className="px-6 py-4">{order.issue}</td> {/* Corrected here */}
+                      <td className="px-6 py-4">{order.issue}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                           {order.status}
