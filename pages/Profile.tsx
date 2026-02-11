@@ -54,10 +54,22 @@ const Profile = () => {
 
     // Notifications Settings State
     const [notificationSettings, setNotificationSettings] = useState({
-        email: true,
-        push: true,
-        marketing: false
+        email: user?.email_notifications ?? true,
+        push: user?.push_notifications ?? true,
+        whatsapp: user?.whatsapp_notifications ?? false
     });
+
+    // Update state when user context changes
+    useEffect(() => {
+        if (user) {
+            setNotificationSettings(prev => ({
+                ...prev,
+                email: user.email_notifications ?? true,
+                push: user.push_notifications ?? true,
+                whatsapp: user.whatsapp_notifications ?? false
+            }));
+        }
+    }, [user]);
 
     // Sincronizar com contexto global quando ele mudar
     useEffect(() => {
@@ -187,15 +199,37 @@ const Profile = () => {
         }
     };
 
-    // Notification Logic (Mock)
-    const handleSaveNotifications = () => {
-        setIsSaving(true);
-        // Simular salvamento
-        setTimeout(() => {
-            setIsSaving(false);
+    // Notification Logic
+    const handleSaveNotifications = async () => {
+        try {
+            setIsSaving(true);
+
+            const { error } = await supabase
+                .from('users')
+                .update({
+                    email_notifications: notificationSettings.email,
+                    whatsapp_notifications: notificationSettings.whatsapp,
+                    push_notifications: notificationSettings.push
+                })
+                .eq('id', user?.id);
+
+            if (error) throw error;
+
+            alert('Preferências de notificação salvas com sucesso!');
             setShowNotificationsModal(false);
-            alert('Preferências de notificação salvas!');
-        }, 1000);
+
+            // Optional: Force a page reload or context refresh if needed, 
+            // but for now we rely on the DB update being enough. 
+            // The AuthContext doesn't auto-refresh on external updates easily without a function.
+            // For a better UX, we might want to reload the window or add a refreshUser method to AuthContext.
+            window.location.reload();
+
+        } catch (error) {
+            console.error('Erro ao salvar notificações:', error);
+            alert('Erro ao salvar preferências. Tente novamente.');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -620,18 +654,18 @@ const Profile = () => {
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                     <div className="p-2 bg-green-50 text-green-600 rounded-lg">
-                                        <Smartphone size={20} />
+                                        <WhatsappIcon size={20} />
                                     </div>
                                     <div>
-                                        <p className="font-medium text-slate-900">Alertas de Marketing</p>
-                                        <p className="text-sm text-slate-500">Novidades e atualizações do sistema</p>
+                                        <p className="font-medium text-slate-900">Notificações por WhatsApp</p>
+                                        <p className="text-sm text-slate-500">Receber atualizações via WhatsApp</p>
                                     </div>
                                 </div>
                                 <label className="relative inline-flex items-center cursor-pointer">
                                     <input
                                         type="checkbox"
-                                        checked={notificationSettings.marketing}
-                                        onChange={e => setNotificationSettings({ ...notificationSettings, marketing: e.target.checked })}
+                                        checked={notificationSettings.whatsapp}
+                                        onChange={e => setNotificationSettings({ ...notificationSettings, whatsapp: e.target.checked })}
                                         className="sr-only peer"
                                     />
                                     <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>

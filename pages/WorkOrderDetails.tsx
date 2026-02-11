@@ -169,7 +169,7 @@ const WorkOrderDetails = () => {
             .update({
                technician_id: selectedTechId || null,
                status: status,
-               subject: editIssue,
+               issue: editIssue,
                priority: editPriority,
                hourly_rate: hourlyRate,
                updated_at: new Date().toISOString()
@@ -199,7 +199,7 @@ const WorkOrderDetails = () => {
          fetchOrderDetails();
       } catch (error) {
          console.error('Error updating order:', error);
-         alert('Erro ao salvar.');
+         alert(`Erro ao salvar: ${(error as any).message || 'Erro desconhecido'}`);
       } finally {
          setSaving(false);
       }

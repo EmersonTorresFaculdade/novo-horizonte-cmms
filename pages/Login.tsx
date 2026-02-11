@@ -246,8 +246,8 @@ const Login = () => {
 
           <div className="flex flex-col gap-4 text-center mt-8">
             <p className="text-xs text-slate-500">
-              © 2024 Novo Horizonte Indústria. Todos os direitos reservados.
-              <br />Versão do Sistema: v2.4.1
+              © {new Date().getFullYear()} Novo Horizonte Indústria. Todos os direitos reservados.
+              <br />Versão do Sistema: v1.0.0
             </p>
           </div>
         </div>

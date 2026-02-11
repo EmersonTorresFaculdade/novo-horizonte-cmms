@@ -58,12 +58,8 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
                 .select('*')
                 .order('created_at', { ascending: false });
 
-            // Admin comum vê apenas notificações tipo 'admin'
-            // Admin root vê todas
-            if (user.role === 'admin') {
-                query = query.eq('recipient_role', 'admin');
-            }
-            // Admin_root vê todas (não precisa filtrar)
+            // Removed deprecated recipient_role filter to allow personal notifications
+
 
             const { data, error } = await query;
 
@@ -112,10 +108,8 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
                 .update({ is_read: true })
                 .eq('is_read', false);
 
-            // Filtrar por role se for admin comum
-            if (user.role === 'admin') {
-                query = query.eq('recipient_role', 'admin');
-            }
+            // Removed deprecated filter
+
 
             const { error } = await query;
 

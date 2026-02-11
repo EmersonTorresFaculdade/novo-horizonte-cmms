@@ -16,6 +16,9 @@ export interface User {
     avatar_url?: string;
     created_at: string;
     last_login?: string;
+    email_notifications?: boolean;
+    whatsapp_notifications?: boolean;
+    push_notifications?: boolean;
 }
 
 interface AuthContextType {
