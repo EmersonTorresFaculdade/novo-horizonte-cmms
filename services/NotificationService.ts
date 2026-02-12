@@ -38,8 +38,8 @@ export const NotificationService = {
                     event,
                     workOrder: {
                         ...workOrder,
-                        // Ensure URL is absolute
-                        url: `${window.location.origin}/work-orders/${workOrder.id}`
+                        // Include hash router for production compatibility
+                        url: `${window.location.origin}/#/work-orders/${workOrder.id}`
                     },
                     // Company name will be fetched by Edge Function from DB
                 }
