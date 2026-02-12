@@ -10,6 +10,7 @@ interface WorkOrderPayload {
     locationId: string;
     assignedTo?: string;
     requesterId?: string; // ID of the user who requested the work order
+    technical_report?: string;
 }
 
 export const NotificationService = {

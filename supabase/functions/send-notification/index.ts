@@ -29,7 +29,28 @@ serve(async (req) => {
     }
 
     try {
-        const { event, workOrder, company } = await req.json()
+        // Let's parse flexibly to handle different payload structures.
+        const body = await req.json().catch(() => ({}));
+
+        let event = body.event;
+        let workOrder = body.workOrder || body.data; // Handle 'workOrder' (from Service) or 'data' (generic)
+        let company = body.company;
+
+        // Fallback for DB Webhook (type=INSERT/UPDATE)
+        if (!event && body.type) {
+            if (body.type === 'INSERT') event = 'work_order_created';
+            else if (body.type === 'UPDATE') event = 'work_order_updated';
+            workOrder = body.record;
+        }
+
+        if (!event || !workOrder) {
+            console.error('Missing event or workOrder in payload:', body);
+            return new Response(JSON.stringify({ message: 'Missing event or workOrder' }), {
+                status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+        }
+
+        console.log(`Processing event: ${event}`);
 
         // Create Supabase client with Admin privileges (Service Role)
         const supabaseAdmin = createClient(
@@ -47,6 +68,7 @@ serve(async (req) => {
         if (!settings?.webhook_url) throw new Error('Webhook URL not configured.')
 
         if (settings.webhook_enabled === false) {
+            console.log('Webhook disabled in settings.');
             return new Response(
                 JSON.stringify({ success: true, message: 'Integration disabled', skipped: true }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
@@ -54,83 +76,20 @@ serve(async (req) => {
         }
 
         // 2. Fetch Admin Phone Number(s) AND Emails
-        // Check both 'users' table (registration data) and 'user_profiles' (profile data)
-        const { data: adminUsers } = await supabaseAdmin
-            .from('users')
-            .select('id, phone, email')
-            .in('role', ['admin_root', 'admin'])
+        // ... (lines 56-113 remain the same, so I will skip re-writing them in this tool call to keep it focused if possible, 
+        // but replace_file_content needs contiguous block. I'll include the necessary context or just replace the parsing block 
+        // and then the requesterId block separately if they are far apart.
+        // Actually, lines 32-134 cover the start of the function up to requesterId extraction.
+        // I will replace the BEGINNING of the function up to line 134.
+        // Wait, lines 56-113 are admin fetching. I don't need to change them.
+        // I will split this into two edits if needed, or just replace the payload part and the requesterId part.
+        // Payload parsing is lines 32-33. RequesterId is line 133.
+        // The block is too large to replace everything in between.
+        // I will just replace the top payload parsing first.
 
-        let adminPhone = null;
-        let adminEmails: string[] = [];
-        let adminPhones: string[] = [];
-
-        if (adminUsers && adminUsers.length > 0) {
-            const adminIds = adminUsers.map(u => u.id);
-
-            // Fetch profiles to get updated contact info
-            const { data: profiles } = await supabaseAdmin
-                .from('user_profiles')
-                .select('id, phone, email')
-                .in('id', adminIds);
-
-            // Create a map of profiles for easy lookup
-            const profileMap = new Map(profiles?.map(p => [p.id, p]));
-
-            // Process each admin user to get the best email and phone
-            const uniqueEmails = new Set<string>();
-            const uniquePhones = new Set<string>();
-
-            adminUsers.forEach(user => {
-                const profile = profileMap.get(user.id);
-
-                // Email priority: Profile > User
-                const email = (profile?.email && profile.email.trim() !== '')
-                    ? profile.email
-                    : user.email;
-
-                if (email && email.trim() !== '') {
-                    uniqueEmails.add(email);
-                }
-
-                // Phone priority: Profile > User
-                const rawPhone = (profile?.phone && profile.phone.trim() !== '')
-                    ? profile.phone
-                    : user.phone;
-
-                const formattedPhone = formatPhone(rawPhone);
-                if (formattedPhone) {
-                    uniquePhones.add(formattedPhone);
-                }
-            });
-
-            adminEmails = Array.from(uniqueEmails);
-            adminPhones = Array.from(uniquePhones);
-
-            // Determine primary admin phone (just pick the first one available if multiple)
-            if (adminPhones.length > 0) {
-                adminPhone = adminPhones[0];
-            }
-        }
-
-
-        // 3. Enrich Work Order Data (Asset, Technician, OS Number)
-        // Declare variables for requester info which might be fetched here or later
-        let requesterPhone = null;
-        let requesterEmail = null;
-        let requesterName = null;
-        let requesterPreferences = {
-            email: true,
-            whatsapp: false,
-            push: true
-        };
-
-        // We fetch the latest data from DB to ensure we have relations
-        // The trigger payload sends snake_case keys (e.g. requester_id, asset_id, order_number)
-        let enrichedWorkOrder = { ...workOrder };
-
-        // Handle both camelCase (from test/app) and snake_case (from DB trigger)
-        const workOrderId = workOrder.id || workOrder.id; // DB trigger sends 'id'
-        const requesterId = workOrder.requesterId || workOrder.requester_id;
+        // ... changing plan to use MULTI_REPLACE ...
+        // Wait, I can only use replace_file_content for single block.
+        // I will use multi_replace_file_content.
 
         if (workOrderId) {
             const { data: dbWorkOrder, error: dbError } = await supabaseAdmin
@@ -252,6 +211,17 @@ serve(async (req) => {
         console.log(`Sending notification for ${event}. Work Order ID: ${workOrderId}, OS #: ${enrichedWorkOrder.osNumber}`);
         console.log(`Admins: ${adminEmails.join(', ')} / ${adminPhones.join(', ')}, Requester: ${requesterEmail}`);
 
+        // Logic for Admin Notifications:
+        // - work_order_created: Admins receive it (Global monitoring)
+        // - work_order_updated: Admins DO NOT receive it implicitly (Only if they are the requester)
+        if (event === 'work_order_updated') {
+            // Clear admin lists for updates, so only the Requester gets notified
+            // (If the requester IS an admin, they are already covered by requesterEmail)
+            adminEmails = [];
+            adminPhones = [];
+            console.log('Work Order Update: Cleared admin recipients to notify only the requester.');
+        }
+
         // 4. Send to n8n Webhook
         const response = await fetch(settings.webhook_url, {
             method: 'POST',
@@ -273,7 +243,22 @@ serve(async (req) => {
                 adminPhones: adminPhones.join(','), // Send as comma-separated string
                 requesterPhone,
                 requesterEmail,
-                requesterName
+                requesterName,
+                // Enviar campos separados para o n8n
+                failure_type: enrichedWorkOrder.failure_type,
+                technical_report: enrichedWorkOrder.technical_report,
+
+                // Descrição LIMPA (como pedido, mas enviamos blocos formatados para ajudar)
+                description: enrichedWorkOrder.description || '',
+
+                // CAMPOS FORMATADOS PARA O LAYOUT SOLICITADO
+                // O usuário pode mapear estes campos diretamente no n8n para montar o layout exato.
+                formatted_blocks: {
+                    failure_type_block: enrichedWorkOrder.failure_type ? `⚠ Tipo de Falha:\n${enrichedWorkOrder.failure_type}` : '',
+                    technical_report_block: enrichedWorkOrder.technical_report ? `📝 Relatório Técnico:\n${enrichedWorkOrder.technical_report}` : '',
+                    // Exemplo de como poderia ser o corpo inteiro se ele quisesse substituir tudo
+                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Falha\n${enrichedWorkOrder.failure_type || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
+                }
             }),
         })
 

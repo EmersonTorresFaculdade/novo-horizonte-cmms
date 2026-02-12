@@ -20,7 +20,9 @@ import { NotificationService } from '../services/NotificationService';
 interface WorkOrder {
    id: string;
    order_number: string;
-   issue: string;
+   issue: string; // Descrição limpa
+   failure_type: string; // Novo campo
+   technical_report?: string; // Novo campo
    status: string;
    priority: string;
    hourly_rate?: number;
@@ -96,6 +98,7 @@ const WorkOrderDetails = () => {
    // Edit Fields (Admin)
    const [editIssue, setEditIssue] = useState('');
    const [editPriority, setEditPriority] = useState('');
+   const [editFailureType, setEditFailureType] = useState('');
 
    const [saving, setSaving] = useState(false);
 
@@ -129,6 +132,8 @@ const WorkOrderDetails = () => {
          setStatus(workOrderData.status);
          setEditIssue(workOrderData.issue);
          setEditPriority(workOrderData.priority);
+         setEditFailureType(workOrderData.failure_type || 'mecanica'); // Default fallback
+         setReport(workOrderData.technical_report || ''); // Populate report state
          setHourlyRate(workOrderData.hourly_rate || 0);
 
          if (workOrderData.technician_id) setSelectedTechId(workOrderData.technician_id);
@@ -171,6 +176,8 @@ const WorkOrderDetails = () => {
                status: status,
                issue: editIssue,
                priority: editPriority,
+               failure_type: editFailureType,
+               technical_report: report,
                hourly_rate: hourlyRate,
                updated_at: new Date().toISOString()
             })
@@ -189,7 +196,8 @@ const WorkOrderDetails = () => {
                assetId: workOrder.asset_id,
                locationId: '',
                assignedTo: selectedTechId || undefined,
-               requesterId: workOrder.requester_id || undefined
+               requesterId: workOrder.requester_id || undefined,
+               technical_report: report
             });
          }
 
@@ -310,29 +318,31 @@ const WorkOrderDetails = () => {
                   {isAdmin && <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px] flex items-center gap-1"><Pencil size={10} /> Editável</span>}
                </p>
 
-               {/* Priority Badge / Selector */}
-               {isAdmin ? (
-                  <select
-                     value={editPriority}
-                     onChange={(e) => setEditPriority(e.target.value)}
-                     disabled={!isEditing}
-                     className={`text-xs font-bold uppercase border rounded px-2 py-1 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
+               <div className="flex items-center gap-2">
+                  {/* Priority Badge / Selector */}
+                  {isAdmin ? (
+                     <select
+                        value={editPriority}
+                        onChange={(e) => setEditPriority(e.target.value)}
+                        disabled={!isEditing}
+                        className={`text-xs font-bold uppercase border rounded px-2 py-1 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
                         ${editPriority === 'Alta' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                           editPriority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' :
-                              'bg-blue-100 text-blue-800 border-blue-200'}`}
-                  >
-                     <option value="Baixa">Prioridade: Baixa</option>
-                     <option value="Média">Prioridade: Média</option>
-                     <option value="Alta">Prioridade: Alta</option>
-                     <option value="Crítica">Prioridade: Crítica</option>
-                  </select>
-               ) : (
-                  <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ml-2
-                     ${workOrder.priority === 'Alta' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                        workOrder.priority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
-                     Prioridade: {workOrder.priority}
-                  </span>
-               )}
+                              editPriority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' :
+                                 'bg-blue-100 text-blue-800 border-blue-200'}`}
+                     >
+                        <option value="Baixa">Prioridade: Baixa</option>
+                        <option value="Média">Prioridade: Média</option>
+                        <option value="Alta">Prioridade: Alta</option>
+                        <option value="Crítica">Prioridade: Crítica</option>
+                     </select>
+                  ) : (
+                     <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ml-2
+                      ${workOrder.priority === 'Alta' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                           workOrder.priority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
+                        Prioridade: {workOrder.priority}
+                     </span>
+                  )}
+               </div>
             </div>
 
             {isAdmin ? (
@@ -369,6 +379,22 @@ const WorkOrderDetails = () => {
                      <option>Aguardando Peça</option>
                      <option>Concluído</option>
                      <option>Cancelado</option>
+                  </select>
+               </div>
+
+               <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Tipo de Falha</label>
+                  <select
+                     value={editFailureType}
+                     onChange={(e) => setEditFailureType(e.target.value)}
+                     disabled={!isEditing}
+                     className="w-full p-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none disabled:bg-slate-50 disabled:text-slate-500 capitalize"
+                  >
+                     <option value="mecanica">Mecânica</option>
+                     <option value="eletrica">Elétrica</option>
+                     <option value="hidraulica">Hidráulica</option>
+                     <option value="software">Software</option>
+                     <option value="outro">Outro</option>
                   </select>
                </div>
             </div>

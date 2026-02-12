@@ -12,10 +12,7 @@ interface Asset {
   sector: string;
 }
 
-interface Technician {
-  id: string;
-  name: string;
-}
+
 
 const NewWorkOrder = () => {
   const navigate = useNavigate();
@@ -25,21 +22,21 @@ const NewWorkOrder = () => {
 
   // Data State
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [technicians, setTechnicians] = useState<Technician[]>([]);
+
 
   // Form State
   const [selectedAssetId, setSelectedAssetId] = useState('');
-  const [selectedTechId, setSelectedTechId] = useState('');
+
   const [issueDescription, setIssueDescription] = useState('');
   const [failureType, setFailureType] = useState('mecanica');
 
   useEffect(() => {
     const fetchData = async () => {
       const { data: assetsData } = await supabase.from('assets').select('id, name, sector');
-      const { data: techData } = await supabase.from('technicians').select('id, name');
+
 
       if (assetsData) setAssets(assetsData);
-      if (techData) setTechnicians(techData);
+      if (assetsData) setAssets(assetsData);
     };
     fetchData();
   }, []);
@@ -60,10 +57,11 @@ const NewWorkOrder = () => {
 
       const payload = {
         asset_id: selectedAssetId,
-        technician_id: selectedTechId || null,
+        technician_id: null,
         priority: priority, // Sends 'Baixa', 'Média', or 'Alta'
         status: 'Pendente',
-        issue: `[${failureType.toUpperCase()}] ${issueDescription}`,
+        issue: issueDescription, // Apenas a descrição limpa
+        failure_type: failureType, // Novo campo
         sector: asset?.sector || 'Geral',
         order_number: orderNumber,
         date: new Date().toISOString(),
@@ -90,7 +88,7 @@ const NewWorkOrder = () => {
           status: 'Pendente',
           assetId: selectedAssetId,
           locationId: '', // Todo: fetch location if needed
-          assignedTo: selectedTechId,
+          assignedTo: null,
           requesterId: user?.id
         });
       }
@@ -164,23 +162,7 @@ const NewWorkOrder = () => {
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-              <User size={16} />
-              Técnico Responsável (Opcional)
-            </label>
-            <select
-              value={selectedTechId}
-              onChange={(e) => setSelectedTechId(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-            >
-              <option value="">-- Não atribuir técnico agora --</option>
-              {technicians.map((tech) => (
-                <option key={tech.id} value={tech.id}>{tech.name}</option>
-              ))}
-            </select>
-            <p className="text-xs text-slate-500">Você pode atribuir um técnico posteriormente se preferir.</p>
-          </div>
+
 
           <div className="space-y-2">
             <label className="text-sm font-semibold text-slate-900">Nível de Prioridade <span className="text-red-500">*</span></label>

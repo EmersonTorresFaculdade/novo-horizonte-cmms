@@ -36,20 +36,13 @@ const Calendar = () => {
   const [loading, setLoading] = useState(true);
 
   // Modal States
-  const [showAddModal, setShowAddModal] = useState(false);
+
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
 
   // Form Data
   const [assets, setAssets] = useState<Asset[]>([]);
   const [technicians, setTechnicians] = useState<Technician[]>([]);
-  const [newEvent, setNewEvent] = useState({
-    title: '',
-    asset_id: '',
-    technician_id: '',
-    date: '',
-    priority: 'Média',
-    type: 'preventiva'
-  });
+
 
   // Fetch Data on Mount
   useEffect(() => {
@@ -148,46 +141,7 @@ const Calendar = () => {
     setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
   };
 
-  const handleAddSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (!newEvent.title || !newEvent.asset_id || !newEvent.date) {
-        alert('Preencha os campos obrigatórios.');
-        return;
-      }
 
-      const orderNumber = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
-      const { error } = await supabase.from('work_orders').insert([{
-        asset_id: newEvent.asset_id,
-        technician_id: newEvent.technician_id || null,
-        priority: newEvent.priority,
-        status: 'Pendente',
-        issue: newEvent.title,
-        order_number: orderNumber,
-        date: new Date(newEvent.date).toISOString(),
-        created_at: new Date().toISOString()
-      }]);
-
-      if (error) throw error;
-
-      alert('Agendamento criado com sucesso!');
-      setShowAddModal(false);
-      fetchEvents(); // Refresh
-      // Reset form
-      setNewEvent({
-        title: '',
-        asset_id: '',
-        technician_id: '',
-        date: '',
-        priority: 'Média',
-        type: 'preventiva'
-      });
-
-    } catch (error: any) {
-      console.error('Error creating schedule:', error);
-      alert('Erro ao agendar: ' + error.message);
-    }
-  };
 
   // Calendar Helpers
   const getDaysInMonth = (date: Date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -229,12 +183,7 @@ const Calendar = () => {
             <span className="px-4 font-bold text-slate-800 min-w-[140px] text-center">{capitalizedMonthName}</span>
             <button onClick={handleNextMonth} className="p-2 hover:bg-slate-100 rounded-md text-slate-600"><ChevronRight size={20} /></button>
           </div>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="bg-primary hover:bg-primary-dark text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm"
-          >
-            <Plus size={18} /> Agendar
-          </button>
+
         </div>
       </div>
 
@@ -264,10 +213,7 @@ const Calendar = () => {
               <div
                 key={day}
                 className={`bg-white p-2 min-h-[100px] hover:bg-slate-50 transition-colors cursor-pointer group relative ${isCurrentDay ? 'bg-blue-50/30' : ''}`}
-                onClick={() => {
-                  // Optional: Click empty cell to add event for that day
-                  setNewEvent(prev => ({ ...prev, date: new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split('T')[0] }));
-                }}
+
               >
                 <div className="flex justify-between items-start">
                   <span className={`text-sm font-medium size-7 flex items-center justify-center rounded-full ${isCurrentDay ? 'bg-primary text-white' : 'text-slate-700'}`}>
@@ -289,17 +235,7 @@ const Calendar = () => {
                   ))}
                 </div>
 
-                {/* Hover Add Button */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setNewEvent(prev => ({ ...prev, date: new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toISOString().split('T')[0] }));
-                    setShowAddModal(true);
-                  }}
-                  className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-slate-100 text-slate-400 opacity-0 group-hover:opacity-100 hover:text-primary hover:bg-primary/10 transition-all"
-                >
-                  <Plus size={14} />
-                </button>
+
               </div>
             );
           })}
@@ -311,82 +247,7 @@ const Calendar = () => {
         </div>
       </div>
 
-      {/* Add Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-              <h3 className="font-bold text-slate-800">Novo Agendamento</h3>
-              <button onClick={() => setShowAddModal(false)} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
-            </div>
-            <form onSubmit={handleAddSubmit} className="p-6 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Descrição do Serviço</label>
-                <input
-                  type="text"
-                  value={newEvent.title}
-                  onChange={e => setNewEvent({ ...newEvent, title: e.target.value })}
-                  className="w-full rounded-lg border-slate-300 focus:border-primary focus:ring-primary"
-                  placeholder="Ex: Manutenção Preventiva"
-                  required
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Data</label>
-                  <input
-                    type="date"
-                    value={newEvent.date}
-                    onChange={e => setNewEvent({ ...newEvent, date: e.target.value })}
-                    className="w-full rounded-lg border-slate-300 focus:border-primary focus:ring-primary"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Prioridade</label>
-                  <select
-                    value={newEvent.priority}
-                    onChange={e => setNewEvent({ ...newEvent, priority: e.target.value })}
-                    className="w-full rounded-lg border-slate-300 focus:border-primary focus:ring-primary"
-                  >
-                    <option value="Baixa">Baixa</option>
-                    <option value="Média">Média</option>
-                    <option value="Alta">Alta</option>
-                    <option value="Crítica">Crítica</option>
-                  </select>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Equipamento</label>
-                <select
-                  value={newEvent.asset_id}
-                  onChange={e => setNewEvent({ ...newEvent, asset_id: e.target.value })}
-                  className="w-full rounded-lg border-slate-300 focus:border-primary focus:ring-primary"
-                  required
-                >
-                  <option value="">Selecione...</option>
-                  {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Técnico (Opcional)</label>
-                <select
-                  value={newEvent.technician_id}
-                  onChange={e => setNewEvent({ ...newEvent, technician_id: e.target.value })}
-                  className="w-full rounded-lg border-slate-300 focus:border-primary focus:ring-primary"
-                >
-                  <option value="">Selecione...</option>
-                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <button type="button" onClick={() => setShowAddModal(false)} className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg">Cancelar</button>
-                <button type="submit" className="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg">Agendar</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+
 
       {/* Event Details Modal */}
       {selectedEvent && (

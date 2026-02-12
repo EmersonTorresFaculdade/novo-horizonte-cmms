@@ -22,6 +22,7 @@ interface WorkOrder {
   id: string;
   order_number: string;
   issue: string; // desc
+  failure_type: string;
   status: string;
   priority: string;
   sector: string;
@@ -58,6 +59,7 @@ const WorkOrders = () => {
         .from('work_orders')
         .select(`
                 *,
+                failure_type,
                 assets (name, model),
                 technicians (name)
             `)
@@ -220,6 +222,7 @@ const WorkOrders = () => {
                       <tr className="bg-slate-50/50 border-b border-slate-100">
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">ID</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Máquina</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Tipo</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Problema</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Setor</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Prioridade</th>
@@ -237,6 +240,11 @@ const WorkOrders = () => {
                               <span className="text-sm font-semibold text-slate-900">{order.assets?.name}</span>
                               <span className="text-xs text-slate-500">{order.assets?.model}</span>
                             </div>
+                          </td>
+                          <td className="p-4">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200 capitalize">
+                              {order.failure_type || 'Geral'}
+                            </span>
                           </td>
                           <td className="p-4 text-sm text-slate-700">{order.issue}</td>
                           <td className="p-4 text-sm text-slate-700">{order.sector}</td>
@@ -330,6 +338,11 @@ const WorkOrders = () => {
                           )}
                         </div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{card.assets?.name}</h4>
+                        <div className="mb-2">
+                          <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {card.failure_type || 'Geral'}
+                          </span>
+                        </div>
                         <p className="text-xs text-slate-500 line-clamp-2 mb-2">{card.issue}</p>
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">
                           <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(card.priority)}`}>{card.priority}</span>

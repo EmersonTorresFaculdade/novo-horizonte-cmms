@@ -8,6 +8,8 @@ export interface WorkOrder {
   technicianAvatar?: string;
   date: string;
   sector: string;
+  failure_type: string;
+  technical_report?: string;
 }
 
 export interface Technician {
