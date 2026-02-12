@@ -16,6 +16,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { NotificationService } from '../services/NotificationService';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface WorkOrder {
    id: string;
@@ -101,6 +102,13 @@ const WorkOrderDetails = () => {
    const [editFailureType, setEditFailureType] = useState('');
 
    const [saving, setSaving] = useState(false);
+   const [feedback, setFeedback] = useState<{
+      type: 'success' | 'error' | 'confirm' | 'info';
+      title: string;
+      message: string;
+      onConfirm?: () => void;
+      showLoading?: boolean;
+   } | null>(null);
 
    useEffect(() => {
       if (id) {
@@ -201,13 +209,26 @@ const WorkOrderDetails = () => {
             });
          }
 
-         alert('Alterações salvas com sucesso!');
-         // Navigate back to details view
-         navigate(`/work-orders/${id}`);
-         fetchOrderDetails();
+         // Mostra o modal de sucesso com visual premium
+         setFeedback({
+            type: 'success',
+            title: 'Salvo com Sucesso!',
+            message: 'As alterações da Ordem de Serviço foram registradas.',
+            showLoading: true
+         });
+
+         // Redireciona após 2.5 segundos
+         setTimeout(() => {
+            navigate('/work-orders');
+         }, 2500);
+
       } catch (error) {
          console.error('Error updating order:', error);
-         alert(`Erro ao salvar: ${(error as any).message || 'Erro desconhecido'}`);
+         setFeedback({
+            type: 'error',
+            title: 'Erro ao Salvar',
+            message: (error as any).message || 'Ocorreu um erro inesperado ao salvar as alterações.'
+         });
       } finally {
          setSaving(false);
       }
@@ -231,24 +252,38 @@ const WorkOrderDetails = () => {
          setPartQuantity(1);
       } catch (error) {
          console.error('Error adding part:', error);
-         alert('Erro ao adicionar peça.');
+         setFeedback({
+            type: 'error',
+            title: 'Erro na Peça',
+            message: 'Não foi possível adicionar a peça ao estoque da Ordem de Serviço.'
+         });
       }
    };
 
    const handleRemovePart = async (partId: string) => {
-      if (!confirm('Tem certeza que deseja remover esta peça?')) return;
-      try {
-         const { error } = await supabase
-            .from('work_order_parts')
-            .delete()
-            .eq('id', partId);
+      setFeedback({
+         type: 'confirm',
+         title: 'Remover Peça?',
+         message: 'Tem certeza que deseja remover esta peça desta Ordem de Serviço?',
+         onConfirm: async () => {
+            try {
+               const { error } = await supabase
+                  .from('work_order_parts')
+                  .delete()
+                  .eq('id', partId);
 
-         if (error) throw error;
-         fetchOrderDetails();
-      } catch (error) {
-         console.error('Error removing part:', error);
-         alert('Erro ao remover peça.');
-      }
+               if (error) throw error;
+               fetchOrderDetails();
+            } catch (error) {
+               console.error('Error removing part:', error);
+               setFeedback({
+                  type: 'error',
+                  title: 'Erro ao Remover',
+                  message: 'Ocorreu um erro ao tentar remover a peça.'
+               });
+            }
+         }
+      });
    };
 
    if (loading) return <div className="p-8 text-center">Carregando detalhes...</div>;
@@ -553,6 +588,18 @@ const WorkOrderDetails = () => {
                </div>
             )}
 
+            {/* Feedback Modal Reutilizável */}
+            {feedback && (
+               <FeedbackModal
+                  isOpen={!!feedback}
+                  onClose={() => setFeedback(null)}
+                  type={feedback.type}
+                  title={feedback.title}
+                  message={feedback.message}
+                  onConfirm={feedback.onConfirm}
+                  showLoadingDots={feedback.showLoading}
+               />
+            )}
          </div>
       </div>
    );

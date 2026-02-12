@@ -144,7 +144,7 @@ const NotificationBell = () => {
                         <div className="p-3 border-t border-slate-200 text-center">
                             <button
                                 onClick={() => {
-                                    navigate('/users/pending');
+                                    navigate('/notifications');
                                     setIsOpen(false);
                                 }}
                                 className="text-sm text-primary hover:text-green-700 font-medium"

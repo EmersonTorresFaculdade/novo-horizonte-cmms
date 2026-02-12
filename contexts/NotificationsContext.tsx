@@ -46,29 +46,37 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
     // Carregar notificações
     const loadNotifications = async () => {
-        if (!user || !isAdmin()) {
+        if (!user) {
             setNotifications([]);
             return;
         }
 
         setLoading(true);
         try {
-            let query = supabase
+            const { data, error } = await supabase
                 .from('notifications')
                 .select('*')
+                .or(`user_id.eq.${user.id},recipient_role.eq.${user.role}`)
                 .order('created_at', { ascending: false });
-
-            // Removed deprecated recipient_role filter to allow personal notifications
-
-
-            const { data, error } = await query;
 
             if (error) {
                 console.error('Error loading notifications:', error);
                 return;
             }
 
-            setNotifications(data || []);
+            // Deduplicar por ID e normalizar is_read
+            const uniqueNotifications = (data || []).reduce((acc: Notification[], current) => {
+                if (!acc.find(n => n.id === current.id)) {
+                    // Garantir que is_read seja boolean (tratar null como false)
+                    acc.push({
+                        ...current,
+                        is_read: !!current.is_read
+                    });
+                }
+                return acc;
+            }, []);
+
+            setNotifications(uniqueNotifications);
         } catch (error) {
             console.error('Error loading notifications:', error);
         } finally {
@@ -78,6 +86,11 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
     // Marcar como lida
     const markAsRead = async (id: string) => {
+        // Atualizar localmente IMEDIATAMENTE (Otimista)
+        setNotifications(prev =>
+            prev.map(n => n.id === id ? { ...n, is_read: true } : n)
+        );
+
         try {
             const { error } = await supabase
                 .from('notifications')
@@ -86,15 +99,13 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
             if (error) {
                 console.error('Error marking as read:', error);
+                // Re-carregar para garantir sincronia com o servidor em caso de erro
+                loadNotifications();
                 return;
             }
-
-            // Atualizar localmente
-            setNotifications(prev =>
-                prev.map(n => n.id === id ? { ...n, is_read: true } : n)
-            );
         } catch (error) {
             console.error('Error marking as read:', error);
+            loadNotifications();
         }
     };
 
@@ -102,33 +113,34 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
     const markAllAsRead = async () => {
         if (!user) return;
 
+        // Atualizar localmente IMEDIATAMENTE
+        setNotifications(prev =>
+            prev.map(n => ({ ...n, is_read: true }))
+        );
+
         try {
-            let query = supabase
+            const { error } = await supabase
                 .from('notifications')
                 .update({ is_read: true })
+                .or(`user_id.eq.${user.id},recipient_role.eq.${user.role}`)
                 .eq('is_read', false);
-
-            // Removed deprecated filter
-
-
-            const { error } = await query;
 
             if (error) {
                 console.error('Error marking all as read:', error);
+                loadNotifications();
                 return;
             }
-
-            // Atualizar localmente
-            setNotifications(prev =>
-                prev.map(n => ({ ...n, is_read: true }))
-            );
         } catch (error) {
             console.error('Error marking all as read:', error);
+            loadNotifications();
         }
     };
 
     // Deletar notificação
     const deleteNotification = async (id: string) => {
+        // Remover localmente IMEDIATAMENTE
+        setNotifications(prev => prev.filter(n => n.id !== id));
+
         try {
             const { error } = await supabase
                 .from('notifications')
@@ -137,13 +149,12 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
             if (error) {
                 console.error('Error deleting notification:', error);
+                loadNotifications();
                 return;
             }
-
-            // Remover localmente
-            setNotifications(prev => prev.filter(n => n.id !== id));
         } catch (error) {
             console.error('Error deleting notification:', error);
+            loadNotifications();
         }
     };
 
@@ -158,7 +169,7 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
         const interval = setInterval(loadNotifications, 30000);
 
         return () => clearInterval(interval);
-    }, [user]);
+    }, [user?.id, user?.role]); // Adicionado role como dependência se mudar
 
     const value: NotificationsContextType = {
         notifications,

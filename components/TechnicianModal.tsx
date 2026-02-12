@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Loader2, User, Briefcase, Phone, DollarSign } from 'lucide-react';
+import FeedbackModal from './FeedbackModal';
 
 interface TechnicianModalProps {
     isOpen: boolean;
@@ -30,6 +31,11 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
     });
     const [isSaving, setIsSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [feedback, setFeedback] = useState<{
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+    } | null>(null);
 
     useEffect(() => {
         if (technician) {
@@ -98,7 +104,11 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
             onClose();
         } catch (error) {
             console.error('Erro ao salvar técnico:', error);
-            alert('Erro ao salvar técnico. Tente novamente.');
+            setFeedback({
+                type: 'error',
+                title: 'Erro ao Salvar',
+                message: 'Ocorreu um erro ao tentar salvar os dados do técnico. Verifique sua conexão e tente novamente.'
+            });
         } finally {
             setIsSaving(false);
         }
@@ -291,6 +301,17 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                     </button>
                 </div>
             </div>
+
+            {/* Feedback Modal para Erros */}
+            {feedback && (
+                <FeedbackModal
+                    isOpen={!!feedback}
+                    onClose={() => setFeedback(null)}
+                    type={feedback.type}
+                    title={feedback.title}
+                    message={feedback.message}
+                />
+            )}
         </div>
     );
 };

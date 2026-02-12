@@ -4,6 +4,7 @@ import { ChevronRight, UploadCloud, AlertTriangle, CheckCircle2, Info, User, Loc
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationService } from '../services/NotificationService';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface Asset {
   id: string;
@@ -19,6 +20,12 @@ const NewWorkOrder = () => {
   const { user } = useAuth();
   const [priority, setPriority] = useState('Média'); // Default: Média (Capitalized + Accent)
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error' | 'confirm' | 'info';
+    title: string;
+    message: string;
+    showLoading?: boolean;
+  } | null>(null);
 
   // Data State
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -47,7 +54,11 @@ const NewWorkOrder = () => {
 
     try {
       if (!selectedAssetId || !issueDescription) {
-        alert('Preencha os campos obrigatórios (Equipamento e Descrição).');
+        setFeedback({
+          type: 'error',
+          title: 'Campos Obrigatórios',
+          message: 'Por favor, selecione um equipamento e descreva detalhadamente o problema.'
+        });
         setLoading(false);
         return;
       }
@@ -93,12 +104,26 @@ const NewWorkOrder = () => {
         });
       }
 
-      alert('Chamado aberto com sucesso!');
-      navigate('/work-orders');
+      // Mostra o modal de sucesso com visual premium
+      setFeedback({
+        type: 'success',
+        title: 'Chamado Aberto!',
+        message: 'Sua solicitação de manutenção foi registrada com sucesso.',
+        showLoading: true
+      });
+
+      // Redireciona após 2.5 segundos
+      setTimeout(() => {
+        navigate('/work-orders');
+      }, 2500);
 
     } catch (error: any) {
       console.error('Error creating work order:', error);
-      alert(`Erro ao abrir chamado: ${error.message || 'Erro desconhecido'} (Código: ${error.code})`);
+      setFeedback({
+        type: 'error',
+        title: 'Erro ao Abrir Chamado',
+        message: error.message || 'Ocorreu um erro ao tentar registrar o chamado no sistema.'
+      });
     } finally {
       setLoading(false);
     }
@@ -259,6 +284,18 @@ const NewWorkOrder = () => {
           </div>
         </form>
       </div>
+
+      {/* Feedback Modal Reutilizável */}
+      {feedback && (
+        <FeedbackModal
+          isOpen={!!feedback}
+          onClose={() => setFeedback(null)}
+          type={feedback.type}
+          title={feedback.title}
+          message={feedback.message}
+          showLoadingDots={feedback.showLoading}
+        />
+      )}
     </div>
   );
 };

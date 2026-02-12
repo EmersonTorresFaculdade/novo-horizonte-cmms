@@ -11,12 +11,14 @@ import {
   CalendarDays,
   ChevronDown,
   LogOut,
-  User
+  User,
+  Bell
 } from 'lucide-react';
 import { IMAGES } from '../constants';
 import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+import { useNotifications } from '../contexts/NotificationsContext';
 
 
 
@@ -26,6 +28,7 @@ const Sidebar = () => {
   const { profile } = useProfile();
   const { user } = useAuth();
   const { settings } = useSettings();
+  const { unreadCount } = useNotifications();
 
   // Função para obter label do role
   const getRoleLabel = () => {
@@ -137,6 +140,22 @@ const Sidebar = () => {
             >
               <Package size={20} />
               <span className="text-sm font-medium">Estoque</span>
+            </NavLink>
+
+            <NavLink
+              to="/notifications"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`
+              }
+            >
+              <Bell size={20} />
+              <span className="text-sm font-medium">Notificações</span>
+              {unreadCount > 0 && (
+                <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
             </NavLink>
 
             <div className="pt-4 pb-2 px-4">

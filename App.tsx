@@ -15,6 +15,7 @@ import Profile from './pages/Profile';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import UsersPending from './pages/UsersPending';
+import Notifications from './pages/Notifications';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
@@ -46,6 +47,7 @@ const App = () => {
                   <Route path="/work-orders/:id/edit" element={<WorkOrderDetails />} />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/calendar" element={<Calendar />} />
+                  <Route path="/notifications" element={<Notifications />} />
 
                   {/* Admin Only Routes */}
                   <Route path="/assets" element={

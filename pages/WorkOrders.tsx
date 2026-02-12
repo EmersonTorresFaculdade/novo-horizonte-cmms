@@ -14,9 +14,9 @@ import {
   Trash2,
   Pencil
 } from 'lucide-react';
-import { IMAGES } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface WorkOrder {
   id: string;
@@ -48,6 +48,12 @@ const WorkOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'maintenance' | 'waiting' | 'completed'>('all');
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error' | 'confirm' | 'info';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  } | null>(null);
 
   useEffect(() => {
     fetchOrders();
@@ -85,18 +91,32 @@ const WorkOrders = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation(); // Previne navegação ao clicar no delete
-    if (!confirm('Tem certeza que deseja excluir esta ordem de serviço? Isso não pode ser desfeito.')) return;
 
-    try {
-      const { error } = await supabase.from('work_orders').delete().eq('id', id);
-      if (error) throw error;
+    setFeedback({
+      type: 'confirm',
+      title: 'Excluir Ordem?',
+      message: 'Tem certeza que deseja excluir esta ordem de serviço? Esta ação removerá permanentemente o registro do banco de dados.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('work_orders').delete().eq('id', id);
+          if (error) throw error;
 
-      alert('Ordem de serviço excluída com sucesso.');
-      fetchOrders(); // Recarrega lista
-    } catch (error) {
-      console.error('Error deleting order:', error);
-      alert('Erro ao excluir ordem de serviço.');
-    }
+          setFeedback({
+            type: 'success',
+            title: 'Excluída!',
+            message: 'A ordem de serviço foi removida com sucesso.'
+          });
+          fetchOrders(); // Recarrega lista
+        } catch (error) {
+          console.error('Error deleting order:', error);
+          setFeedback({
+            type: 'error',
+            title: 'Erro ao Excluir',
+            message: 'Não foi possível remover a ordem de serviço no momento.'
+          });
+        }
+      }
+    });
   };
 
   const getPriorityColor = (p: string) => {
@@ -355,6 +375,18 @@ const WorkOrders = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Feedback Modal Reutilizável */}
+      {feedback && (
+        <FeedbackModal
+          isOpen={!!feedback}
+          onClose={() => setFeedback(null)}
+          type={feedback.type}
+          title={feedback.title}
+          message={feedback.message}
+          onConfirm={feedback.onConfirm}
+        />
       )}
     </div>
   );

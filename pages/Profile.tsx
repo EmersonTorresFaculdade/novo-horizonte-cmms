@@ -189,7 +189,7 @@ const Profile = () => {
             setTimeout(() => {
                 setShowPasswordModal(false);
                 setPasswordSuccess('');
-            }, 2000);
+            }, 3000);
 
         } catch (error: any) {
             console.error('Erro ao alterar senha:', error);

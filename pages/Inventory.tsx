@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { TrendingUp, AlertTriangle, Package, QrCode, Tag, DollarSign, Search, Edit, Trash2, Plus, Save, Eraser, Download, Loader2, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface InventoryItem {
     id: string;
@@ -18,6 +19,12 @@ const Inventory = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [isEditing, setIsEditing] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const [feedback, setFeedback] = useState<{
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+        onConfirm?: () => void;
+    } | null>(null);
 
     // Form State
     const [formData, setFormData] = useState({
@@ -65,7 +72,11 @@ const Inventory = () => {
             setItems(formattedData);
         } catch (error) {
             console.error('Erro ao carregar estoque:', error);
-            alert('Erro ao carregar estoque');
+            setFeedback({
+                type: 'error',
+                title: 'Erro de Carregamento',
+                message: 'Não foi possível carregar os itens do estoque.'
+            });
         } finally {
             setLoading(false);
         }
@@ -91,7 +102,11 @@ const Inventory = () => {
     const handleSave = async () => {
         try {
             if (!formData.sku || !formData.name) {
-                alert('Preencha SKU e Descrição.');
+                setFeedback({
+                    type: 'error',
+                    title: 'Campos Obrigatórios',
+                    message: 'O SKU e a Descrição da peça são obrigatórios.'
+                });
                 return;
             }
 
@@ -115,20 +130,32 @@ const Inventory = () => {
                     .update(payload)
                     .eq('id', editingId);
                 if (error) throw error;
-                alert('Peça atualizada com sucesso!');
+                setFeedback({
+                    type: 'success',
+                    title: 'Peça Atualizada',
+                    message: 'Os dados da peça foram atualizados no estoque.'
+                });
             } else {
                 const { error } = await supabase
                     .from('inventory_items')
                     .insert([payload]);
                 if (error) throw error;
-                alert('Peça cadastrada com sucesso!');
+                setFeedback({
+                    type: 'success',
+                    title: 'Peça Cadastrada',
+                    message: 'A nova peça foi adicionada ao inventário.'
+                });
             }
 
             resetForm();
             loadInventory();
         } catch (error: any) {
             console.error('Erro ao salvar:', error);
-            alert('Erro ao salvar: ' + (error.message || error));
+            setFeedback({
+                type: 'error',
+                title: 'Erro ao Salvar',
+                message: error.message || 'Ocorreu um erro ao tentar salvar os dados da peça.'
+            });
         }
     };
 
@@ -146,21 +173,34 @@ const Inventory = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Tem certeza que deseja excluir esta peça?')) return;
+        setFeedback({
+            type: 'confirm',
+            title: 'Excluir Peça?',
+            message: 'Deseja realmente remover esta peça do inventário? Esta ação é permanente.',
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('inventory_items')
+                        .delete()
+                        .eq('id', id);
 
-        try {
-            const { error } = await supabase
-                .from('inventory_items')
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-            alert('Peça excluída com sucesso!');
-            loadInventory();
-        } catch (error: any) {
-            console.error('Erro ao excluir:', error);
-            alert('Erro ao excluir peça: ' + (error.message || error));
-        }
+                    if (error) throw error;
+                    setFeedback({
+                        type: 'success',
+                        title: 'Peça Removida',
+                        message: 'O item foi excluído do estoque com sucesso.'
+                    });
+                    loadInventory();
+                } catch (error: any) {
+                    console.error('Erro ao excluir:', error);
+                    setFeedback({
+                        type: 'error',
+                        title: 'Erro ao Excluir',
+                        message: error.message || 'Não foi possível excluir a peça selecionada.'
+                    });
+                }
+            }
+        });
     };
 
     const resetForm = () => {
@@ -195,7 +235,11 @@ const Inventory = () => {
             document.body.removeChild(link);
         } catch (error) {
             console.error('Erro ao exportar:', error);
-            alert('Erro ao exportar CSV');
+            setFeedback({
+                type: 'error',
+                title: 'Erro na Exportação',
+                message: 'Ocorreu um erro ao gerar o arquivo CSV do estoque.'
+            });
         }
     };
 
@@ -433,6 +477,18 @@ const Inventory = () => {
                     )}
                 </div>
             </div>
+
+            {/* Feedback Modal Reutilizável */}
+            {feedback && (
+                <FeedbackModal
+                    isOpen={!!feedback}
+                    onClose={() => setFeedback(null)}
+                    type={feedback.type}
+                    title={feedback.title}
+                    message={feedback.message}
+                    onConfirm={feedback.onConfirm}
+                />
+            )}
         </div>
     );
 };

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Search, Edit2, Trash2, Loader2 } from 'lucide-react';
 import TechnicianModal, { TechnicianData } from '../components/TechnicianModal';
 import { supabase } from '../lib/supabase';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface Technician {
     id: string;
@@ -22,6 +23,12 @@ const Technicians = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTechnician, setSelectedTechnician] = useState<TechnicianData | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [feedback, setFeedback] = useState<{
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+        onConfirm?: () => void;
+    } | null>(null);
     const [stats, setStats] = useState({
         total: 0,
         available: 0,
@@ -93,7 +100,11 @@ const Technicians = () => {
             setTechnicians(computedTechs);
         } catch (error) {
             console.error('Erro ao carregar técnicos:', error);
-            alert('Erro ao carregar técnicos');
+            setFeedback({
+                type: 'error',
+                title: 'Erro de Carregamento',
+                message: 'Não foi possível carregar a lista de técnicos.'
+            });
         } finally {
             setIsLoading(false);
         }
@@ -144,24 +155,35 @@ const Technicians = () => {
     };
 
     const handleDeleteTechnician = async (id: string, name: string) => {
-        if (!confirm(`Tem certeza que deseja excluir o técnico ${name}?`)) {
-            return;
-        }
+        setFeedback({
+            type: 'confirm',
+            title: 'Excluir Técnico?',
+            message: `Tem certeza que deseja excluir o técnico ${name}? Esta ação não pode ser desfeita.`,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('technicians')
+                        .delete()
+                        .eq('id', id);
 
-        try {
-            const { error } = await supabase
-                .from('technicians')
-                .delete()
-                .eq('id', id);
+                    if (error) throw error;
 
-            if (error) throw error;
-
-            await loadTechnicians();
-            alert('Técnico excluído com sucesso!');
-        } catch (error) {
-            console.error('Erro ao excluir técnico:', error);
-            alert('Erro ao excluir técnico');
-        }
+                    await loadTechnicians();
+                    setFeedback({
+                        type: 'success',
+                        title: 'Técnico Excluído',
+                        message: 'O cadastro do técnico foi removido com sucesso.'
+                    });
+                } catch (error) {
+                    console.error('Erro ao excluir técnico:', error);
+                    setFeedback({
+                        type: 'error',
+                        title: 'Erro ao Excluir',
+                        message: 'Não foi possível remover o técnico no momento.'
+                    });
+                }
+            }
+        });
     };
 
     const handleEditTechnician = (tech: Technician) => {
@@ -374,6 +396,18 @@ const Technicians = () => {
                 onSave={handleSaveTechnician}
                 technician={selectedTechnician}
             />
+
+            {/* Feedback Modal Reutilizável */}
+            {feedback && (
+                <FeedbackModal
+                    isOpen={!!feedback}
+                    onClose={() => setFeedback(null)}
+                    type={feedback.type}
+                    title={feedback.title}
+                    message={feedback.message}
+                    onConfirm={feedback.onConfirm}
+                />
+            )}
         </div>
     );
 };

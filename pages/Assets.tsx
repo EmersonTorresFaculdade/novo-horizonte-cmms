@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import FeedbackModal from '../components/FeedbackModal';
 
 interface Asset {
   id: string;
@@ -25,6 +26,12 @@ const Assets = () => {
     model: '',
     status: 'Operacional'
   });
+  const [feedback, setFeedback] = useState<{
+    type: 'success' | 'error' | 'confirm' | 'info';
+    title: string;
+    message: string;
+    onConfirm?: () => void;
+  } | null>(null);
 
   /* Edit State */
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -104,7 +111,11 @@ const Assets = () => {
         console.log('Update result:', data, error);
 
         if (error) throw error;
-        alert('Máquina atualizada com sucesso!');
+        setFeedback({
+          type: 'success',
+          title: 'Máquina Atualizada',
+          message: 'Os dados do equipamento foram atualizados com sucesso.'
+        });
       } else {
         // Create new asset
         const { error } = await supabase
@@ -119,32 +130,58 @@ const Assets = () => {
           }]);
 
         if (error) throw error;
-        alert('Máquina cadastrada com sucesso!');
+        setFeedback({
+          type: 'success',
+          title: 'Máquina Cadastrada',
+          message: 'O novo equipamento foi registrado no sistema.'
+        });
       }
 
       handleCancelEdit(); // Reset form
       fetchAssets();
     } catch (error) {
       console.error('Error saving asset:', error);
-      alert('Erro ao salvar máquina.');
+      setFeedback({
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: 'Não foi possível salvar as informações da máquina.'
+      });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta máquina?')) return;
-
-    try {
-      const { error } = await supabase.from('assets').delete().eq('id', id);
-      if (error) throw error;
-      fetchAssets();
-    } catch (error: any) {
-      console.error('Error deleting asset:', error);
-      if (error.code === '23503') {
-        alert('Não é possível excluir esta máquina pois ela possui Ordens de Serviço vinculadas.');
-      } else {
-        alert('Erro ao excluir máquina: ' + error.message);
+    setFeedback({
+      type: 'confirm',
+      title: 'Excluir Máquina?',
+      message: 'Tem certeza que deseja excluir esta máquina? Esta ação não pode ser desfeita.',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('assets').delete().eq('id', id);
+          if (error) throw error;
+          fetchAssets();
+          setFeedback({
+            type: 'success',
+            title: 'Excluída!',
+            message: 'Máquina removida do sistema com sucesso.'
+          });
+        } catch (error: any) {
+          console.error('Error deleting asset:', error);
+          if (error.code === '23503') {
+            setFeedback({
+              type: 'error',
+              title: 'Ação Bloqueada',
+              message: 'Não é possível excluir esta máquina pois ela possui Ordens de Serviço vinculadas.'
+            });
+          } else {
+            setFeedback({
+              type: 'error',
+              title: 'Erro ao Excluir',
+              message: 'Ocorreu um erro ao tentar remover a máquina.'
+            });
+          }
+        }
       }
-    }
+    });
   };
 
   const filteredAssets = assets.filter(asset =>
@@ -187,7 +224,11 @@ const Assets = () => {
             </button>
             <button
               onClick={() => {
-                alert("Máquina simulada detectada!");
+                setFeedback({
+                  type: 'success',
+                  title: 'QR Code Detectado',
+                  message: 'Simulação: Máquina identificada com sucesso!'
+                });
                 setIsScanning(false);
               }}
               className="bg-primary hover:bg-primary-dark text-white px-8 py-3 rounded-xl font-bold shadow-lg shadow-primary/30 transition-all flex items-center gap-2"
@@ -404,6 +445,18 @@ const Assets = () => {
           )}
         </div>
       </div>
+
+      {/* Feedback Modal Reutilizável */}
+      {feedback && (
+        <FeedbackModal
+          isOpen={!!feedback}
+          onClose={() => setFeedback(null)}
+          type={feedback.type}
+          title={feedback.title}
+          message={feedback.message}
+          onConfirm={feedback.onConfirm}
+        />
+      )}
     </div>
   );
 };
