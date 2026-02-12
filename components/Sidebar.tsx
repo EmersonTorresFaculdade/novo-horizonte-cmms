@@ -15,6 +15,7 @@ import {
   Bell
 } from 'lucide-react';
 import { IMAGES } from '../constants';
+import { supabase } from '../lib/supabase';
 import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
@@ -29,6 +30,38 @@ const Sidebar = () => {
   const { user } = useAuth();
   const { settings } = useSettings();
   const { unreadCount } = useNotifications();
+
+  const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
+
+  React.useEffect(() => {
+    fetchOpenOrdersCount();
+
+    // Subscribe to changes in work_orders table
+    const channel = supabase
+      .channel('work_orders_count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => {
+        fetchOpenOrdersCount();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  const fetchOpenOrdersCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('work_orders')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['Aberto', 'Em Manutenção']);
+
+      if (error) throw error;
+      setOpenOrdersCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching open orders count:', err);
+    }
+  };
 
   // Função para obter label do role
   const getRoleLabel = () => {
@@ -91,7 +124,11 @@ const Sidebar = () => {
         >
           <Wrench size={20} />
           <span className="text-sm font-medium">Ordens de Serviço</span>
-          <span className="ml-auto bg-brand-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">3</span>
+          {openOrdersCount > 0 && (
+            <span className="ml-auto bg-brand-accent text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+              {openOrdersCount}
+            </span>
+          )}
         </NavLink>
 
         <NavLink

@@ -294,6 +294,32 @@ const Dashboard = () => {
   }
   return (
     <div className="flex flex-col gap-6">
+      {/* Header with Title and System Status */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+            Dashboard <span className="text-primary">Operacional</span>
+          </h1>
+          <p className="text-slate-500 text-sm">Visão geral dos indicadores de manutenção e performance.</p>
+        </div>
+
+        <div className="flex items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+          <div className="flex flex-col items-end pr-3 border-r border-slate-100">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1.5">Status Sistema</span>
+            <div className="flex items-center gap-2">
+              <span className="size-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(17,212,115,0.4)]"></span>
+              <span className="text-xs font-bold text-slate-700 uppercase">Online</span>
+            </div>
+          </div>
+          <div className="flex flex-col items-end px-1">
+            <span className="text-xs font-bold text-slate-900 uppercase">
+              {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+            </span>
+            <span className="text-[10px] font-medium text-slate-400 uppercase leading-none">Última Sincronia</span>
+          </div>
+        </div>
+      </div>
+
       {/* KPI Section - Updated Layout to 3 columns Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-2">
 
