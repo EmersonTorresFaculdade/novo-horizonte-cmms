@@ -96,6 +96,7 @@ const ReportsContent = () => {
         totalWorkOrders: 0,
         completedWorkOrders: 0,
         pendingWorkOrders: 0,
+        inMaintenanceWorkOrders: 0,
         urgentWorkOrders: 0,
         totalTechnicians: 0,
         activeTechnicians: 0,
@@ -115,7 +116,8 @@ const ReportsContent = () => {
         priority: [] as any[],
         assetsStatus: [] as any[],
         technicianPerformance: [] as any[],
-        topProblematicAssets: [] as any[]
+        topProblematicAssets: [] as any[],
+        recentWorkOrders: [] as any[]
     });
 
     const handleExportPDF = async () => {
@@ -220,9 +222,10 @@ const ReportsContent = () => {
 
             // --- Basic KPIs ---
             const totalWO = woData.length;
-            const completedWO = woData.filter(wo => wo.status === 'Concluído');
-            const pendingWO = woData.filter(wo => ['Pendente', 'Em Andamento'].includes(wo.status)).length;
-            const urgentWO = woData.filter(wo => wo.priority === 'Alta').length;
+            const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
+            const pendingWO = woData.filter(wo => wo.status?.toLowerCase() === 'pendente').length;
+            const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção').length;
+            const urgentWO = woData.filter(wo => ['alta', 'crítica', 'crítico'].includes(wo.priority?.toLowerCase())).length;
 
             const totalAssets = assetData.length;
             const criticalAssets = assetData.filter(a => a.status === 'Crítico' || a.status === 'Parado').length;
@@ -261,6 +264,7 @@ const ReportsContent = () => {
                 totalWorkOrders: totalWO,
                 completedWorkOrders: completedWO.length,
                 pendingWorkOrders: pendingWO,
+                inMaintenanceWorkOrders: inMaintenanceWO,
                 urgentWorkOrders: urgentWO,
                 totalTechnicians: techData.length,
                 activeTechnicians: techData.filter(t => t.status === 'Ativo').length,
@@ -323,7 +327,8 @@ const ReportsContent = () => {
                 priority: priorityData,
                 assetsStatus: assetStatusData,
                 technicianPerformance: techPerformance,
-                topProblematicAssets: problematicAssets
+                topProblematicAssets: problematicAssets,
+                recentWorkOrders: woData.slice(0, 10)
             });
 
         } catch (error) {
@@ -418,9 +423,28 @@ const ReportsContent = () => {
                         </div>
                     </div>
 
-                    {/* 1. Executive Summary KPIs */}
+                    {/* 1. Executive Summary KPIs - 4 Column Layout as requested */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                            <h3 className="text-3xl font-black text-blue-600 mb-1">{stats.totalWorkOrders}</h3>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                            <h3 className="text-3xl font-black text-emerald-500 mb-1">{stats.completedWorkOrders}</h3>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Concluídos</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                            <h3 className="text-3xl font-black text-orange-500 mb-1">{stats.pendingWorkOrders}</h3>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Abertos</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                            <h3 className="text-3xl font-black text-indigo-500 mb-1">{stats.inMaintenanceWorkOrders}</h3>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Em Manutenção</p>
+                        </div>
+                    </div>
+
                     <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                        <Activity size={20} className="text-primary" /> Indicadores Chave de Performance (KPIs)
+                        <Activity size={20} className="text-primary" /> Indicadores Técnicos
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
@@ -447,9 +471,6 @@ const ReportsContent = () => {
                             <h3 className="text-2xl font-black text-slate-900">
                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(stats.totalMaintenanceCost)}
                             </h3>
-                            <div className="text-xs text-slate-500 mt-2 flex justify-between">
-                                <span>MO: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(stats.estimatedLaborCost)}</span>
-                            </div>
                         </div>
                     </div>
 
@@ -576,19 +597,45 @@ const ReportsContent = () => {
                         </div>
                     </div>
 
-                    {/* Footer Analysis */}
-                    <div className="bg-slate-100 p-6 rounded-xl border border-slate-200">
-                        <h4 className="text-sm font-bold text-slate-800 mb-2 uppercase flex items-center gap-2">
-                            <FileText size={16} /> Insights Automatizados
-                        </h4>
-                        <p className="text-sm text-slate-600 leading-relaxed text-justify">
-                            O sistema registrou uma confiabilidade de <strong>{stats.reliability}%</strong> no período selecionado.
-                            O tempo médio para reparo (MTTR) atual é de <strong>{stats.mttr} horas</strong>, indicando a eficiência da equipe técnica na resolução de falhas.
-                            {stats.criticalAssets > 0
-                                ? ` Atenção especial é recomendada para ${stats.criticalAssets} ativos que se encontram em estado crítico.`
-                                : ' Todos os ativos monitorados estão operando dentro dos parâmetros de normalidade.'}
-                            Financeiramente, estima-se que <strong>{((stats.estimatedLaborCost / stats.totalMaintenanceCost) * 100 || 0).toFixed(0)}%</strong> dos custos operacionais sejam derivados de mão de obra direta.
-                        </p>
+                    {/* Footer Analysis and Recent Updates */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="md:col-span-1 bg-slate-100 p-6 rounded-xl border border-slate-200 h-fit">
+                            <h4 className="text-sm font-bold text-slate-800 mb-2 uppercase flex items-center gap-2">
+                                <FileText size={16} /> Insights Automatizados
+                            </h4>
+                            <p className="text-sm text-slate-600 leading-relaxed text-left">
+                                O sistema registrou uma confiabilidade de <strong>{stats.reliability}%</strong> no período selecionado.
+                                O tempo médio para reparo (MTTR) atual é de <strong>{stats.mttr} horas</strong>.
+                                {stats.criticalAssets > 0
+                                    ? ` Atenção especial é recomendada para ${stats.criticalAssets} ativos críticos.`
+                                    : ' Todos os ativos estão operando normalmente.'}
+                            </p>
+                        </div>
+
+                        <div className="md:col-span-2 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-slate-100 bg-slate-50">
+                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-widest">Últimas Atualizações</h4>
+                            </div>
+                            <div className="divide-y divide-slate-100">
+                                {chartData.recentWorkOrders.slice(0, 5).map((wo: any) => (
+                                    <div key={wo.id} className="p-4 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-slate-800 text-sm">{wo.issue || 'Sem descrição'}</p>
+                                            <p className="text-[10px] text-slate-400 font-mono uppercase tracking-tight">
+                                                OS-{wo.id.substring(0, 8).toUpperCase()} • {wo.priority} • {new Date(wo.created_at).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className={`text-[10px] font-black uppercase tracking-widest ${wo.status?.toLowerCase() === 'concluído' ? 'text-emerald-600' :
+                                                wo.status?.toLowerCase() === 'em manutenção' ? 'text-blue-600' : 'text-slate-400'
+                                                }`}>
+                                                {wo.status}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
