@@ -240,7 +240,7 @@ const Dashboard = () => {
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'concluído': return 'bg-green-100 text-green-700';
-      case 'em manutenção': return 'bg-blue-100 text-blue-700';
+      case 'em manutenção': return 'bg-purple-100 text-purple-700';
       case 'aguardando peça': return 'bg-amber-100 text-amber-700';
       case 'pendente': return 'bg-orange-100 text-orange-700';
       case 'crítico': return 'bg-red-100 text-red-700';

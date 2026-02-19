@@ -548,7 +548,7 @@ const ReportsContent = () => {
     );
 }
 
-const Reports = () => {
+const PublicReports = () => {
     return (
         <ErrorBoundary>
             <ReportsContent />
@@ -556,4 +556,4 @@ const Reports = () => {
     );
 };
 
-export default Reports;
+export default PublicReports;

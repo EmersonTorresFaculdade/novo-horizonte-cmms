@@ -5,7 +5,11 @@ import NotificationBell from './NotificationBell';
 import FeedbackModal from './FeedbackModal';
 import { useState } from 'react';
 
-const Header = () => {
+interface HeaderProps {
+  onMenuClick?: () => void;
+}
+
+const Header = ({ onMenuClick }: HeaderProps) => {
   const navigate = useNavigate();
   const [showHelp, setShowHelp] = useState(false);
 
@@ -13,7 +17,10 @@ const Header = () => {
     <>
       <header className="h-20 flex items-center justify-between px-6 md:px-10 bg-white border-b border-slate-200 shadow-sm z-10 shrink-0 relative">
         <div className="flex items-center gap-4">
-          <button className="md:hidden text-slate-500 hover:text-primary">
+          <button
+            onClick={onMenuClick}
+            className="md:hidden text-slate-500 hover:text-primary"
+          >
             <Menu size={24} />
           </button>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight hidden sm:block">

@@ -4,11 +4,13 @@ import Sidebar from './Sidebar';
 import Header from './Header';
 
 const Layout = () => {
+  const [isSidebarOpen, setSidebarOpen] = React.useState(false);
+
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      <Sidebar />
+      <Sidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col h-full w-full">
-        <Header />
+        <Header onMenuClick={() => setSidebarOpen(true)} />
         <main className="flex-1 overflow-y-auto p-6 md:p-10 pb-20">
           <Outlet />
         </main>

@@ -13,6 +13,7 @@ import Calendar from './pages/Calendar';
 import Profile from './pages/Profile';
 
 import Reports from './pages/Reports';
+import PublicReports from './pages/PublicReports';
 import Settings from './pages/Settings';
 import UsersPending from './pages/UsersPending';
 import Notifications from './pages/Notifications';
@@ -32,6 +33,7 @@ const App = () => {
               <Routes>
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/public-reports" element={<PublicReports />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
 
                 {/* Protected Routes */}

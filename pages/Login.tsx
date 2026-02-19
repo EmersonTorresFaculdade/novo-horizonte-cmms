@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LogIn, Factory, Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus, X, User, Phone, Shield, AlertTriangle } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
 import { IMAGES } from '../constants';
@@ -41,7 +41,10 @@ const Login = () => {
       const result = await login(email, password);
 
       if (result.success) {
-        navigate('/dashboard');
+        const state = (location as any).state;
+        const from = state?.from?.pathname || '/dashboard';
+        const search = state?.from?.search || '';
+        navigate(`${from}${search}`, { replace: true });
       } else {
         setError(result.error || 'Erro ao fazer login');
       }

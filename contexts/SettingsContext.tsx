@@ -12,6 +12,8 @@ interface UpdateAppSettingsParams {
     p_work_order_alerts: boolean;
     p_critical_alerts: boolean;
     p_daily_report: boolean;
+    p_report_frequency: string;
+    p_company_email: string;
 }
 
 interface AppSettings {
@@ -33,6 +35,7 @@ interface AppSettings {
     passwordExpiry: number;
     webhookUrl?: string;
     webhookEnabled: boolean;
+    reportFrequency: string;
 }
 
 const defaultSettings: AppSettings = {
@@ -53,7 +56,8 @@ const defaultSettings: AppSettings = {
     sessionTimeout: 30,
     passwordExpiry: 90,
     webhookUrl: '',
-    webhookEnabled: true
+    webhookEnabled: true,
+    reportFrequency: 'diario'
 };
 
 interface SettingsContextType {
@@ -122,7 +126,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                         whatsappNotifications: dbData.whatsapp_notifications ?? false, // Map from DB
                         workOrderAlerts: dbData.work_order_alerts ?? true,
                         criticalAlerts: dbData.critical_alerts ?? true,
-                        dailyReport: dbData.daily_report ?? true
+                        dailyReport: dbData.daily_report ?? true,
+                        reportFrequency: dbData.report_frequency ?? 'diario'
                     };
 
                     const next = { ...prev, ...dbSettings };
@@ -166,7 +171,9 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 p_whatsapp_notifications: settingsToSave.whatsappNotifications,
                 p_work_order_alerts: settingsToSave.workOrderAlerts,
                 p_critical_alerts: settingsToSave.criticalAlerts,
-                p_daily_report: settingsToSave.dailyReport
+                p_daily_report: settingsToSave.dailyReport,
+                p_report_frequency: settingsToSave.reportFrequency || 'diario',
+                p_company_email: settingsToSave.companyEmail
             };
 
             const { error } = await supabase.rpc('update_app_settings' as any, rpcParams as any);

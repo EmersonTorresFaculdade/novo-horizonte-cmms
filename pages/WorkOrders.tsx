@@ -121,9 +121,9 @@ const WorkOrders = () => {
 
   const getPriorityColor = (p: string) => {
     switch (p) {
-      case 'Alta': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'Média': return 'bg-amber-100 text-amber-800 border-amber-200';
-      case 'Baixa': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'Alta': return 'bg-red-100 text-red-800 border-red-200';
+      case 'Média': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Baixa': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
   };
@@ -131,7 +131,7 @@ const WorkOrders = () => {
   const getStatusBadge = (status: string) => {
     let colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
     if (status === 'Concluído') colorClass = 'bg-green-100 text-green-700 border-green-200';
-    if (status === 'Em Manutenção') colorClass = 'bg-blue-100 text-blue-700 border-blue-200';
+    if (status === 'Em Manutenção') colorClass = 'bg-purple-100 text-purple-700 border-purple-200';
     if (status === 'Aguardando Peça') colorClass = 'bg-amber-100 text-amber-700 border-amber-200';
     if (status === 'Pendente') colorClass = 'bg-orange-100 text-orange-700 border-orange-200';
 

@@ -300,7 +300,13 @@ const WorkOrderDetails = () => {
                {/* Show Checkmark if completed */}
                {workOrder.status === 'Concluído' ?
                   <span className="bg-green-100 text-green-700 px-3 py-1 rounded-full text-xs font-bold border border-green-200">CONCLUÍDO</span>
-                  : <span className="bg-blue-50 text-blue-700 px-3 py-1 rounded-full text-xs font-bold border border-blue-100 uppercase">{workOrder.status}</span>
+                  : <span className={`px-3 py-1 rounded-full text-xs font-bold border uppercase
+                   ${workOrder.status === 'Em Manutenção' ? 'bg-purple-100 text-purple-700 border-purple-200' :
+                        workOrder.status === 'Aguardando Peça' ? 'bg-amber-100 text-amber-700 border-amber-200' :
+                           workOrder.status === 'Pendente' ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                              'bg-blue-50 text-blue-700 border-blue-100'}`}>
+                     {workOrder.status}
+                  </span>
                }
             </div>
             <div className="flex items-center gap-2">
@@ -361,9 +367,9 @@ const WorkOrderDetails = () => {
                         onChange={(e) => setEditPriority(e.target.value)}
                         disabled={!isEditing}
                         className={`text-xs font-bold uppercase border rounded px-2 py-1 outline-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed
-                        ${editPriority === 'Alta' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                              editPriority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' :
-                                 'bg-blue-100 text-blue-800 border-blue-200'}`}
+                        ${editPriority === 'Alta' ? 'bg-red-100 text-red-800 border-red-200' :
+                              editPriority === 'Média' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                 'bg-green-100 text-green-800 border-green-200'}`}
                      >
                         <option value="Baixa">Prioridade: Baixa</option>
                         <option value="Média">Prioridade: Média</option>
@@ -372,8 +378,8 @@ const WorkOrderDetails = () => {
                      </select>
                   ) : (
                      <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ml-2
-                      ${workOrder.priority === 'Alta' ? 'bg-orange-100 text-orange-800 border-orange-200' :
-                           workOrder.priority === 'Média' ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
+                      ${workOrder.priority === 'Alta' ? 'bg-red-100 text-red-800 border-red-200' :
+                           workOrder.priority === 'Média' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-green-100 text-green-800 border-green-200'}`}>
                         Prioridade: {workOrder.priority}
                      </span>
                   )}

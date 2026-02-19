@@ -194,30 +194,30 @@ const NewWorkOrder = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div
                 onClick={() => setPriority('Baixa')}
-                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Baixa' ? 'border-blue-500 bg-blue-50' : 'border-slate-100 hover:border-slate-300'}`}
+                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Baixa' ? 'border-green-500 bg-green-50' : 'border-slate-100 hover:border-slate-300'}`}
               >
-                <div className={`p-2 rounded-full ${priority === 'Baixa' ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <div className={`p-2 rounded-full ${priority === 'Baixa' ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
                   <Info size={20} />
                 </div>
                 <div>
                   <p className="font-bold text-slate-900">Baixa</p>
                   <p className="text-xs text-slate-500">Não urgente</p>
                 </div>
-                {priority === 'Baixa' && <CheckCircle2 size={20} className="ml-auto text-blue-500" />}
+                {priority === 'Baixa' && <CheckCircle2 size={20} className="ml-auto text-green-500" />}
               </div>
 
               <div
                 onClick={() => setPriority('Média')}
-                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Média' ? 'border-amber-500 bg-amber-50' : 'border-slate-100 hover:border-slate-300'}`}
+                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Média' ? 'border-yellow-500 bg-yellow-50' : 'border-slate-100 hover:border-slate-300'}`}
               >
-                <div className={`p-2 rounded-full ${priority === 'Média' ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                <div className={`p-2 rounded-full ${priority === 'Média' ? 'bg-yellow-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
                   <AlertTriangle size={20} />
                 </div>
                 <div>
                   <p className="font-bold text-slate-900">Média</p>
                   <p className="text-xs text-slate-500">Atenção necessária</p>
                 </div>
-                {priority === 'Média' && <CheckCircle2 size={20} className="ml-auto text-amber-500" />}
+                {priority === 'Média' && <CheckCircle2 size={20} className="ml-auto text-yellow-500" />}
               </div>
 
               <div
