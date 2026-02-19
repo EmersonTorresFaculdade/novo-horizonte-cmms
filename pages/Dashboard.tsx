@@ -51,6 +51,7 @@ interface DashboardKPIs {
   avgExecution: number;
   completedTickets: number;
   maintenanceTickets: number;
+  totalWorkOrders: number;
 }
 
 const Dashboard = () => {
@@ -65,7 +66,8 @@ const Dashboard = () => {
     avgWait: 0,
     avgExecution: 0,
     completedTickets: 0,
-    maintenanceTickets: 0
+    maintenanceTickets: 0,
+    totalWorkOrders: 0
   });
   const [technicianData, setTechnicianData] = useState<TechnicianPerf[]>([]);
   const [downtimeData, setDowntimeData] = useState<MachineDowntime[]>([]);
@@ -97,14 +99,12 @@ const Dashboard = () => {
 
       // --- Calculate KPIs ---
       const totalOrders = orders.length;
-      const closedOrders = orders.filter(o => o.status === 'Concluído');
-      const openOrders = orders.filter(o => o.status === 'Pendente');
+      const closedOrders = orders.filter(o => o.status?.toLowerCase() === 'concluído');
+      const openOrders = orders.filter(o => o.status?.toLowerCase() === 'pendente');
+      const maintenanceOrders = orders.filter(o => o.status?.toLowerCase() === 'em manutenção');
 
       // 1. Counts
       const openCount = openOrders.length;
-      const urgentCount = openOrders.filter(o => ['Alta', 'Crítica', 'Crítico'].includes(o.priority)).length;
-
-      const maintenanceOrders = orders.filter(o => o.status === 'Em Manutenção');
       const maintenanceCount = maintenanceOrders.length;
       const completedCount = closedOrders.length;
 
@@ -132,13 +132,11 @@ const Dashboard = () => {
         mttr: `${mttrH}h ${mttrM}m`,
         mtbf: `${Math.round(mtbfVal)}h`,
         openTickets: openCount,
-        urgentTickets: urgentCount,
-        downtimeRate: `${downtimeRateVal.toFixed(1)}%`,
-        totalDowntime: Number(totalDowntimeVal.toFixed(1)),
         avgWait: Number(avgWaitVal.toFixed(1)),
         avgExecution: Number(avgRepairHours.toFixed(1)),
         completedTickets: completedCount,
-        maintenanceTickets: maintenanceCount
+        maintenanceTickets: maintenanceCount,
+        totalWorkOrders: totalOrders
       });
 
       // 2. Fetch Technicians
@@ -320,51 +318,27 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* KPI Section - Updated Layout to 3 columns Grid */}
+      {/* KPI Section - Updated Layout to 4 columns matching Reports */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+          <h3 className="text-3xl font-black text-blue-600 mb-1">{kpis.totalWorkOrders}</h3>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+          <h3 className="text-3xl font-black text-emerald-500 mb-1">{kpis.completedTickets}</h3>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Concluídos</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+          <h3 className="text-3xl font-black text-orange-500 mb-1">{kpis.openTickets}</h3>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Abertos</p>
+        </div>
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+          <h3 className="text-3xl font-black text-indigo-500 mb-1">{kpis.maintenanceTickets}</h3>
+          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Em Manutenção</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-2">
-
-        {/* Chamados Pendentes (Abertos) */}
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-orange-500">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-              <AlertCircle size={24} />
-            </div>
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Chamados Pendentes</p>
-          <div className="flex items-baseline gap-2">
-            <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.openTickets}</h3>
-            {kpis.urgentTickets > 0 && (
-              <span className="text-sm font-medium text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
-                {kpis.urgentTickets} Urgentes
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Chamados em Manutenção */}
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-blue-500">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <Activity size={24} />
-            </div>
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Em Manutenção</p>
-          <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.maintenanceTickets}</h3>
-        </div>
-
-        {/* Chamados Concluídos */}
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-green-500">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-2 bg-green-50 rounded-lg text-green-600">
-              <Activity size={24} />
-            </div>
-            <span className="flex items-center text-xs font-semibold text-green-600 bg-green-100 px-2 py-1 rounded-full">
-              Total
-            </span>
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Chamados Concluídos</p>
-          <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.completedTickets}</h3>
-        </div>
 
         {/* MTTR */}
         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">

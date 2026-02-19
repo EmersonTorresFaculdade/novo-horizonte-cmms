@@ -97,7 +97,6 @@ const ReportsContent = () => {
         completedWorkOrders: 0,
         pendingWorkOrders: 0,
         inMaintenanceWorkOrders: 0,
-        urgentWorkOrders: 0,
         totalTechnicians: 0,
         activeTechnicians: 0,
         totalAssets: 0,
@@ -225,7 +224,6 @@ const ReportsContent = () => {
             const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
             const pendingWO = woData.filter(wo => wo.status?.toLowerCase() === 'pendente').length;
             const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção').length;
-            const urgentWO = woData.filter(wo => ['alta', 'crítica', 'crítico'].includes(wo.priority?.toLowerCase())).length;
 
             const totalAssets = assetData.length;
             const criticalAssets = assetData.filter(a => a.status === 'Crítico' || a.status === 'Parado').length;
@@ -265,7 +263,6 @@ const ReportsContent = () => {
                 completedWorkOrders: completedWO.length,
                 pendingWorkOrders: pendingWO,
                 inMaintenanceWorkOrders: inMaintenanceWO,
-                urgentWorkOrders: urgentWO,
                 totalTechnicians: techData.length,
                 activeTechnicians: techData.filter(t => t.status === 'Ativo').length,
                 totalAssets: totalAssets,

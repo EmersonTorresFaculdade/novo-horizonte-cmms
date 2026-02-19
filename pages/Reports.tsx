@@ -90,7 +90,7 @@ const ReportsContent = () => {
         totalWorkOrders: 0,
         completedWorkOrders: 0,
         pendingWorkOrders: 0,
-        urgentWorkOrders: 0,
+        inMaintenanceWorkOrders: 0,
         totalTechnicians: 0,
         activeTechnicians: 0,
         totalAssets: 0,
@@ -180,9 +180,9 @@ const ReportsContent = () => {
 
             // --- Basic KPIs ---
             const totalWO = woData.length;
-            const completedWO = woData.filter(wo => wo.status === 'Concluído');
-            const pendingWO = woData.filter(wo => ['Pendente', 'Em Andamento'].includes(wo.status)).length;
-            const urgentWO = woData.filter(wo => wo.priority === 'Alta').length;
+            const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
+            const pendingWO = woData.filter(wo => wo.status?.toLowerCase() === 'pendente').length;
+            const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção').length;
 
             const totalAssets = assetData.length;
             const criticalAssets = assetData.filter(a => a.status === 'Crítico' || a.status === 'Parado').length;
@@ -221,7 +221,7 @@ const ReportsContent = () => {
                 totalWorkOrders: totalWO,
                 completedWorkOrders: completedWO.length,
                 pendingWorkOrders: pendingWO,
-                urgentWorkOrders: urgentWO,
+                inMaintenanceWorkOrders: inMaintenanceWO,
                 totalTechnicians: techData.length,
                 activeTechnicians: techData.filter(t => t.status === 'Ativo').length,
                 totalAssets: totalAssets,
@@ -363,9 +363,28 @@ const ReportsContent = () => {
                     </div>
                 </div>
 
-                {/* 1. Executive Summary KPIs */}
+                {/* 1. Executive Summary KPIs - 4 Column Layout as requested */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <h3 className="text-3xl font-black text-blue-600 mb-1">{stats.totalWorkOrders}</h3>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <h3 className="text-3xl font-black text-emerald-500 mb-1">{stats.completedWorkOrders}</h3>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Concluídos</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <h3 className="text-3xl font-black text-orange-500 mb-1">{stats.pendingWorkOrders}</h3>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Abertos</p>
+                    </div>
+                    <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
+                        <h3 className="text-3xl font-black text-indigo-500 mb-1">{stats.inMaintenanceWorkOrders}</h3>
+                        <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Em Manutenção</p>
+                    </div>
+                </div>
+
                 <h3 className="text-lg font-bold text-slate-800 mb-4 flex items-center gap-2">
-                    <Activity size={20} className="text-primary" /> Indicadores Chave de Performance (KPIs)
+                    <Activity size={20} className="text-primary" /> Indicadores Técnicos
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
