@@ -129,14 +129,23 @@ const WorkOrders = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    let colorClass = 'bg-slate-100 text-slate-700 border-slate-200';
-    if (status === 'Concluído') colorClass = 'bg-green-100 text-green-700 border-green-200';
-    if (status === 'Em Manutenção') colorClass = 'bg-purple-100 text-purple-700 border-purple-200';
-    if (status === 'Aguardando Peça') colorClass = 'bg-amber-100 text-amber-700 border-amber-200';
-    if (status === 'Pendente') colorClass = 'bg-orange-100 text-orange-700 border-orange-200';
+    const s = status?.toLowerCase() || '';
+    let colorClass = 'bg-slate-50 text-slate-600 border-slate-200';
+
+    if (s === 'concluído' || s === 'concluido' || s === 'concluída' || s === 'concluida') {
+      colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+    } else if (s === 'em manutenção' || s === 'manutenção') {
+      colorClass = 'bg-purple-50 text-purple-700 border-purple-200';
+    } else if (s === 'aguardando peça' || s === 'aguardando') {
+      colorClass = 'bg-amber-50 text-amber-700 border-amber-200';
+    } else if (s === 'pendente') {
+      colorClass = 'bg-orange-50 text-orange-700 border-orange-200';
+    } else if (s === 'crítico' || s === 'crítica') {
+      colorClass = 'bg-red-50 text-red-700 border-red-200';
+    }
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${colorClass}`}>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
         {status}
       </span>
     );
