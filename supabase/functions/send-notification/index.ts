@@ -200,7 +200,7 @@ serve(async (req) => {
             body: JSON.stringify({
                 event: event,
                 timestamp: new Date().toISOString(),
-                company: company || 'Novo Horizonte',
+                company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,
                 preferences: {
                     email: settings.email_notifications,

@@ -36,7 +36,7 @@ interface AppSettings {
 }
 
 const defaultSettings: AppSettings = {
-    companyName: 'Novo Horizonte',
+    companyName: 'Novo Horizonte Alumínios',
     companyEmail: 'contato@novohorizonte.com',
     companyLogo: null,
     timezone: 'America/Sao_Paulo',
@@ -183,10 +183,9 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 setIsSaving(false);
             }, 500);
         } catch (e: unknown) {
-            console.error('Unexpected error saving settings:', e);
             const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
-            alert(`Erro ao salvar configurações: ${errorMessage}`);
             setIsSaving(false);
+            throw e;
         }
     };
 
@@ -225,7 +224,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
             await saveSettings(newSettings);
         } catch (error) {
             console.error('Error uploading logo:', error);
-            alert('Erro ao fazer upload da logo. Tente novamente.');
+            throw error;
         }
     };
 

@@ -1,6 +1,6 @@
-# Novo Horizonte CMMS
-
-Sistema de Gerenciamento de Manutenção Computadorizada (CMMS) para a indústria Novo Horizonte.
+# Novo Horizonte Alumínios
+=
+Sistema de Gerenciamento de Manutenção Computadorizada (CMMS) para a indústria Novo Horizonte Alumínios.
 
 ## Funcionalidades
 

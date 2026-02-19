@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useSettings } from '../contexts/SettingsContext';
 import { supabase } from '../lib/supabase';
+import FeedbackModal from '../components/FeedbackModal';
 
 const Settings = () => {
     const { settings, updateSettings, saveSettings, uploadLogo, isSaving } = useSettings();
@@ -26,13 +27,45 @@ const Settings = () => {
     const [testingWebhook, setTestingWebhook] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleSave = () => {
-        saveSettings();
+    const [feedback, setFeedback] = useState<{
+        isOpen: boolean;
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+    }>({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
+
+    const handleSave = async () => {
+        try {
+            await saveSettings();
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: 'Configurações Salvas',
+                message: 'As alterações foram aplicadas com sucesso.'
+            });
+        } catch (error: any) {
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro ao Salvar',
+                message: error.message || 'Erro ao salvar configurações. Tente novamente.'
+            });
+        }
     };
 
     const handleTestWebhook = async () => {
         if (!settings.webhookUrl) {
-            alert('Por favor, preencha a URL do Webhook antes de testar.');
+            setFeedback({
+                isOpen: true,
+                type: 'info',
+                title: 'Atenção',
+                message: 'Por favor, preencha a URL do Webhook antes de testar.'
+            });
             return;
         }
 
@@ -65,7 +98,12 @@ const Settings = () => {
                 throw error;
             }
 
-            alert('Teste enviado via Servidor Supabase! Verifique seu n8n.');
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: 'Webhook Testado',
+                message: 'O teste foi enviado com sucesso via Servidor Supabase! Verifique seu n8n.'
+            });
 
         } catch (error: any) {
             console.error('Test Error:', error);
@@ -90,7 +128,12 @@ const Settings = () => {
                 }
             }
 
-            alert(`Falha ao enviar teste: ${errorMessage}`);
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro no Teste',
+                message: `Falha ao enviar teste: ${errorMessage}`
+            });
         } finally {
             setTestingWebhook(false);
         }
@@ -101,12 +144,22 @@ const Settings = () => {
         if (file) {
             // Validar tipo de arquivo
             if (!file.type.startsWith('image/')) {
-                alert('Por favor, selecione apenas arquivos de imagem.');
+                setFeedback({
+                    isOpen: true,
+                    type: 'error',
+                    title: 'Formato Inválido',
+                    message: 'Por favor, selecione apenas arquivos de imagem.'
+                });
                 return;
             }
             // Validar tamanho (máximo 2MB para upload)
             if (file.size > 2 * 1024 * 1024) {
-                alert('A imagem deve ter no máximo 2MB.');
+                setFeedback({
+                    isOpen: true,
+                    type: 'error',
+                    title: 'Arquivo muito grande',
+                    message: 'A imagem deve ter no máximo 2MB.'
+                });
                 return;
             }
 
@@ -590,6 +643,14 @@ const Settings = () => {
                     </div>
                 </div>
             </div>
+
+            <FeedbackModal
+                isOpen={feedback.isOpen}
+                onClose={() => setFeedback({ ...feedback, isOpen: false })}
+                type={feedback.type}
+                title={feedback.title}
+                message={feedback.message}
+            />
         </div>
     );
 };

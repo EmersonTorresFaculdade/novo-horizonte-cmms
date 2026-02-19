@@ -10,6 +10,7 @@ import {
     Printer,
     FileText
 } from 'lucide-react';
+import FeedbackModal from '../components/FeedbackModal';
 import { supabase } from '../lib/supabase';
 import {
     BarChart,
@@ -70,6 +71,18 @@ const ReportsContent = () => {
     const [period, setPeriod] = useState('month');
     const [loading, setLoading] = useState(true);
     const reportRef = useRef<HTMLDivElement>(null);
+
+    const [feedback, setFeedback] = useState<{
+        isOpen: boolean;
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+    }>({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
 
     const [stats, setStats] = useState({
         totalWorkOrders: 0,
@@ -279,7 +292,12 @@ const ReportsContent = () => {
             pdf.save(`relatorio_pcm_${new Date().toISOString().split('T')[0]}.pdf`);
         } catch (error) {
             console.error('Erro ao gerar PDF:', error);
-            alert('Erro ao gerar PDF: ' + error);
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro na Exportação',
+                message: 'Ocorreu um erro ao gerar o arquivo PDF. Tente novamente.'
+            });
         }
     };
 
@@ -324,7 +342,7 @@ const ReportsContent = () => {
                         </p>
                     </div>
                     <div className="text-right">
-                        <p className="text-sm font-bold text-slate-900">Novo Horizonte CMMS</p>
+                        <p className="text-sm font-bold text-slate-900">Novo Horizonte Alumínios</p>
                         <p className="text-xs text-slate-500">Emitido em: {new Date().toLocaleDateString()} às {new Date().toLocaleTimeString()}</p>
                     </div>
                 </div>
@@ -502,6 +520,14 @@ const ReportsContent = () => {
                     </p>
                 </div>
             </div>
+
+            <FeedbackModal
+                isOpen={feedback.isOpen}
+                onClose={() => setFeedback({ ...feedback, isOpen: false })}
+                type={feedback.type}
+                title={feedback.title}
+                message={feedback.message}
+            />
         </div>
     );
 }

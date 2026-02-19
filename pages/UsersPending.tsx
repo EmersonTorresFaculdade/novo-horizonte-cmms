@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth, User } from '../contexts/AuthContext';
 import { Check, X, User as UserIcon, Shield, Search, Filter, AlertCircle, Clock } from 'lucide-react';
+import FeedbackModal from '../components/FeedbackModal';
 
 const UsersPending = () => {
     const { id } = useParams();
@@ -15,6 +16,24 @@ const UsersPending = () => {
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+    const [feedback, setFeedback] = useState<{
+        isOpen: boolean;
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+    }>({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
+    });
+
+    const [confirmAction, setConfirmAction] = useState<{
+        userId: string;
+        userName: string;
+        action: 'approve' | 'reject';
+    } | null>(null);
 
     useEffect(() => {
         fetchUsers();
@@ -57,54 +76,56 @@ const UsersPending = () => {
         setLoading(false);
     };
 
-    const handleApprove = async (userId: string, userName: string) => {
-        if (!window.confirm(`Tem certeza que deseja APROVAR o usuário ${userName}?`)) return;
+    const handleApproveClick = (userId: string, userName: string) => {
+        setConfirmAction({ userId, userName, action: 'approve' });
+    };
+
+    const handleRejectClick = (userId: string, userName: string) => {
+        setConfirmAction({ userId, userName, action: 'reject' });
+    };
+
+    const processAction = async () => {
+        if (!confirmAction) return;
+        const { userId, userName, action } = confirmAction;
+        setConfirmAction(null);
 
         setProcessingId(userId);
         setError(null);
 
-        const { success, error } = await approveUser(userId);
+        const { success, error } = action === 'approve'
+            ? await approveUser(userId)
+            : await rejectUser(userId);
 
         if (success) {
-            setSuccessMessage(`Usuário ${userName} aprovado com sucesso!`);
-            // Remover da lista
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: action === 'approve' ? 'Usuário Aprovado' : 'Usuário Rejeitado',
+                message: `O usuário ${userName} foi ${action === 'approve' ? 'aprovado' : 'rejeitado'} com sucesso.`
+            });
             setUsers(prev => prev.filter(u => u.id !== userId));
 
-            // Limpar mensagem após 3s
-            setTimeout(() => setSuccessMessage(null), 3000);
-
-            // Se estava na URL com esse ID, limpar URL
             if (id === userId) {
                 navigate('/users/pending');
             }
         } else {
-            setError(`Erro ao aprovar: ${error}`);
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro na Operação',
+                message: `Erro ao ${action === 'approve' ? 'aprovar' : 'rejeitar'}: ${error}`
+            });
         }
 
         setProcessingId(null);
     };
 
+    const handleApprove = async (userId: string, userName: string) => {
+        // This function is now deprecated in favor of handleApproveClick + processAction
+    };
+
     const handleReject = async (userId: string, userName: string) => {
-        if (!window.confirm(`Tem certeza que deseja REJEITAR o usuário ${userName}?`)) return;
-
-        setProcessingId(userId);
-        setError(null);
-
-        const { success, error } = await rejectUser(userId);
-
-        if (success) {
-            setSuccessMessage(`Usuário ${userName} rejeitado.`);
-            setUsers(prev => prev.filter(u => u.id !== userId));
-            setTimeout(() => setSuccessMessage(null), 3000);
-
-            if (id === userId) {
-                navigate('/users/pending');
-            }
-        } else {
-            setError(`Erro ao rejeitar: ${error}`);
-        }
-
-        setProcessingId(null);
+        // Deprecated
     };
 
     if (loading) {
@@ -208,7 +229,7 @@ const UsersPending = () => {
 
                                 <div className="flex gap-3">
                                     <button
-                                        onClick={() => handleReject(user.id, user.name)}
+                                        onClick={() => handleRejectClick(user.id, user.name)}
                                         disabled={processingId === user.id}
                                         className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 font-medium text-sm flex items-center justify-center gap-2 transition-colors"
                                     >
@@ -216,7 +237,7 @@ const UsersPending = () => {
                                         Rejeitar
                                     </button>
                                     <button
-                                        onClick={() => handleApprove(user.id, user.name)}
+                                        onClick={() => handleApproveClick(user.id, user.name)}
                                         disabled={processingId === user.id}
                                         className="flex-1 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark font-medium text-sm flex items-center justify-center gap-2 transition-colors shadow-sm hover:shadow"
                                     >
@@ -233,6 +254,25 @@ const UsersPending = () => {
                     ))}
                 </div>
             )}
+
+            <FeedbackModal
+                isOpen={!!confirmAction}
+                onClose={() => setConfirmAction(null)}
+                type="confirm"
+                title={confirmAction?.action === 'approve' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}
+                message={`Tem certeza que deseja ${confirmAction?.action === 'approve' ? 'APROVAR' : 'REJEITAR'} o usuário ${confirmAction?.userName}?`}
+                onConfirm={processAction}
+                confirmText={confirmAction?.action === 'approve' ? 'Sim, Aprovar' : 'Sim, Rejeitar'}
+                cancelText="Não, Cancelar"
+            />
+
+            <FeedbackModal
+                isOpen={feedback.isOpen}
+                onClose={() => setFeedback({ ...feedback, isOpen: false })}
+                type={feedback.type}
+                title={feedback.title}
+                message={feedback.message}
+            />
         </div>
     );
 };

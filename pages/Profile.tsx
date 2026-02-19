@@ -22,6 +22,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, BellRing, Smartphone } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
+import FeedbackModal from '../components/FeedbackModal';
 
 const Profile = () => {
     const navigate = useNavigate();
@@ -57,6 +58,18 @@ const Profile = () => {
         email: user?.email_notifications ?? true,
         push: user?.push_notifications ?? true,
         whatsapp: user?.whatsapp_notifications ?? false
+    });
+
+    const [feedback, setFeedback] = useState<{
+        isOpen: boolean;
+        type: 'success' | 'error' | 'confirm' | 'info';
+        title: string;
+        message: string;
+    }>({
+        isOpen: false,
+        type: 'info',
+        title: '',
+        message: ''
     });
 
     // Update state when user context changes
@@ -109,10 +122,20 @@ const Profile = () => {
             // Atualizar contexto global para sincronizar com outros componentes
             updateGlobalProfile(tempData);
 
-            alert('Perfil atualizado com sucesso!');
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: 'Sucesso!',
+                message: 'Seu perfil foi atualizado com sucesso.'
+            });
         } catch (error) {
             console.error('Erro ao salvar perfil:', error);
-            alert('Erro ao salvar perfil. Tente novamente.');
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro',
+                message: 'Ocorreu um erro ao salvar seu perfil. Tente novamente.'
+            });
         } finally {
             setIsSaving(false);
         }
@@ -215,18 +238,27 @@ const Profile = () => {
 
             if (error) throw error;
 
-            alert('Preferências de notificação salvas com sucesso!');
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: 'Preferências Salvas',
+                message: 'Suas configurações de notificação foram atualizadas.'
+            });
             setShowNotificationsModal(false);
 
-            // Optional: Force a page reload or context refresh if needed, 
-            // but for now we rely on the DB update being enough. 
-            // The AuthContext doesn't auto-refresh on external updates easily without a function.
-            // For a better UX, we might want to reload the window or add a refreshUser method to AuthContext.
-            window.location.reload();
+            // Em vez de reload imediato, poderíamos recarregar após o modal fechar
+            // ou simplesmente confiar que as variáveis locais estão corretas.
+            // Para garantir que o Header mostre dados atualizados se necessário:
+            // window.location.reload();
 
         } catch (error) {
             console.error('Erro ao salvar notificações:', error);
-            alert('Erro ao salvar preferências. Tente novamente.');
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro',
+                message: 'Não foi possível salvar suas preferências. Tente novamente.'
+            });
         } finally {
             setIsSaving(false);
         }
@@ -691,6 +723,20 @@ const Profile = () => {
                     </div>
                 </div>
             )}
+
+            <FeedbackModal
+                isOpen={feedback.isOpen}
+                onClose={() => {
+                    setFeedback({ ...feedback, isOpen: false });
+                    // Se for sucesso de notificações, talvez queira recarregar aqui para atualizar o resto da app
+                    if (feedback.title === 'Preferências Salvas') {
+                        window.location.reload();
+                    }
+                }}
+                type={feedback.type}
+                title={feedback.title}
+                message={feedback.message}
+            />
         </div>
     );
 };
