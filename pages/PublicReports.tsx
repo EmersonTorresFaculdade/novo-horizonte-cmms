@@ -31,9 +31,13 @@ import html2canvas from 'html2canvas';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-// Basic Error Boundary
-class ErrorBoundary extends React.Component<any, any> {
-    constructor(props: any) {
+interface ErrorBoundaryState {
+    hasError: boolean;
+    error: any;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+    constructor(props: { children: React.ReactNode }) {
         super(props);
         this.state = { hasError: false, error: null };
     }
@@ -72,7 +76,7 @@ const ReportsContent = () => {
     const [searchParams] = useSearchParams();
     const [period, setPeriod] = useState('month');
     const [loading, setLoading] = useState(true);
-    const [isExporting, setIsExporting] = useState(false);
+    const [isExporting, setIsExporting] = useState(searchParams.get('auto_export') === 'true');
     const [exportFinished, setExportFinished] = useState(false);
     const reportRef = useRef<HTMLDivElement>(null);
 
