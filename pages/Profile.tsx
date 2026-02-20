@@ -23,17 +23,21 @@ import { useAuth } from '../contexts/AuthContext';
 import { Eye, EyeOff, BellRing, Smartphone } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
 import FeedbackModal from '../components/FeedbackModal';
+import { useSettings } from '../contexts/SettingsContext';
 
 const Profile = () => {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { profile: globalProfile, updateProfile: updateGlobalProfile } = useProfile();
-    const { user, login } = useAuth(); // Usado para reautenticar/verificar senha
+    const { user, login, isAdmin } = useAuth(); // Usado para reautenticar/verificar senha
 
     const [profileData, setProfileData] = useState(globalProfile);
     const [isEditing, setIsEditing] = useState(false);
     const [tempData, setTempData] = useState(profileData);
     const [isSaving, setIsSaving] = useState(false);
+
+    // Configurações globais (para o Relatório do Admin)
+    const { settings, updateSettings, saveSettings } = useSettings();
 
     // Modals state
     const [showPasswordModal, setShowPasswordModal] = useState(false);
@@ -57,7 +61,9 @@ const Profile = () => {
     const [notificationSettings, setNotificationSettings] = useState({
         email: user?.email_notifications ?? true,
         push: user?.push_notifications ?? true,
-        whatsapp: user?.whatsapp_notifications ?? false
+        whatsapp: user?.whatsapp_notifications ?? false,
+        dailyReport: user?.daily_report ?? false,
+        reportFrequency: user?.report_frequency ?? 'diario'
     });
 
     const [feedback, setFeedback] = useState<{
@@ -232,7 +238,9 @@ const Profile = () => {
                 .update({
                     email_notifications: notificationSettings.email,
                     whatsapp_notifications: notificationSettings.whatsapp,
-                    push_notifications: notificationSettings.push
+                    push_notifications: notificationSettings.push,
+                    daily_report: notificationSettings.dailyReport,
+                    report_frequency: notificationSettings.reportFrequency
                 })
                 .eq('id', user?.id);
 
@@ -703,6 +711,62 @@ const Profile = () => {
                                     <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
                                 </label>
                             </div>
+
+                            {isAdmin() && (
+                                <>
+                                    <hr className="my-6 border-slate-100" />
+                                    <h4 className="font-bold text-slate-900 mb-4">Relatórios do Sistema (Admin)</h4>
+
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                                                <Briefcase size={20} />
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-slate-900">Relatório Técnico Consolidado</p>
+                                                <p className="text-sm text-slate-500">Resumo geral enviado para o e-mail da empresa</p>
+                                            </div>
+                                        </div>
+                                        <label className="relative inline-flex items-center cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={notificationSettings.dailyReport}
+                                                onChange={e => setNotificationSettings({ ...notificationSettings, dailyReport: e.target.checked })}
+                                                className="sr-only peer"
+                                            />
+                                            <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+
+                                    {notificationSettings.dailyReport && (
+                                        <div className="ml-14 mt-2 mb-4 animate-in fade-in slide-in-from-top-2">
+                                            <label className="block text-xs font-semibold text-slate-600 mb-2 uppercase tracking-winder">
+                                                Frequência de Envio
+                                            </label>
+                                            <div className="grid grid-cols-3 gap-2">
+                                                {[
+                                                    { id: 'diario', label: 'Diário' },
+                                                    { id: 'semanal', label: 'Semanal' },
+                                                    { id: 'mensal', label: 'Mensal' }
+                                                ].map((freq) => (
+                                                    <button
+                                                        type="button"
+                                                        key={freq.id}
+                                                        onClick={() => setNotificationSettings({ ...notificationSettings, reportFrequency: freq.id })}
+                                                        className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border-2 ${notificationSettings.reportFrequency === freq.id
+                                                            ? 'bg-primary text-white border-primary shadow-md'
+                                                            : 'bg-white text-slate-600 border-slate-100 hover:border-slate-200'
+                                                            }`}
+                                                    >
+                                                        {freq.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
 
                             <div className="flex justify-end gap-3 mt-6">
                                 <button

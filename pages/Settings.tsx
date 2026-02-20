@@ -183,7 +183,6 @@ const Settings = () => {
     const tabs = [
         { id: 'general', label: 'Geral', icon: Building2 },
         { id: 'integrations', label: 'Integrações', icon: Webhook },
-        { id: 'notifications', label: 'Notificações', icon: Bell },
         { id: 'appearance', label: 'Aparência', icon: Palette },
         { id: 'security', label: 'Segurança', icon: Shield },
         { id: 'data', label: 'Dados', icon: Database }
@@ -430,66 +429,6 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Notifications Settings */}
-                        {activeTab === 'notifications' && (
-                            <div className="p-6">
-                                <h3 className="text-lg font-bold text-slate-900 mb-6">Notificações</h3>
-                                <div className="space-y-4">
-                                    {[
-                                        { key: 'emailNotifications', label: 'Notificações por Email', description: 'Receba atualizações importantes por email' },
-                                        { key: 'whatsappNotifications', label: 'Notificações por WhatsApp', description: 'Receba alertas críticos via WhatsApp' },
-                                        { key: 'workOrderAlerts', label: 'Alertas de Ordem de Serviço', description: 'Notificações sobre novas ordens e atualizações' },
-                                        { key: 'criticalAlerts', label: 'Alertas Críticos', description: 'Notificações para situações urgentes' },
-                                        { key: 'dailyReport', label: 'Relatório Diário', description: 'Resumo periódico enviado por email' }
-                                    ].map((item) => (
-                                        <div key={item.key} className="space-y-4">
-                                            <div className="flex items-start justify-between p-4 bg-slate-50 rounded-lg">
-                                                <div className="flex-1">
-                                                    <h4 className="font-semibold text-slate-900">{item.label}</h4>
-                                                    <p className="text-sm text-slate-500 mt-1">{item.description}</p>
-                                                </div>
-                                                <button
-                                                    onClick={() => updateSettings({ [item.key]: !settings[item.key as keyof typeof settings] })}
-                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings[item.key as keyof typeof settings] ? 'bg-primary' : 'bg-slate-200'
-                                                        }`}
-                                                >
-                                                    <span
-                                                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings[item.key as keyof typeof settings] ? 'translate-x-6' : 'translate-x-1'
-                                                            }`}
-                                                    />
-                                                </button>
-                                            </div>
-
-                                            {item.key === 'dailyReport' && settings.dailyReport && (
-                                                <div className="ml-4 p-4 border-l-2 border-primary bg-slate-50 rounded-r-lg animate-in fade-in slide-in-from-left-2 duration-300">
-                                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                                        Frequência do Relatório
-                                                    </label>
-                                                    <div className="grid grid-cols-3 gap-2">
-                                                        {[
-                                                            { id: 'diario', label: 'Diário' },
-                                                            { id: 'semanal', label: 'Semanal' },
-                                                            { id: 'mensal', label: 'Mensal' }
-                                                        ].map((freq) => (
-                                                            <button
-                                                                key={freq.id}
-                                                                onClick={() => updateSettings({ reportFrequency: freq.id })}
-                                                                className={`px-3 py-2 rounded-lg text-xs font-bold transition-all border-2 ${settings.reportFrequency === freq.id
-                                                                    ? 'bg-primary text-white border-primary shadow-md'
-                                                                    : 'bg-white text-slate-600 border-slate-100 hover:border-slate-200'
-                                                                    }`}
-                                                            >
-                                                                {freq.label}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
 
                         {/* Appearance Settings */}
                         {activeTab === 'appearance' && (

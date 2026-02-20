@@ -19,6 +19,8 @@ export interface User {
     email_notifications?: boolean;
     whatsapp_notifications?: boolean;
     push_notifications?: boolean;
+    daily_report?: boolean;
+    report_frequency?: string;
 }
 
 interface AuthContextType {
