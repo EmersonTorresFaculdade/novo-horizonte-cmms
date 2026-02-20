@@ -316,18 +316,7 @@ const Settings = () => {
                                         />
                                     </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                                            <Mail size={16} />
-                                            Email da Empresa
-                                        </label>
-                                        <input
-                                            type="email"
-                                            value={settings.companyEmail}
-                                            onChange={(e) => updateSettings({ companyEmail: e.target.value })}
-                                            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                                        />
-                                    </div>
+
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
