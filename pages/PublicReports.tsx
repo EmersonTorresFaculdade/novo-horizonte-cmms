@@ -31,12 +31,20 @@ import html2canvas from 'html2canvas';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
-interface ErrorBoundaryState {
+interface Props {
+    children: React.ReactNode;
+}
+
+interface State {
     hasError: boolean;
     error: any;
 }
 
-class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+// @ts-nocheck
+class ErrorBoundary extends React.Component<
+    { children: React.ReactNode },
+    { hasError: boolean; error: any }
+> {
     constructor(props: { children: React.ReactNode }) {
         super(props);
         this.state = { hasError: false, error: null };
@@ -230,7 +238,19 @@ const ReportsContent = () => {
             const inventoryVal = invData.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_value)), 0);
 
             // --- Advanced Analytics ---
-            const totalRepairHours = completedWO.reduce((acc, wo) => acc + (Number(wo.repair_hours) || 0), 0);
+            const totalRepairHours = completedWO.reduce((acc, wo: any) => {
+                const storedRepair = Number(wo.repair_hours) || 0;
+                if (storedRepair > 0) return acc + storedRepair;
+
+                if (wo.created_at && wo.updated_at) {
+                    const start = new Date(wo.created_at).getTime();
+                    const end = new Date(wo.updated_at).getTime();
+                    const downtime = (end - start) / (1000 * 60 * 60);
+                    const response = Number(wo.response_hours) || 0;
+                    return acc + Math.max(0, downtime - response);
+                }
+                return acc;
+            }, 0);
             const mttr = completedWO.length > 0 ? (totalRepairHours / completedWO.length).toFixed(1) : 0;
 
             const periodDays = Math.max(1, Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 3600 * 24)));
@@ -242,19 +262,38 @@ const ReportsContent = () => {
 
             const reliability = totalPossibleTime > 0 ? ((operationalTime / totalPossibleTime) * 100).toFixed(1) : 100;
 
-            // Labor Cost Calculation (Per Work Order)
-            const laborCost = completedWO.reduce((acc, wo) => {
-                const hours = Number(wo.repair_hours) || 0;
-                const rate = Number(wo.hourly_rate) || 50; // Fallback to 50 if null
+            // MTTA (Mean Time To Acknowledge/Attend) - Fallback logic for completeness
+            const respondedWO = woData.filter((wo: any) =>
+                (Number(wo.response_hours) > 0) ||
+                (wo.status?.toLowerCase() === 'em manutenção' || wo.status?.toLowerCase() === 'concluído')
+            );
+
+            const totalResponseHours = respondedWO.reduce((acc, wo: any) => {
+                const storedResponse = Number(wo.response_hours) || 0;
+                if (storedResponse > 0) return acc + storedResponse;
+
+                if (wo.created_at) {
+                    const start = new Date(wo.created_at).getTime();
+                    const end = wo.updated_at ? new Date(wo.updated_at).getTime() : new Date().getTime();
+                    const diff = (end - start) / (1000 * 60 * 60);
+                    return acc + Math.max(0, diff);
+                }
+                return acc;
+            }, 0);
+
+            const mtta = respondedWO.length > 0 ? (totalResponseHours / respondedWO.length).toFixed(1) : 0;
+
+            // Labor Cost Calculation - Include closed and maintenance for total estimate
+            const laborCost = woData.reduce((acc, wo) => {
+                const status = wo.status?.toLowerCase();
+                if (status === 'pendente') return acc;
+
+                const hours = Number(wo.repair_hours) || Number(wo.downtime_hours) || 0;
+                const rate = Number(wo.hourly_rate) || 50;
                 return acc + (hours * rate);
             }, 0);
 
-            const partsCostEst = woData.reduce((acc, wo) => {
-                if (wo.priority === 'Baixa') return acc + 50;
-                if (wo.priority === 'Média') return acc + 100;
-                if (wo.priority === 'Alta') return acc + 300;
-                return acc + 500;
-            }, 0);
+            const partsCostEst = (woData as any[]).reduce((acc, wo) => acc + (Number(wo.parts_cost) || 0), 0);
 
             const totalCost = laborCost + partsCostEst;
 
@@ -624,9 +663,9 @@ const ReportsContent = () => {
                                         </div>
                                         <div className="text-right">
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border ${(wo.status?.toLowerCase().includes('concluid')) ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                                                    (wo.status?.toLowerCase().includes('manuten')) ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                                        (wo.status?.toLowerCase() === 'pendente') ? 'bg-orange-50 text-orange-700 border-orange-200' :
-                                                            'bg-slate-50 text-slate-600 border-slate-200'
+                                                (wo.status?.toLowerCase().includes('manuten')) ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                                    (wo.status?.toLowerCase() === 'pendente') ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                                                        'bg-slate-50 text-slate-600 border-slate-200'
                                                 }`}>
                                                 {wo.status}
                                             </span>

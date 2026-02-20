@@ -53,7 +53,7 @@ serve(async (req) => {
         // 1. Fetch Webhook URL & Settings
         const { data: settings, error: settingsError } = await supabaseAdmin
             .from('app_settings')
-            .select('webhook_url, webhook_enabled, email_notifications, whatsapp_notifications')
+            .select('webhook_url, webhook_enabled')
             .single()
 
         if (settingsError) throw new Error('Failed to fetch app settings.')
@@ -203,8 +203,6 @@ serve(async (req) => {
                 company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,
                 preferences: {
-                    email: settings.email_notifications,
-                    whatsapp: settings.whatsapp_notifications,
                     requester: requesterPreferences
                 },
                 adminPhone,

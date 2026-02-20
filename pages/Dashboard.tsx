@@ -47,11 +47,12 @@ interface DashboardKPIs {
   urgentTickets: number;
   downtimeRate: string;
   totalDowntime: number;
-  avgWait: number;
+  avgWait: number; // Agora será MTTA real
   avgExecution: number;
   completedTickets: number;
   maintenanceTickets: number;
   totalWorkOrders: number;
+  backlog: number; // Novo campo
 }
 
 const Dashboard = () => {
@@ -61,7 +62,7 @@ const Dashboard = () => {
     mtbf: '0h',
     openTickets: 0,
     urgentTickets: 0,
-    downtimeRate: '0%',
+    downtimeRate: '0.0%',
     totalDowntime: 0,
     avgWait: 0,
     avgExecution: 0,
@@ -69,9 +70,11 @@ const Dashboard = () => {
     maintenanceTickets: 0,
     totalWorkOrders: 0
   });
+
   const [technicianData, setTechnicianData] = useState<TechnicianPerf[]>([]);
   const [downtimeData, setDowntimeData] = useState<MachineDowntime[]>([]);
   const [timelineData, setTimelineData] = useState<TimelineEvent[]>([]);
+  const [timelineEvents, setTimelineEvents] = useState<TimelineEvent[]>([]);
   const [recentOrders, setRecentOrders] = useState<WorkOrder[]>([]);
   const [totalDowntime, setTotalDowntime] = useState(0);
 
@@ -95,7 +98,7 @@ const Dashboard = () => {
 
       if (orderError) throw orderError;
 
-      const orders = allOrders || [];
+      const orders = (allOrders as any[]) || [];
 
       // --- Calculate KPIs ---
       const totalOrders = orders.length;
@@ -108,8 +111,22 @@ const Dashboard = () => {
       const maintenanceCount = maintenanceOrders.length;
       const completedCount = closedOrders.length;
 
-      // 2. MTTR (Mean Time To Repair) - Average repair_hours
-      const totalRepairHours = closedOrders.reduce((acc, o) => acc + (Number(o.repair_hours) || 0), 0);
+      // 2. MTTR (Mean Time To Repair) - Average repair time
+      // Fallback: If repair_hours is 0, use (updated_at - created_at) - response_hours
+      const totalRepairHours = closedOrders.reduce((acc, o) => {
+        const storedRepair = Number(o.repair_hours) || 0;
+        if (storedRepair > 0) return acc + storedRepair;
+
+        if (o.created_at && o.updated_at) {
+          const start = new Date(o.created_at).getTime();
+          const end = new Date(o.updated_at).getTime();
+          const downtime = (end - start) / (1000 * 60 * 60);
+          const response = Number(o.response_hours) || 0;
+          return acc + Math.max(0, downtime - response);
+        }
+        return acc;
+      }, 0);
+
       const avgRepairHours = closedOrders.length > 0 ? totalRepairHours / closedOrders.length : 0;
       const mttrH = Math.floor(avgRepairHours);
       const mttrM = Math.round((avgRepairHours - mttrH) * 60);
@@ -117,9 +134,30 @@ const Dashboard = () => {
       // 3. Total Downtime & Average Wait
       const totalDowntimeVal = orders.reduce((acc, o) => acc + (Number(o.downtime_hours) || 0), 0);
 
-      // Approx Wait = Downtime - Repair (simplified)
-      const totalWait = Math.max(0, totalDowntimeVal - totalRepairHours);
-      const avgWaitVal = closedOrders.length > 0 ? totalWait / closedOrders.length : 0;
+      // MTTA Abertura -> Em Manutenção
+      // Consideramos orders que já têm response_hours OU que estão em Manutenção/Concluídas (usando updated_at como proxy se response_hours for 0)
+      const respondedOrders = orders.filter(o =>
+        (Number(o.response_hours) > 0) ||
+        (o.status?.toLowerCase() === 'em manutenção' || o.status?.toLowerCase() === 'concluído')
+      );
+
+      const totalResponseHours = respondedOrders.reduce((acc, o) => {
+        const storedResponse = Number(o.response_hours) || 0;
+        if (storedResponse > 0) return acc + storedResponse;
+
+        // Fallback: se está em manutenção mas não tem valor salvo, usa a diferença de tempo
+        if (o.created_at) {
+          const start = new Date(o.created_at).getTime();
+          const end = o.updated_at ? new Date(o.updated_at).getTime() : new Date().getTime();
+          const diff = (end - start) / (1000 * 60 * 60);
+          return acc + Math.max(0, diff);
+        }
+        return acc;
+      }, 0);
+
+      const avgWaitVal = respondedOrders.length > 0 ? totalResponseHours / respondedOrders.length : 0; // Isso agora é o MTTA
+
+
 
       // 4. MTBF (Simplified: Total Time Window / Failures)
       const timeWindowHours = 30 * 24; // 30 days
@@ -132,6 +170,8 @@ const Dashboard = () => {
         mttr: `${mttrH}h ${mttrM}m`,
         mtbf: `${Math.round(mtbfVal)}h`,
         openTickets: openCount,
+        downtimeRate: `${downtimeRateVal.toFixed(1)}%`,
+        totalDowntime: totalDowntimeVal,
         avgWait: Number(avgWaitVal.toFixed(1)),
         avgExecution: Number(avgRepairHours.toFixed(1)),
         completedTickets: completedCount,
@@ -149,18 +189,23 @@ const Dashboard = () => {
       // 3. Calculate Tech Performance
       if (techs) {
         const closedCountMap: Record<string, number> = {};
+        const openCountMap: Record<string, number> = {}; // Added for open tickets per tech
         closedOrders.forEach(order => {
           if (order.technician_id) {
             closedCountMap[order.technician_id] = (closedCountMap[order.technician_id] || 0) + 1;
+          }
+        });
+        openOrders.forEach(order => {
+          if (order.technician_id) {
+            openCountMap[order.technician_id] = (openCountMap[order.technician_id] || 0) + 1;
           }
         });
 
         const sortedTechs = techs.map(t => ({
           name: t.name,
           closed: closedCountMap[t.id] || 0,
-          open: 0
-        })).sort((a, b) => b.closed - a.closed);
-
+          open: openCountMap[t.id] || 0
+        })).sort((a, b) => b.closed - a.closed).slice(0, 5);
         setTechnicianData(sortedTechs);
       }
 
@@ -216,6 +261,7 @@ const Dashboard = () => {
         };
       });
       setTimelineData(timeline);
+      setTimelineEvents(timeline); // Assuming timelineEvents should be the same as timelineData for now
 
       // Map Recent Orders Table
       const tableData = orders.slice(0, 10).map(order => ({
@@ -386,7 +432,7 @@ const Dashboard = () => {
       </div>
 
       {/* Additional KPIs - Time Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-2">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-2">
         {/* Horas Paradas */}
         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow border-l-4 border-l-red-500">
           <div className="flex items-start justify-between mb-4">
@@ -402,28 +448,16 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Média Espera */}
+        {/* Média Espera / MTTA */}
         <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
           <div className="flex items-start justify-between mb-4">
             <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
               <Timer size={24} />
             </div>
-            <span className="text-xs text-slate-500">Abertura → Início</span>
+            <span className="text-xs text-slate-500" title="Mean Time To Acknowledge">Abertura → Atendimento (MTTA)</span>
           </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Média Espera</p>
+          <p className="text-slate-500 text-sm font-medium mb-1">Tempo Médio Atendimento (MTTA)</p>
           <h3 className="text-3xl font-bold text-orange-600 tracking-tight">{kpis.avgWait}h</h3>
-        </div>
-
-        {/* Média Execução */}
-        <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-start justify-between mb-4">
-            <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-              <Activity size={24} />
-            </div>
-            <span className="text-xs text-slate-500">Início → Conclusão</span>
-          </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">Média Execução</p>
-          <h3 className="text-3xl font-bold text-blue-600 tracking-tight">{kpis.avgExecution}h</h3>
         </div>
       </div>
 

@@ -45,6 +45,12 @@ interface WorkOrder {
       name: string;
       role: string;
    } | null;
+   response_hours?: number;
+   repair_hours?: number;
+   downtime_hours?: number;
+   estimated_hours?: number;
+   maintenance_type?: string;
+   parts_cost?: number;
 }
 
 interface Technician {
@@ -100,6 +106,10 @@ const WorkOrderDetails = () => {
    const [editIssue, setEditIssue] = useState('');
    const [editPriority, setEditPriority] = useState('');
    const [editFailureType, setEditFailureType] = useState('');
+   const [editMaintenanceType, setEditMaintenanceType] = useState('Corretiva');
+
+   // Novas métricas de PCM
+   const [partsCost, setPartsCost] = useState<number>(0);
 
    const [saving, setSaving] = useState(false);
    const [feedback, setFeedback] = useState<{
@@ -141,8 +151,11 @@ const WorkOrderDetails = () => {
          setEditIssue(workOrderData.issue);
          setEditPriority(workOrderData.priority);
          setEditFailureType(workOrderData.failure_type || 'mecanica'); // Default fallback
+         setEditMaintenanceType((workOrderData as any).maintenance_type || 'Corretiva');
          setReport(workOrderData.technical_report || ''); // Populate report state
          setHourlyRate(workOrderData.hourly_rate || 0);
+
+         setPartsCost(Number((workOrderData as any).parts_cost) || 0);
 
          if (workOrderData.technician_id) setSelectedTechId(workOrderData.technician_id);
 
@@ -177,6 +190,33 @@ const WorkOrderDetails = () => {
    const handleSave = async () => {
       setSaving(true);
       try {
+         const calculatedPartsCost = usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0);
+
+         let finalResponseHours = Number((workOrder as any).response_hours) || 0;
+         let finalDowntimeHours = Number((workOrder as any).downtime_hours) || 0;
+         let finalRepairHours = Number((workOrder as any).repair_hours) || 0;
+
+         const now = new Date();
+         const createdDate = workOrder?.created_at ? new Date(workOrder.created_at) : now;
+
+         // 1. Calculate Response Hours (MTTA) if missing
+         if ((status === 'Em Manutenção' || status === 'Concluído') &&
+            (!finalResponseHours || finalResponseHours === 0)) {
+            const diffInHrs = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+            finalResponseHours = Number(Math.max(0, diffInHrs).toFixed(2));
+         }
+
+         // 2. Calculate Downtime and Repair Hours if completing
+         if (status === 'Concluído') {
+            // Downtime = creation to now
+            const downtime = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+            finalDowntimeHours = Number(Math.max(0, downtime).toFixed(2));
+
+            // Repair = Downtime - Response
+            const repair = downtime - finalResponseHours;
+            finalRepairHours = Number(Math.max(0, repair).toFixed(2));
+         }
+
          const { error } = await supabase
             .from('work_orders')
             .update({
@@ -185,9 +225,15 @@ const WorkOrderDetails = () => {
                issue: editIssue,
                priority: editPriority,
                failure_type: editFailureType,
+               estimated_hours: 0,
+               maintenance_type: editMaintenanceType,
                technical_report: report,
                hourly_rate: hourlyRate,
-               updated_at: new Date().toISOString()
+               response_hours: finalResponseHours,
+               repair_hours: finalRepairHours,
+               downtime_hours: finalDowntimeHours,
+               parts_cost: calculatedPartsCost,
+               updated_at: now.toISOString()
             })
             .eq('id', id);
 
@@ -205,8 +251,10 @@ const WorkOrderDetails = () => {
                locationId: '',
                assignedTo: selectedTechId || undefined,
                requesterId: workOrder.requester_id || undefined,
-               technical_report: report
-            });
+               technical_report: report,
+               maintenance_type: editMaintenanceType,
+               estimated_hours: 0
+            } as any);
          }
 
          // Mostra o modal de sucesso com visual premium
@@ -434,8 +482,24 @@ const WorkOrderDetails = () => {
                      <option value="mecanica">Mecânica</option>
                      <option value="eletrica">Elétrica</option>
                      <option value="hidraulica">Hidráulica</option>
-                     <option value="software">Software</option>
-                     <option value="outro">Outro</option>
+                     <option value="software">Software / Painel</option>
+                     <option value="outro">Outro / Preventiva</option>
+                  </select>
+               </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-6 mb-6">
+               <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-500 uppercase">Classe de Manutenção</label>
+                  <select
+                     value={editMaintenanceType}
+                     onChange={(e) => setEditMaintenanceType(e.target.value)}
+                     disabled={!isEditing}
+                     className="w-full p-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                  >
+                     <option value="Corretiva">Corretiva (Quebra/Falha)</option>
+                     <option value="Preventiva">Preventiva (Agendada)</option>
+                     <option value="Preditiva">Preditiva (Inspeção/Medição)</option>
                   </select>
                </div>
             </div>
@@ -466,25 +530,22 @@ const WorkOrderDetails = () => {
                </div>
 
                {selectedTechId && (
-                  <div className="space-y-2">
-                     <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                        Valor Hora (R$)
-                        <span className="text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 font-normal">Editável</span>
-                     </label>
-                     <input
-                        type="number"
-                        value={hourlyRate}
-                        onChange={(e) => setHourlyRate(Number(e.target.value))}
-                        disabled={!isEditing}
-                        className="w-full p-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none disabled:bg-slate-50 disabled:text-slate-500"
-                        placeholder="0.00"
-                        step="0.01"
-                     />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
+                           Valor Hora (R$)
+                        </label>
+                        <input
+                           type="number"
+                           value={hourlyRate}
+                           onChange={(e) => setHourlyRate(Number(e.target.value))}
+                           disabled={!isEditing}
+                           className="w-full p-3 rounded-lg border border-slate-300 bg-white font-medium text-slate-700 focus:ring-2 focus:ring-primary/20 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                        />
+                     </div>
                   </div>
                )}
-            </div>
-
-            <div className="space-y-2 mb-6 mt-6">
+            </div>         <div className="space-y-2 mb-6 mt-6">
                <label className="text-xs font-bold text-slate-500 uppercase">Relatório Técnico / Solução</label>
                <textarea
                   rows={4}
@@ -496,118 +557,125 @@ const WorkOrderDetails = () => {
                ></textarea>
             </div>
 
-            {isEditing && (
-               <div className="flex justify-end pt-4 border-t border-slate-100">
-                  <button
-                     onClick={handleSave}
-                     disabled={saving}
-                     className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition-all disabled:opacity-70"
-                  >
-                     <Save size={18} />
-                     {saving ? 'Salvando...' : 'Salvar Alterações'}
-                  </button>
-               </div>
-            )}
-         </div>
+            {
+               isEditing && (
+                  <div className="flex justify-end pt-4 border-t border-slate-100">
+                     <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white font-bold rounded-lg hover:bg-primary-dark transition-all disabled:opacity-70"
+                     >
+                        <Save size={18} />
+                        {saving ? 'Salvando...' : 'Salvar Alterações'}
+                     </button>
+                  </div>
+               )
+            }
+         </div >
 
          {/* Parts Section */}
-         <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+         < div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6" >
             <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
                <Package size={18} className="text-slate-400" />
                Peças Utilizadas
             </h3>
 
-            {usedParts.length > 0 && (
-               <div className="mb-6 space-y-2 border rounded-lg overflow-hidden">
-                  <div className="bg-slate-50 px-4 py-2 border-b grid grid-cols-12 text-xs font-bold text-slate-500 uppercase">
-                     <div className="col-span-6">Item</div>
-                     <div className="col-span-2 text-right">Qtd</div>
-                     <div className="col-span-3 text-right">Valor Unit.</div>
-                     <div className="col-span-1"></div>
-                  </div>
-                  {usedParts.map(part => (
-                     <div key={part.id} className="grid grid-cols-12 items-center px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors">
-                        <div className="col-span-6 font-medium text-slate-700">{part.inventory_items?.name}</div>
-                        <div className="col-span-2 text-right text-slate-600">{part.quantity}</div>
-                        <div className="col-span-3 text-right text-slate-600">
-                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(part.inventory_items?.unit_value || 0)}
+            {
+               usedParts.length > 0 && (
+                  <div className="mb-6 space-y-2 border rounded-lg overflow-hidden">
+                     <div className="bg-slate-50 px-4 py-2 border-b grid grid-cols-12 text-xs font-bold text-slate-500 uppercase">
+                        <div className="col-span-6">Item</div>
+                        <div className="col-span-2 text-right">Qtd</div>
+                        <div className="col-span-3 text-right">Valor Unit.</div>
+                        <div className="col-span-1"></div>
+                     </div>
+                     {usedParts.map(part => (
+                        <div key={part.id} className="grid grid-cols-12 items-center px-4 py-3 border-b last:border-0 hover:bg-slate-50 transition-colors">
+                           <div className="col-span-6 font-medium text-slate-700">{part.inventory_items?.name}</div>
+                           <div className="col-span-2 text-right text-slate-600">{part.quantity}</div>
+                           <div className="col-span-3 text-right text-slate-600">
+                              {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(part.inventory_items?.unit_value || 0)}
+                           </div>
+                           <div className="col-span-1 text-right">
+                              {isEditing && (
+                                 <button
+                                    onClick={() => handleRemovePart(part.id)}
+                                    className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-all"
+                                    title="Remover peça"
+                                 >
+                                    <Trash2 size={16} />
+                                 </button>
+                              )}
+                           </div>
                         </div>
-                        <div className="col-span-1 text-right">
-                           {isEditing && (
-                              <button
-                                 onClick={() => handleRemovePart(part.id)}
-                                 className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-50 transition-all"
-                                 title="Remover peça"
-                              >
-                                 <Trash2 size={16} />
-                              </button>
+                     ))}
+                     <div className="bg-slate-50 px-4 py-3 grid grid-cols-12 text-xs font-bold text-slate-700">
+                        <div className="col-span-8 text-right pr-4">TOTAL PEÇAS:</div>
+                        <div className="col-span-3 text-right">
+                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                              usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
                            )}
                         </div>
+                        <div className="col-span-1"></div>
                      </div>
-                  ))}
-                  <div className="bg-slate-50 px-4 py-3 grid grid-cols-12 text-xs font-bold text-slate-700">
-                     <div className="col-span-8 text-right pr-4">TOTAL PEÇAS:</div>
-                     <div className="col-span-3 text-right">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                           usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
-                        )}
-                     </div>
-                     <div className="col-span-1"></div>
                   </div>
-               </div>
-            )}
+               )}
 
-            {isEditing && (
-               <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-                  <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
-                     <Package size={18} className="text-slate-400" />
-                     Adicionar Peças
-                  </h3>
-                  <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                     <select
-                        value={selectedPartId}
-                        onChange={(e) => setSelectedPartId(e.target.value)}
-                        className="flex-1 p-2.5 rounded-lg border border-slate-300 bg-white text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                     >
-                        <option value="">Selecione uma peça para adicionar...</option>
-                        {availableParts.map(part => (
-                           <option key={part.id} value={part.id}>
-                              {part.name} - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(part.unit_value)} (Estoque: {part.quantity})
-                           </option>
-                        ))}
-                     </select>
-                     <input
-                        type="number"
-                        value={partQuantity}
-                        onChange={(e) => setPartQuantity(parseInt(e.target.value))}
-                        min={1}
-                        className="w-20 p-2.5 rounded-lg border border-slate-300 text-center text-sm outline-none focus:ring-2 focus:ring-primary/20"
-                     />
-                     <button
-                        onClick={handleAddPart}
-                        disabled={!selectedPartId}
-                        className="bg-primary text-white p-2.5 rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
-                     >
-                        <Plus size={18} />
-                     </button>
+            {
+               isEditing && (
+                  <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+                     <h3 className="text-base font-bold text-slate-900 flex items-center gap-2 mb-6 border-b border-slate-100 pb-4">
+                        <Package size={18} className="text-slate-400" />
+                        Adicionar Peças
+                     </h3>
+                     <div className="flex items-center gap-2 p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                        <select
+                           value={selectedPartId}
+                           onChange={(e) => setSelectedPartId(e.target.value)}
+                           className="flex-1 p-2.5 rounded-lg border border-slate-300 bg-white text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        >
+                           <option value="">Selecione uma peça para adicionar...</option>
+                           {availableParts.map(part => (
+                              <option key={part.id} value={part.id}>
+                                 {part.name} - {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(part.unit_value)} (Estoque: {part.quantity})
+                              </option>
+                           ))}
+                        </select>
+                        <input
+                           type="number"
+                           value={partQuantity}
+                           onChange={(e) => setPartQuantity(parseInt(e.target.value))}
+                           min={1}
+                           className="w-20 p-2.5 rounded-lg border border-slate-300 text-center text-sm outline-none focus:ring-2 focus:ring-primary/20"
+                        />
+                        <button
+                           onClick={handleAddPart}
+                           disabled={!selectedPartId}
+                           className="bg-primary text-white p-2.5 rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
+                        >
+                           <Plus size={18} />
+                        </button>
+                     </div>
                   </div>
-               </div>
-            )}
+               )
+            }
 
             {/* Feedback Modal Reutilizável */}
-            {feedback && (
-               <FeedbackModal
-                  isOpen={!!feedback}
-                  onClose={() => setFeedback(null)}
-                  type={feedback.type}
-                  title={feedback.title}
-                  message={feedback.message}
-                  onConfirm={feedback.onConfirm}
-                  showLoadingDots={feedback.showLoading}
-               />
-            )}
-         </div>
-      </div>
+            {
+               feedback && (
+                  <FeedbackModal
+                     isOpen={!!feedback}
+                     onClose={() => setFeedback(null)}
+                     type={feedback.type}
+                     title={feedback.title}
+                     message={feedback.message}
+                     onConfirm={feedback.onConfirm}
+                     showLoadingDots={feedback.showLoading}
+                  />
+               )
+            }
+         </div >
+      </div >
    );
 };
 

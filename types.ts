@@ -10,6 +10,10 @@ export interface WorkOrder {
   sector: string;
   failure_type: string;
   technical_report?: string;
+  maintenance_type?: 'Preventiva' | 'Corretiva' | 'Preditiva';
+  response_hours?: number;
+  estimated_hours?: number;
+  parts_cost?: number;
 }
 
 export interface Technician {

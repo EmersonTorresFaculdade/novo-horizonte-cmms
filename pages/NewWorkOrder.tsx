@@ -18,7 +18,6 @@ interface Asset {
 const NewWorkOrder = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [priority, setPriority] = useState('Média'); // Default: Média (Capitalized + Accent)
   const [loading, setLoading] = useState(false);
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
@@ -33,9 +32,10 @@ const NewWorkOrder = () => {
 
   // Form State
   const [selectedAssetId, setSelectedAssetId] = useState('');
-
   const [issueDescription, setIssueDescription] = useState('');
+  const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta'>('Média');
   const [failureType, setFailureType] = useState('mecanica');
+  const [maintenanceType, setMaintenanceType] = useState<'Preventiva' | 'Corretiva' | 'Preditiva'>('Corretiva');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -76,7 +76,12 @@ const NewWorkOrder = () => {
         sector: asset?.sector || 'Geral',
         order_number: orderNumber,
         date: new Date().toISOString(),
-        requester_id: user?.id
+        requester_id: user?.id,
+        maintenance_type: maintenanceType,
+        estimated_hours: 0,
+        downtime_hours: 0,
+        parts_cost: 0,
+        response_hours: 0
       };
 
       console.log('Enviando payload:', payload);
@@ -172,7 +177,7 @@ const NewWorkOrder = () => {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Tipo de Falha</label>
+              <label className="text-sm font-semibold text-slate-900">Tipo de Falha / Serviço</label>
               <select
                 value={failureType}
                 onChange={(e) => setFailureType(e.target.value)}
@@ -182,10 +187,25 @@ const NewWorkOrder = () => {
                 <option value="eletrica">Elétrica</option>
                 <option value="hidraulica">Hidráulica</option>
                 <option value="software">Software / Painel</option>
-                <option value="outro">Outro</option>
+                <option value="outro">Outro / Preventiva</option>
               </select>
             </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-semibold text-slate-900">Classe de Manutenção</label>
+              <select
+                value={maintenanceType}
+                onChange={(e) => setMaintenanceType(e.target.value as any)}
+                className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+              >
+                <option value="Corretiva">Corretiva (Quebra/Falha)</option>
+                <option value="Preventiva">Preventiva (Agendada)</option>
+                <option value="Preditiva">Preditiva (Inspeção/Medição)</option>
+              </select>
+            </div>
+
           </div>
+
 
 
 
