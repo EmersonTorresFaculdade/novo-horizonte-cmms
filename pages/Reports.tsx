@@ -389,19 +389,19 @@ const ReportsContent = () => {
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-3 opacity-10"><Clock size={40} /></div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">MTTR (Médio Reparo)</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tempo Médio de Reparo</p>
                         <h3 className="text-2xl font-black text-slate-900">{stats.mttr} <span className="text-sm font-normal text-slate-500">horas</span></h3>
                         <p className="text-xs text-green-600 mt-2 font-medium">Meta: &lt; 2.0h</p>
                     </div>
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-3 opacity-10"><CheckCircle size={40} /></div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">MTBF (Confiabilidade)</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Tempo Médio Entre Falhas</p>
                         <h3 className="text-2xl font-black text-slate-900">{stats.mtbf} <span className="text-sm font-normal text-slate-500">horas</span></h3>
-                        <p className="text-xs text-blue-600 mt-2 font-medium">Entre falhas</p>
+                        <p className="text-xs text-blue-600 mt-2 font-medium">Intervalo de falhas</p>
                     </div>
                     <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-3 opacity-10"><ThumbsUp size={40} /></div>
-                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Disponibilidade</p>
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">Confiabilidade do Sistema</p>
                         <h3 className="text-2xl font-black text-slate-900">{stats.reliability}%</h3>
                         <p className="text-xs text-slate-500 mt-2">Tempo Operacional</p>
                     </div>

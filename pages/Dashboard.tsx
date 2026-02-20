@@ -351,7 +351,7 @@ const Dashboard = () => {
               -5%
             </span>
           </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">MTTR (Tempo de Reparo)</p>
+          <p className="text-slate-500 text-sm font-medium mb-1">Tempo Médio de Reparo</p>
           <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.mttr}</h3>
         </div>
 
@@ -366,7 +366,7 @@ const Dashboard = () => {
               +8%
             </span>
           </div>
-          <p className="text-slate-500 text-sm font-medium mb-1">MTBF (Intervalo Falhas)</p>
+          <p className="text-slate-500 text-sm font-medium mb-1">Tempo Médio Entre Falhas</p>
           <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.mtbf}</h3>
         </div>
 
