@@ -94,6 +94,35 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         }
     }, []);
 
+    // Effect to apply appearance settings
+    useEffect(() => {
+        const root = document.documentElement;
+
+        // Apply Primary Color
+        if (settings.primaryColor) {
+            root.style.setProperty('--primary-color', settings.primaryColor);
+
+            // Generate a slightly darker version for hover states (simplified)
+            // If it's a hex, we could calculate it, or just use opacity/filter in CSS
+            // For now, let's just use the same or a fixed darkening if needed
+            root.style.setProperty('--primary-dark-color', `${settings.primaryColor}dd`);
+        }
+
+        // Apply Theme
+        if (settings.theme === 'dark') {
+            root.classList.add('dark');
+        } else {
+            root.classList.remove('dark');
+        }
+
+        // Apply Compact Mode
+        if (settings.compactMode) {
+            root.classList.add('compact-mode');
+        } else {
+            root.classList.remove('compact-mode');
+        }
+    }, [settings.primaryColor, settings.theme, settings.compactMode]);
+
     const loadSettingsFromDb = async () => {
         try {
             setLoading(true);

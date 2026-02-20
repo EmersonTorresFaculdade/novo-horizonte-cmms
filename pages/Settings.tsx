@@ -452,14 +452,24 @@ const Settings = () => {
                                             Cor Primária
                                         </label>
                                         <div className="grid grid-cols-5 gap-3">
-                                            {['#10b981', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b'].map((color) => (
+                                            {/* Professional Palette */}
+                                            {[
+                                                { name: 'Emeralda (Padrão)', color: '#10b981' },
+                                                { name: 'Oceano', color: '#0ea5e9' },
+                                                { name: 'Safira', color: '#2563eb' },
+                                                { name: 'Ametista', color: '#8b5cf6' },
+                                                { name: 'Ardósia', color: '#475569' }
+                                            ].map((item) => (
                                                 <button
-                                                    key={color}
-                                                    onClick={() => updateSettings({ primaryColor: color })}
-                                                    className={`h-12 rounded-lg border-2 transition-all ${settings.primaryColor === color ? 'border-slate-900 scale-110' : 'border-transparent'
+                                                    key={item.color}
+                                                    title={item.name}
+                                                    onClick={() => updateSettings({ primaryColor: item.color })}
+                                                    className={`h-12 rounded-lg border-2 transition-all flex items-center justify-center ${settings.primaryColor === item.color ? 'border-slate-900 scale-105 shadow-sm' : 'border-transparent'
                                                         }`}
-                                                    style={{ backgroundColor: color }}
-                                                />
+                                                    style={{ backgroundColor: item.color }}
+                                                >
+                                                    {settings.primaryColor === item.color && <Check size={20} className="text-white drop-shadow-sm" />}
+                                                </button>
                                             ))}
                                         </div>
                                     </div>

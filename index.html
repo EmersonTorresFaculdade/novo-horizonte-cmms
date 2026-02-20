@@ -18,20 +18,36 @@
             display: ['Inter', 'sans-serif'],
           },
           colors: {
-            primary: "#11d473",
-            "primary-dark": "#0ea65a",
+            primary: "var(--primary-color)",
+            "primary-dark": "var(--primary-dark-color)",
             "brand-dark": "#0e1b2a",
             "brand-accent": "#f59e0b",
-            background: "#f6f8f7",
+            background: "var(--bg-color)",
           }
         },
       },
     }
   </script>
   <style>
+    :root {
+      --primary-color: #11d473;
+      --primary-dark-color: #0ea65a;
+      --bg-color: #f6f8f7;
+      --text-main: #1e293b;
+      --text-muted: #64748b;
+    }
+
+    .dark {
+      --bg-color: #0f172a;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
     body {
       font-family: 'Inter', sans-serif;
-      background-color: #f6f8f7;
+      background-color: var(--bg-color);
+      color: var(--text-main);
+      transition: background-color 0.3s ease, color 0.3s ease;
     }
 
     /* Custom scrollbar */
