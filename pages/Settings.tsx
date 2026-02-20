@@ -183,9 +183,9 @@ const Settings = () => {
     const tabs = [
         { id: 'general', label: 'Geral', icon: Building2 },
         { id: 'integrations', label: 'Integrações', icon: Webhook },
-        { id: 'appearance', label: 'Aparência', icon: Palette },
-        { id: 'security', label: 'Segurança', icon: Shield }
+        { id: 'appearance', label: 'Aparência', icon: Palette }
     ];
+
 
 
     return (
@@ -484,59 +484,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Security Settings */}
-                        {activeTab === 'security' && (
-                            <div className="p-6">
-                                <h3 className="text-lg font-bold text-slate-900 mb-6">Segurança</h3>
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                                        <div>
-                                            <h4 className="font-semibold text-slate-900">Autenticação de Dois Fatores</h4>
-                                            <p className="text-sm text-slate-500 mt-1">Adicione uma camada extra de segurança</p>
-                                        </div>
-                                        <button
-                                            onClick={() => updateSettings({ twoFactorAuth: !settings.twoFactorAuth })}
-                                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.twoFactorAuth ? 'bg-primary' : 'bg-slate-200'
-                                                }`}
-                                        >
-                                            <span
-                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.twoFactorAuth ? 'translate-x-6' : 'translate-x-1'
-                                                    }`}
-                                            />
-                                        </button>
-                                    </div>
 
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                            Tempo Limite de Sessão (minutos)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={settings.sessionTimeout}
-                                            onChange={(e) => updateSettings({ sessionTimeout: parseInt(e.target.value) })}
-                                            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                            Validade da Senha (dias)
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={settings.passwordExpiry}
-                                            onChange={(e) => updateSettings({ passwordExpiry: parseInt(e.target.value) })}
-                                            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                                        />
-                                    </div>
-
-                                    <button className="w-full py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-all flex items-center justify-center gap-2">
-                                        <Lock size={16} />
-                                        Alterar Senha
-                                    </button>
-                                </div>
-                            </div>
-                        )}
 
 
                     </div>
