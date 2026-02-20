@@ -184,9 +184,9 @@ const Settings = () => {
         { id: 'general', label: 'Geral', icon: Building2 },
         { id: 'integrations', label: 'Integrações', icon: Webhook },
         { id: 'appearance', label: 'Aparência', icon: Palette },
-        { id: 'security', label: 'Segurança', icon: Shield },
-        { id: 'data', label: 'Dados', icon: Database }
+        { id: 'security', label: 'Segurança', icon: Shield }
     ];
+
 
     return (
         <div className="flex flex-col gap-6">
@@ -538,64 +538,7 @@ const Settings = () => {
                             </div>
                         )}
 
-                        {/* Data Settings */}
-                        {activeTab === 'data' && (
-                            <div className="p-6">
-                                <h3 className="text-lg font-bold text-slate-900 mb-6">Gerenciamento de Dados</h3>
-                                <div className="space-y-4">
-                                    <div className="p-6 bg-blue-50 border border-blue-100 rounded-lg">
-                                        <div className="flex items-start gap-4">
-                                            <div className="p-3 bg-blue-100 rounded-lg">
-                                                <Download size={24} className="text-blue-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-bold text-slate-900">Exportar Dados</h4>
-                                                <p className="text-sm text-slate-600 mt-2">
-                                                    Exporte todos os seus dados em formato CSV ou JSON
-                                                </p>
-                                                <button className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium text-sm transition-all">
-                                                    Exportar Agora
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
 
-                                    <div className="p-6 bg-green-50 border border-green-100 rounded-lg">
-                                        <div className="flex items-start gap-4">
-                                            <div className="p-3 bg-green-100 rounded-lg">
-                                                <Upload size={24} className="text-green-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-bold text-slate-900">Importar Dados</h4>
-                                                <p className="text-sm text-slate-600 mt-2">
-                                                    Importe dados de sistemas anteriores
-                                                </p>
-                                                <button className="mt-4 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium text-sm transition-all">
-                                                    Importar Arquivo
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="p-6 bg-red-50 border border-red-100 rounded-lg">
-                                        <div className="flex items-start gap-4">
-                                            <div className="p-3 bg-red-100 rounded-lg">
-                                                <Database size={24} className="text-red-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h4 className="font-bold text-slate-900">Limpar Cache</h4>
-                                                <p className="text-sm text-slate-600 mt-2">
-                                                    Limpe o cache do sistema para resolver problemas de performance
-                                                </p>
-                                                <button className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium text-sm transition-all">
-                                                    Limpar Cache
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
