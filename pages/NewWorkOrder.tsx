@@ -64,7 +64,7 @@ const NewWorkOrder = () => {
       }
 
       const asset = assets.find(a => a.id === selectedAssetId);
-      const orderNumber = `OS-${Math.floor(1000 + Math.random() * 9000)}`;
+      // O número da OS agora é gerado automaticamente pelo banco de dados (Trigger: tr_generate_order_number)
 
       const payload = {
         asset_id: selectedAssetId,
@@ -74,7 +74,6 @@ const NewWorkOrder = () => {
         issue: issueDescription, // Apenas a descrição limpa
         failure_type: failureType, // Novo campo
         sector: asset?.sector || 'Geral',
-        order_number: orderNumber,
         date: new Date().toISOString(),
         requester_id: user?.id,
         maintenance_type: maintenanceType,
@@ -98,7 +97,7 @@ const NewWorkOrder = () => {
       if (newOrder) {
         await NotificationService.notifyWorkOrderCreated({
           id: newOrder.id,
-          title: `Nova OS: ${orderNumber}`,
+          title: `Nova OS: ${newOrder.order_number}`,
           description: issueDescription,
           priority: priority,
           status: 'Pendente',
