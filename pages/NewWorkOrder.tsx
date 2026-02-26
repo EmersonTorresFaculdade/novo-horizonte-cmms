@@ -1,7 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, UploadCloud, AlertTriangle, CheckCircle2, Info, User, Lock } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import {
+  ArrowLeft,
+  Plus,
+  X,
+  Save,
+  AlertTriangle,
+  CheckCircle2,
+  Search,
+  ChevronDown,
+  ChevronRight,
+  UploadCloud,
+  User,
+  MapPin,
+  AlertOctagon,
+  Loader2,
+  MoreHorizontal,
+  Info,
+  Settings,
+  Wrench,
+  Building2
+} from 'lucide-react';
+import { supabase, supabaseUntyped } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { NotificationService } from '../services/NotificationService';
 import FeedbackModal from '../components/FeedbackModal';
@@ -9,11 +29,10 @@ import FeedbackModal from '../components/FeedbackModal';
 interface Asset {
   id: string;
   name: string;
-  max_sector?: string;
+  code: string;
   sector: string;
+  category: string;
 }
-
-
 
 const NewWorkOrder = () => {
   const navigate = useNavigate();
@@ -29,50 +48,98 @@ const NewWorkOrder = () => {
   // Data State
   const [assets, setAssets] = useState<Asset[]>([]);
 
-
   // Form State
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
-  const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta'>('Média');
+  const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta' | 'Crítica'>('Média');
   const [failureType, setFailureType] = useState('mecanica');
   const [maintenanceType, setMaintenanceType] = useState<'Preventiva' | 'Corretiva' | 'Preditiva'>('Corretiva');
+  const [maintenanceCategory, setMaintenanceCategory] = useState<'Equipamento' | 'Predial' | 'Outros'>('Equipamento');
+
+  // Quick Asset Registration State
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAssetData, setQuickAssetData] = useState({
+    name: '',
+    sector: '',
+    image_url: ''
+  });
+  const [assetSearchTerm, setAssetSearchTerm] = useState('');
+  const [isAssetSelectorOpen, setIsAssetSelectorOpen] = useState(false);
+
+  const fetchAssets = async () => {
+    try {
+      const { data: assetsData, error } = await supabaseUntyped.from('assets').select('id, name, code, sector, category');
+      if (error) throw error;
+      if (assetsData) setAssets(assetsData as Asset[]);
+    } catch (error) {
+      console.error('Error fetching assets:', error);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      const { data: assetsData } = await supabase.from('assets').select('id, name, sector');
-
-
-      if (assetsData) setAssets(assetsData);
-      if (assetsData) setAssets(assetsData);
-    };
-    fetchData();
+    fetchAssets();
   }, []);
+
+  const generateAutoCode = async (category: string) => {
+    const prefix = category === 'Máquina' ? 'MAQ-' : category === 'Predial' ? 'PRE-' : 'OUT-';
+
+    const { data: existingAssets, error } = await supabase
+      .from('assets')
+      .select('code')
+      .ilike('code', `${prefix}%`);
+
+    if (error || !existingAssets || existingAssets.length === 0) {
+      return `${prefix}001`;
+    }
+
+    const numbers = existingAssets
+      .map(a => {
+        const parts = a.code.split('-');
+        return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+
+    const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+    const nextNumber = maxNumber + 1;
+
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      if (!selectedAssetId || !issueDescription) {
+      if (!issueDescription) {
         setFeedback({
           type: 'error',
           title: 'Campos Obrigatórios',
-          message: 'Por favor, selecione um equipamento e descreva detalhadamente o problema.'
+          message: 'Por favor, descreva detalhadamente o problema.'
+        });
+        setLoading(false);
+        return;
+      }
+
+      if (maintenanceCategory !== 'Outros' && !selectedAssetId) {
+        setFeedback({
+          type: 'error',
+          title: 'Campos Obrigatórios',
+          message: `Por favor, selecione um item da categoria ${maintenanceCategory}.`
         });
         setLoading(false);
         return;
       }
 
       const asset = assets.find(a => a.id === selectedAssetId);
-      // O número da OS agora é gerado automaticamente pelo banco de dados (Trigger: tr_generate_order_number)
 
       const payload = {
-        asset_id: selectedAssetId,
+        asset_id: maintenanceCategory !== 'Outros' ? selectedAssetId : null,
+        maintenance_category: maintenanceCategory,
         technician_id: null,
-        priority: priority, // Sends 'Baixa', 'Média', or 'Alta'
+        priority: priority,
         status: 'Pendente',
-        issue: issueDescription, // Apenas a descrição limpa
-        failure_type: failureType, // Novo campo
+        issue: issueDescription,
+        failure_type: failureType,
         sector: asset?.sector || 'Geral',
         date: new Date().toISOString(),
         requester_id: user?.id,
@@ -83,9 +150,7 @@ const NewWorkOrder = () => {
         response_hours: 0
       };
 
-      console.log('Enviando payload:', payload);
-
-      const { data: newOrder, error } = await supabase
+      const { data: newOrder, error } = await supabaseUntyped
         .from('work_orders')
         .insert([payload])
         .select()
@@ -93,22 +158,30 @@ const NewWorkOrder = () => {
 
       if (error) throw error;
 
-      // Trigger Notification
       if (newOrder) {
+        // Registrar atividade inicial
+        const actorName = user?.name || 'Administrador';
+        await supabaseUntyped.from('work_order_activities').insert({
+          work_order_id: newOrder.id,
+          user_id: user?.id,
+          user_name: actorName,
+          activity_type: 'creation',
+          description: 'criou o chamado'
+        });
+
         await NotificationService.notifyWorkOrderCreated({
           id: newOrder.id,
           title: `Nova OS: ${newOrder.order_number}`,
           description: issueDescription,
           priority: priority,
           status: 'Pendente',
-          assetId: selectedAssetId,
-          locationId: '', // Todo: fetch location if needed
+          assetId: selectedAssetId || undefined,
+          locationId: '',
           assignedTo: null,
           requesterId: user?.id
         });
       }
 
-      // Mostra o modal de sucesso com visual premium
       setFeedback({
         type: 'success',
         title: 'Chamado Aberto!',
@@ -116,7 +189,6 @@ const NewWorkOrder = () => {
         showLoading: true
       });
 
-      // Redireciona após 2.5 segundos
       setTimeout(() => {
         navigate('/work-orders');
       }, 2500);
@@ -133,178 +205,419 @@ const NewWorkOrder = () => {
     }
   };
 
+  const categoryIcons = [
+    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900', iconColor: 'text-blue-600', permission: 'manage_equipment' },
+    { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-900', iconColor: 'text-indigo-600', permission: 'manage_predial' },
+    { id: 'Outros', icon: MoreHorizontal, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900', iconColor: 'text-slate-600', permission: 'manage_others' }
+  ].filter(cat => {
+    // Verifica permissão específica do perfil (incluindo administradores)
+    const permKey = cat.permission as keyof typeof user;
+    return user ? !!user[permKey] : true;
+  });
+
+  // Ajustar categoria inicial se a padrão (Equipamento) não estiver disponível
+  useEffect(() => {
+    if (categoryIcons.length > 0 && !categoryIcons.find(c => c.id === maintenanceCategory)) {
+      setMaintenanceCategory(categoryIcons[0].id as any);
+    }
+  }, [categoryIcons]);
+
+  const handleQuickAddAsset = async () => {
+    if (!quickAssetData.name || !quickAssetData.sector) {
+      setFeedback({
+        type: 'error',
+        title: 'Campos Incompletos',
+        message: 'Preencha Nome e Setor para cadastrar o novo ativo.'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const dbCategory = maintenanceCategory === 'Predial' ? 'Predial' :
+        maintenanceCategory === 'Equipamento' ? 'Máquina' : 'Outros';
+      const autoCode = await generateAutoCode(dbCategory);
+
+      const { data, error } = await supabase
+        .from('assets')
+        .insert([{
+          name: quickAssetData.name,
+          code: autoCode,
+          sector: quickAssetData.sector,
+          category: dbCategory,
+          status: 'Operacional',
+          image_url: quickAssetData.image_url || null,
+          model: '',
+          manufacturer: ''
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      await fetchAssets();
+      setSelectedAssetId(data.id);
+      setShowQuickAdd(false);
+      setQuickAssetData({ name: '', sector: '', image_url: '' });
+
+      setFeedback({
+        type: 'success',
+        title: 'Ativo Cadastrado',
+        message: `O novo ativo foi registrado com o código ${autoCode} e selecionado.`
+      });
+    } catch (error: any) {
+      console.error('Error adding asset:', error);
+      setFeedback({
+        type: 'error',
+        title: 'Erro no Cadastro',
+        message: error.message || 'Não foi possível cadastrar o ativo agora.'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const priorities = [
+    { id: 'Baixa', label: 'Baixa', icon: CheckCircle2, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-500' },
+    { id: 'Média', label: 'Média', icon: AlertTriangle, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-500' },
+    { id: 'Alta', label: 'Alta', icon: AlertTriangle, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', iconColor: 'text-orange-500' },
+    { id: 'Crítica', label: 'Emergência', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
+  ];
+
+  const filteredAssets = assets
+    .filter(asset => {
+      if (maintenanceCategory === 'Equipamento') return asset.category === 'Máquina';
+      if (maintenanceCategory === 'Predial') return asset.category === 'Predial';
+      if (maintenanceCategory === 'Outros') return asset.category === 'Outros';
+      return false;
+    })
+    .filter(asset =>
+      asset.name.toLowerCase().includes(assetSearchTerm.toLowerCase()) ||
+      asset.code.toLowerCase().includes(assetSearchTerm.toLowerCase())
+    );
+
+  const selectedAsset = assets.find(a => a.id === selectedAssetId);
+
   return (
-    <div className="flex flex-col gap-6 max-w-4xl mx-auto">
-      {/* Breadcrumb & Header */}
-      <div className="flex flex-col gap-2 mb-2">
-        <nav className="flex items-center text-sm text-slate-500 mb-1">
-          <button onClick={() => navigate('/dashboard')} className="hover:text-primary">Início</button>
-          <ChevronRight size={14} className="mx-1" />
-          <button onClick={() => navigate('/work-orders')} className="hover:text-primary">Chamados</button>
-          <ChevronRight size={14} className="mx-1" />
-          <span className="text-slate-900 font-medium">Novo Chamado</span>
-        </nav>
-        <h2 className="text-3xl font-black text-slate-900 tracking-tight">Novo Chamado</h2>
-        <p className="text-slate-500">
-          Preencha os detalhes abaixo para solicitar manutenção corretiva ou preventiva.
-        </p>
+    <div className="flex flex-col gap-6 max-w-6xl mx-auto pb-12">
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex-1">
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight">Formulário de Abertura de Chamado</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            Envie um novo chamado para problemas de manutenção. Preencha todos os detalhes com atenção.
+          </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100/50">
+          <Info size={14} />
+          <span className="text-xs font-bold uppercase tracking-wide">Status: Será Pendente</span>
+        </div>
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-8">
-        <div className="flex justify-end mb-6">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold uppercase tracking-wide">
-            <Info size={14} /> Status: Será Pendente
-          </span>
-        </div>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-8 space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-6">
+              <div className="p-1.5 bg-slate-100 rounded-md text-slate-500">
+                <User size={16} />
+              </div>
+              Informações do Solicitante
+            </h3>
 
-        <form className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Equipamento / Máquina <span className="text-red-500">*</span></label>
-              <select
-                value={selectedAssetId}
-                onChange={(e) => setSelectedAssetId(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-              >
-                <option value="" disabled>Selecione o equipamento...</option>
-                {assets.map(asset => (
-                  <option key={asset.id} value={asset.id}>
-                    {asset.name} - {asset.sector}
-                  </option>
-                ))}
-              </select>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Nome Completo</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={user?.name || 'Administrador Root'}
+                  className="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-sm text-slate-600 outline-none font-medium"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">E-mail Corporativo</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={user?.email || 'ti@novohorizonte.com'}
+                  className="w-full px-4 py-2.5 bg-slate-50/50 border border-slate-200 rounded-lg text-sm text-slate-600 outline-none font-medium"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-6">
+              <div className="p-1.5 bg-slate-100 rounded-md text-slate-500">
+                <MapPin size={16} />
+              </div>
+              Detalhes do Local
+            </h3>
+
+            <div className="space-y-5">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
+                    Ativo vinculado a {maintenanceCategory === 'Equipamento' ? 'Máquina' : maintenanceCategory === 'Predial' ? 'Predial' : 'Geral'} <span className="text-red-500">*</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickAdd(!showQuickAdd)}
+                    className="text-xs font-bold text-primary hover:text-primary-dark flex items-center gap-1 transition-colors"
+                  >
+                    {showQuickAdd ? <X size={14} /> : <Plus size={14} />}
+                    {showQuickAdd ? 'Cancelar' : 'Cadastrar Novo'}
+                  </button>
+                </div>
+
+                {!showQuickAdd ? (
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsAssetSelectorOpen(!isAssetSelectorOpen)}
+                      className="w-full px-4 py-3 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 transition-all font-medium flex items-center justify-between cursor-pointer"
+                    >
+                      <span className={selectedAssetId ? 'text-slate-900' : 'text-slate-400'}>
+                        {selectedAsset ? `${selectedAsset.name} [${selectedAsset.code}]` : 'Selecione um ativo...'}
+                      </span>
+                      <ChevronDown size={18} className={`text-slate-400 transition-transform ${isAssetSelectorOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {isAssetSelectorOpen && (
+                      <div className="absolute z-50 w-full mt-2 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-2 border-b border-slate-100 bg-slate-50/50">
+                          <div className="relative">
+                            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                            <input
+                              type="text"
+                              placeholder="Pesquisar por nome ou código..."
+                              value={assetSearchTerm}
+                              onChange={(e) => setAssetSearchTerm(e.target.value)}
+                              autoFocus
+                              className="w-full pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-lg text-xs outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                        <div className="max-h-60 overflow-y-auto">
+                          {filteredAssets.length > 0 ? (
+                            filteredAssets.map(asset => (
+                              <button
+                                type="button"
+                                key={asset.id}
+                                onClick={() => {
+                                  setSelectedAssetId(asset.id);
+                                  setIsAssetSelectorOpen(false);
+                                  setAssetSearchTerm('');
+                                }}
+                                className={`w-full text-left px-4 py-3 text-sm border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors ${selectedAssetId === asset.id ? 'bg-primary/5 text-primary font-bold' : 'text-slate-700'}`}
+                              >
+                                <div className="font-bold text-slate-800 uppercase tracking-tight">{asset.name}</div>
+                                <div className="text-xs text-slate-500 font-medium">{asset.code} • {asset.sector}</div>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="px-4 py-8 text-center text-slate-500 text-xs">
+                              Nenhum ativo encontrado
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 shadow-inner">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Nome do Ativo</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Ar Condicionado Sala 10"
+                          value={quickAssetData.name}
+                          onChange={(e) => setQuickAssetData({ ...quickAssetData, name: e.target.value })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-primary transition-all"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Local / Setor</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Sala TI, Ferramentaria"
+                          value={quickAssetData.sector}
+                          onChange={(e) => setQuickAssetData({ ...quickAssetData, sector: e.target.value })}
+                          className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-primary transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Imagem do Ativo (URL)</label>
+                      <input
+                        type="text"
+                        placeholder="https://exemplo.com/imagem.jpg"
+                        value={quickAssetData.image_url}
+                        onChange={(e) => setQuickAssetData({ ...quickAssetData, image_url: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm outline-none focus:border-primary transition-all"
+                      />
+                    </div>
+                    <div className="flex justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={handleQuickAddAsset}
+                        disabled={loading}
+                        className="px-6 py-2.5 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-dark transition-all flex items-center gap-2 shadow-md shadow-primary/10 disabled:opacity-50"
+                      >
+                        {loading ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        SALVAR E SELECIONAR ATIVO
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Tipo de Falha / Serviço</label>
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Descrição do Problema <span className="text-red-500">*</span></label>
+              <textarea
+                value={issueDescription}
+                onChange={(e) => setIssueDescription(e.target.value)}
+                className="w-full p-4 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/10 resize-none transition-all font-medium"
+                rows={4}
+                placeholder="Descreva o problema com o máximo de detalhes possível..."
+              ></textarea>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Evidências / Fotos</label>
+              <div className="border border-dashed border-slate-300 rounded-lg p-6 flex items-center justify-center gap-4 hover:bg-slate-50/50 transition-colors cursor-pointer group">
+                <div className="p-2.5 bg-slate-100 rounded-md text-slate-500 group-hover:bg-slate-200 transition-colors">
+                  <UploadCloud size={20} />
+                </div>
+                <div className="text-sm font-medium text-slate-700">Fazer upload de arquivo</div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-6">
+              <div className="p-1.5 bg-slate-100 rounded-md text-slate-500">
+                <Wrench size={16} />
+              </div>
+              Tipo de Serviço
+            </h3>
+
+            <div className="flex flex-wrap gap-3">
+              {['Corretiva', 'Preventiva', 'Preditiva'].map(type => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setMaintenanceType(type as any)}
+                  className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all ${maintenanceType === type
+                    ? 'bg-[#0a2540] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    }`}
+                >
+                  {type === 'Preditiva' ? 'Inspeção' : type}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 space-y-1.5 max-w-sm">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Classificação da Falha</label>
               <select
                 value={failureType}
                 onChange={(e) => setFailureType(e.target.value)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:bg-white transition-all font-medium"
               >
                 <option value="mecanica">Mecânica</option>
                 <option value="eletrica">Elétrica</option>
                 <option value="hidraulica">Hidráulica</option>
-                <option value="software">Software / Painel</option>
-                <option value="outro">Outro / Preventiva</option>
+                <option value="outro">Geral</option>
               </select>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-semibold text-slate-900">Classe de Manutenção</label>
-              <select
-                value={maintenanceType}
-                onChange={(e) => setMaintenanceType(e.target.value as any)}
-                className="w-full px-4 py-3 rounded-lg border border-slate-300 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all"
-              >
-                <option value="Corretiva">Corretiva (Quebra/Falha)</option>
-                <option value="Preventiva">Preventiva (Agendada)</option>
-                <option value="Preditiva">Preditiva (Inspeção/Medição)</option>
-              </select>
-            </div>
-
           </div>
+        </div>
 
-
-
-
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-900">Nível de Prioridade <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div
-                onClick={() => setPriority('Baixa')}
-                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Baixa' ? 'border-green-500 bg-green-50' : 'border-slate-100 hover:border-slate-300'}`}
-              >
-                <div className={`p-2 rounded-full ${priority === 'Baixa' ? 'bg-green-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <Info size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-900">Baixa</p>
-                  <p className="text-xs text-slate-500">Não urgente</p>
-                </div>
-                {priority === 'Baixa' && <CheckCircle2 size={20} className="ml-auto text-green-500" />}
-              </div>
-
-              <div
-                onClick={() => setPriority('Média')}
-                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Média' ? 'border-yellow-500 bg-yellow-50' : 'border-slate-100 hover:border-slate-300'}`}
-              >
-                <div className={`p-2 rounded-full ${priority === 'Média' ? 'bg-yellow-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <AlertTriangle size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-900">Média</p>
-                  <p className="text-xs text-slate-500">Atenção necessária</p>
-                </div>
-                {priority === 'Média' && <CheckCircle2 size={20} className="ml-auto text-yellow-500" />}
-              </div>
-
-              <div
-                onClick={() => setPriority('Alta')}
-                className={`cursor-pointer rounded-xl border-2 p-4 flex items-center gap-3 transition-all ${priority === 'Alta' ? 'border-red-500 bg-red-50' : 'border-slate-100 hover:border-slate-300'}`}
-              >
-                <div className={`p-2 rounded-full ${priority === 'Alta' ? 'bg-red-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
-                  <AlertTriangle size={20} />
-                </div>
-                <div>
-                  <p className="font-bold text-slate-900">Alta</p>
-                  <p className="text-xs text-slate-500">Parada de produção</p>
-                </div>
-                {priority === 'Alta' && <CheckCircle2 size={20} className="ml-auto text-red-500" />}
-              </div>
+        <div className="lg:col-span-4 space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Tipo de Manutenção</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {categoryIcons.map(cat => (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => {
+                    setMaintenanceCategory(cat.id as any);
+                    if (cat.id !== 'Equipamento') setSelectedAssetId('');
+                  }}
+                  className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all group ${maintenanceCategory === cat.id
+                    ? `${cat.bg} ${cat.border} ${cat.text}`
+                    : 'bg-white border-transparent hover:border-slate-100 hover:bg-slate-50 text-slate-500'
+                    }`}
+                >
+                  <cat.icon size={24} strokeWidth={1.5} className={`mb-3 transition-colors ${maintenanceCategory === cat.id ? cat.iconColor : 'text-slate-400 group-hover:text-slate-600'}`} />
+                  <span className={`text-[11px] font-bold ${maintenanceCategory === cat.id ? cat.text : 'text-slate-500'}`}>{cat.label}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-900">Descrição do Problema <span className="text-red-500">*</span></label>
-            <p className="text-xs text-slate-500 mb-2">Descreva o que aconteceu, ruídos estranhos, mensagens de erro ou qualquer observação relevante.</p>
-            <textarea
-              rows={4}
-              value={issueDescription}
-              onChange={(e) => setIssueDescription(e.target.value)}
-              className="w-full px-4 py-3 rounded-lg border border-slate-300 focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all resize-none"
-              placeholder="Ex: A máquina parou de repente durante o ciclo de acabamento e apresentou o erro #404 no painel. Percebi um cheiro de queimado..."
-            ></textarea>
-          </div>
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-4">Prioridade</h3>
+            <div className="space-y-1">
+              {priorities.map(p => {
+                const isSelected = priority === p.id;
+                const bgColor = isSelected ? p.bg : 'bg-white hover:bg-slate-50';
+                const borderColor = isSelected ? p.border : 'border-slate-100';
+                const textColor = isSelected ? p.text : 'text-slate-600';
 
-          <div className="space-y-2">
-            <label className="text-sm font-semibold text-slate-900">Evidências / Fotos (Opcional)</label>
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 flex flex-col items-center justify-center text-center hover:bg-slate-50 transition-colors cursor-pointer group">
-              <div className="p-4 bg-slate-100 rounded-full text-slate-400 group-hover:text-primary group-hover:bg-primary/10 transition-all mb-3">
-                <UploadCloud size={32} />
-              </div>
-              <p className="text-sm font-medium text-primary">Clique para enviar <span className="text-slate-500 font-normal">ou arraste e solte</span></p>
-              <p className="text-xs text-slate-400 mt-1">PNG, JPG, GIF até 10MB</p>
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setPriority(p.id as any)}
+                    className={`w-full flex items-center justify-between p-3.5 border rounded-lg transition-all ${bgColor} ${borderColor}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`size-4 rounded-full border-2 flex items-center justify-center ${isSelected ? p.iconColor.replace('text-', 'border-') : 'border-slate-300'
+                        }`}>
+                        {isSelected && <div className={`size-2 rounded-full ${p.iconColor.replace('text-', 'bg-')}`}></div>}
+                      </div>
+                      <span className={`text-sm font-semibold ${textColor}`}>
+                        {p.label}
+                      </span>
+                    </div>
+                    {p.id === 'Média' ? (
+                      <span className={`font-bold text-lg leading-none ${isSelected ? p.iconColor : 'text-slate-300'}`}>-</span>
+                    ) : (
+                      <p.icon size={16} className={isSelected ? p.iconColor : 'text-slate-300'} />
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          <div className="pt-6 border-t border-slate-100 flex items-center justify-end gap-3">
-            <button
-              type="button"
-              onClick={() => navigate('/work-orders')}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-slate-600 hover:bg-slate-100 transition-colors"
-              disabled={loading}
-            >
-              Cancelar
-            </button>
+          <div className="pt-2">
             <button
               type="button"
               onClick={handleSubmit}
               disabled={loading}
-              className={`px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-primary hover:bg-primary-dark shadow-lg shadow-primary/20 flex items-center gap-2 transition-all ${loading ? 'opacity-70 cursor-not-allowed' : ''}`}
+              className={`w-full bg-[#0a2540] hover:bg-slate-800 text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-md ${loading ? 'opacity-70 cursor-not-allowed' : ''
+                }`}
             >
-              <div className="rotate-90">
-                <div className="-rotate-90">
-                  <CheckCircle2 size={18} />
-                </div>
-              </div>
-              {loading ? 'Abrindo...' : 'Abrir Chamado'}
+              {loading ? <Loader2 className="animate-spin" size={20} /> : <ChevronRight size={20} />}
+              ABRIR CHAMADO
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/work-orders')}
+              disabled={loading}
+              className="w-full mt-3 py-3 text-slate-500 font-bold text-sm hover:text-slate-800 transition-colors"
+            >
+              Cancelar
             </button>
           </div>
-        </form>
+        </div>
       </div>
 
-      {/* Feedback Modal Reutilizável */}
       {feedback && (
         <FeedbackModal
           isOpen={!!feedback}
@@ -312,7 +625,7 @@ const NewWorkOrder = () => {
           type={feedback.type}
           title={feedback.title}
           message={feedback.message}
-          showLoadingDots={feedback.showLoading}
+          showLoading={feedback.showLoading}
         />
       )}
     </div>

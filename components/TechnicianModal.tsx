@@ -225,12 +225,9 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                         } focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all`}
                                 >
                                     <option value="">Selecione...</option>
-                                    <option value="Mecânica">Mecânica</option>
-                                    <option value="Elétrica">Elétrica</option>
-                                    <option value="Hidráulica">Hidráulica</option>
-                                    <option value="Pneumática">Pneumática</option>
-                                    <option value="Eletrônica">Eletrônica</option>
-                                    <option value="Instrumentação">Instrumentação</option>
+                                    <option value="Máquinas">Máquinas</option>
+                                    <option value="Predial">Predial</option>
+                                    <option value="Outros">Outros</option>
                                     <option value="Geral">Geral</option>
                                 </select>
                                 {errors.specialty && (
