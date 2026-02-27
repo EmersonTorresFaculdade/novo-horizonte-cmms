@@ -12,7 +12,7 @@ export const workOrdersData: WorkOrder[] = [
         status: 'Aberto',
         date: '2h atrás',
         technician: 'Não atribuído'
-    },
+    } as any,
     {
         id: '#4023',
         asset: 'Robô de Solda R2',
@@ -22,7 +22,7 @@ export const workOrdersData: WorkOrder[] = [
         status: 'Aberto',
         date: '4h atrás',
         technician: 'Não atribuído'
-    },
+    } as any,
     // In Progress
     {
         id: '#4020',
@@ -34,7 +34,7 @@ export const workOrdersData: WorkOrder[] = [
         date: '1d atrás',
         technician: 'João Doe',
         technicianAvatar: IMAGES.technicianJohn
-    },
+    } as any,
     {
         id: '#4021',
         asset: 'Esteira A',
@@ -44,7 +44,7 @@ export const workOrdersData: WorkOrder[] = [
         status: 'Pendente',
         date: '30m atrás',
         technician: 'Pendente'
-    },
+    } as any,
     // Completed
     {
         id: '#4018',
@@ -56,7 +56,7 @@ export const workOrdersData: WorkOrder[] = [
         date: '2d atrás',
         technician: 'Jane Smith',
         technicianAvatar: IMAGES.technicianAna
-    },
+    } as any,
     {
         id: '#4015',
         asset: 'Compressor C1',
@@ -67,7 +67,7 @@ export const workOrdersData: WorkOrder[] = [
         date: '3d atrás',
         technician: 'Carlos Silva',
         technicianAvatar: IMAGES.profileCarlos
-    }
+    } as any
 ];
 
 export const inventoryData: InventoryItem[] = [

@@ -40,14 +40,16 @@ interface State {
     error: any;
 }
 
-// @ts-nocheck
 class ErrorBoundary extends React.Component<
     { children: React.ReactNode },
     { hasError: boolean; error: any }
 > {
+    public state = { hasError: false, error: null };
+    public props: { children: React.ReactNode };
+
     constructor(props: { children: React.ReactNode }) {
         super(props);
-        this.state = { hasError: false, error: null };
+        this.props = props;
     }
 
     static getDerivedStateFromError(error: any) {

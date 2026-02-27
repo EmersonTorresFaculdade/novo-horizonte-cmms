@@ -41,14 +41,16 @@ interface State {
     error: any;
 }
 
-// @ts-nocheck
 class ErrorBoundary extends React.Component<
     { children: React.ReactNode },
     { hasError: boolean; error: any }
 > {
+    public state = { hasError: false, error: null };
+    public props: { children: React.ReactNode };
+
     constructor(props: { children: React.ReactNode }) {
         super(props);
-        this.state = { hasError: false, error: null };
+        this.props = props;
     }
 
     static getDerivedStateFromError(error: any) {
@@ -218,7 +220,10 @@ const ReportsContent = () => {
             }, 0);
             const mttr = completedWO.length > 0 ? (totalRepairHours / completedWO.length).toFixed(1) : 0;
 
-            const periodDays = Math.max(1, Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 3600 * 24)));
+            let periodDays = Math.max(1, Math.floor((new Date().getTime() - startDate.getTime()) / (1000 * 3600 * 24)));
+            // Align 'month' report to exactly 30 days (720h) to match the standard Dashboard metrics
+            if (periodDays >= 28 && periodDays <= 31) periodDays = 30;
+
             const totalDowntimeHours = woData.reduce((acc, wo) => acc + (Number(wo.downtime_hours) || 0), 0);
             const totalPossibleTime = periodDays * 24 * (totalAssets || 1);
             const operationalTime = Math.max(0, totalPossibleTime - totalDowntimeHours);
@@ -248,14 +253,10 @@ const ReportsContent = () => {
 
             const mtta = respondedWO.length > 0 ? (totalResponseHours / respondedWO.length).toFixed(1) : 0;
 
-            // Labor Cost Calculation - Include closed and in-progress for total estimate
+            // Labor Cost Calculation - Only count REALIZED hours (repair_hours)
             const laborCost = woData.reduce((acc, wo) => {
-                const status = wo.status?.toLowerCase();
-                if (status === 'pendente') return acc;
-
-                // Use repair_hours if closed, otherwise downtime_hours so far as estimate
-                const hours = Number(wo.repair_hours) || Number(wo.downtime_hours) || 0;
-                const rate = Number(wo.hourly_rate) || 50;
+                const hours = Number(wo.repair_hours) || 0;
+                const rate = Number(wo.hourly_rate) || 0;
                 return acc + (hours * rate);
             }, 0);
 

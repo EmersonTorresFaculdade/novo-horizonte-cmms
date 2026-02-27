@@ -66,10 +66,10 @@ serve(async (req) => {
             )
         }
 
-        // 2. Fetch Admin(s) with individual preferences
+        // 2. Fetch Admin(s) with individual preferences and category permissions
         const { data: adminUsers } = await supabaseAdmin
             .from('users')
-            .select('id, phone, email, email_notifications, whatsapp_notifications')
+            .select('id, phone, email, email_notifications, whatsapp_notifications, manage_equipment, manage_predial, manage_others')
             .in('role', ['admin_root', 'admin'])
 
         let adminPhone = null;
@@ -87,7 +87,22 @@ serve(async (req) => {
             const uniqueEmails = new Set<string>();
             const uniquePhones = new Set<string>();
 
+            // Get maintenance category from work order (default to Equipamento if not present)
+            const woCategory = workOrder.maintenance_category || 'Equipamento';
+
             adminUsers.forEach(user => {
+                // Category filtering logic
+                let hasCategoryPermission = false;
+                if (user.manage_equipment && woCategory === 'Equipamento') hasCategoryPermission = true;
+                if (user.manage_predial && woCategory === 'Predial') hasCategoryPermission = true;
+                if (user.manage_others && woCategory === 'Outros') hasCategoryPermission = true;
+
+                // admin_root sees everything by default if they have at least one key? 
+                // Wait, last session we decided universally even admin_root is filtered.
+                // Let's stick to the strict category matching.
+
+                if (!hasCategoryPermission) return;
+
                 const profile = profileMap.get(user.id);
 
                 // Respect individual email preference
@@ -120,66 +135,117 @@ serve(async (req) => {
         const workOrderId = workOrder.id;
         const requesterId = workOrder.requesterId || workOrder.requester_id;
 
+        console.log(`Enriching work order ${workOrderId}, requester: ${requesterId}`);
+
         // Preserve URL if exists in input
         const originalUrl = workOrder.url || workOrder.link;
 
         let enrichedWorkOrder = { ...workOrder };
 
         if (workOrderId) {
-            const { data: dbWorkOrder, error: dbError } = await supabaseAdmin
-                .from('work_orders')
-                .select(`
-                    *,
-                    asset:assets(name, code),
-                    technician:technicians!technician_id(name),
-                    requester:users!requester_id(name, email, phone, email_notifications, whatsapp_notifications, push_notifications)
-                `)
-                .eq('id', workOrderId)
-                .single();
+            try {
+                // Use a simpler join or separate queries if the complex join fails
+                const { data: dbWorkOrder, error: dbError } = await supabaseAdmin
+                    .from('work_orders')
+                    .select(`
+                        *,
+                        asset:assets(name, code),
+                        technician:technicians!technician_id(name),
+                        requester:users!requester_id(name, email, phone, email_notifications, whatsapp_notifications, push_notifications)
+                    `)
+                    .eq('id', workOrderId)
+                    .maybeSingle();
 
-            if (dbError) {
-                console.error('Error fetching work order details:', dbError);
+                if (dbError) {
+                    console.error('Error fetching work order details with joins:', dbError);
+                    // Fallback to basic work order fetch if join failed
+                    const { data: basicOrder } = await supabaseAdmin
+                        .from('work_orders')
+                        .select('*')
+                        .eq('id', workOrderId)
+                        .maybeSingle();
+
+                    if (basicOrder) {
+                        enrichedWorkOrder = { ...enrichedWorkOrder, ...basicOrder };
+                    }
+                } else if (dbWorkOrder) {
+                    enrichedWorkOrder = {
+                        ...workOrder,
+                        ...dbWorkOrder,
+                        url: originalUrl || workOrder.url || enrichedWorkOrder.url,
+                        assetName: dbWorkOrder.asset?.name || 'N/A',
+                        assetCode: dbWorkOrder.asset?.code,
+                        technicianName: dbWorkOrder.technician?.name || 'Pendente',
+                        osNumber: dbWorkOrder.order_number || workOrder.osNumber || workOrder.order_number,
+                        description: dbWorkOrder.issue || workOrder.description || workOrder.issue,
+                        title: dbWorkOrder.issue || workOrder.title
+                    };
+
+                    if (dbWorkOrder.requester) {
+                        const userData = dbWorkOrder.requester;
+                        if (userData.phone) requesterPhone = formatPhone(userData.phone);
+                        if (userData.email) requesterEmail = userData.email;
+                        if (userData.name) requesterName = userData.name;
+                        requesterPreferences = {
+                            email: userData.email_notifications ?? true,
+                            whatsapp: userData.whatsapp_notifications ?? false,
+                            push: userData.push_notifications ?? true
+                        };
+                    }
+                }
+            } catch (innerError) {
+                console.error('Exception during work order enrichment:', innerError);
             }
 
-            if (dbWorkOrder) {
-                enrichedWorkOrder = {
-                    ...workOrder,
-                    ...dbWorkOrder,
-                    url: originalUrl || workOrder.url || enrichedWorkOrder.url,
-                    assetName: dbWorkOrder.asset?.name || 'N/A',
-                    assetCode: dbWorkOrder.asset?.code,
-                    technicianName: dbWorkOrder.technician?.name || 'Pendente',
-                    osNumber: dbWorkOrder.order_number || workOrder.osNumber || workOrder.order_number,
-                    description: dbWorkOrder.issue || workOrder.description || workOrder.issue,
-                    title: dbWorkOrder.issue || workOrder.title
-                };
-
-                if (dbWorkOrder.requester) {
-                    const userData = dbWorkOrder.requester;
-                    if (userData.phone) requesterPhone = formatPhone(userData.phone);
-                    if (userData.email) requesterEmail = userData.email;
-                    if (userData.name) requesterName = userData.name;
-                    requesterPreferences = {
-                        email: userData.email_notifications ?? true,
-                        whatsapp: userData.whatsapp_notifications ?? false,
-                        push: userData.push_notifications ?? true
-                    };
-                }
-
-                const profileRequesterId = dbWorkOrder.requester_id || requesterId;
-                if (profileRequesterId) {
+            // Independent fetch for requester profile if needed
+            const profileRequesterId = requesterId || enrichedWorkOrder.requester_id;
+            if (profileRequesterId) {
+                try {
                     const { data: profileData } = await supabaseAdmin
                         .from('user_profiles')
                         .select('phone, email, name')
                         .eq('id', profileRequesterId)
-                        .single();
+                        .maybeSingle();
+
                     if (profileData) {
                         if (profileData.phone) requesterPhone = formatPhone(profileData.phone);
                         if (profileData.email) requesterEmail = profileData.email;
                         if (profileData.name) requesterName = profileData.name;
                     }
+
+                    // Also fetch notification preferences from users table if not already set
+                    if (requesterPreferences.email === true && requesterPreferences.whatsapp === false) {
+                        const { data: userData } = await supabaseAdmin
+                            .from('users')
+                            .select('email_notifications, whatsapp_notifications, push_notifications')
+                            .eq('id', profileRequesterId)
+                            .maybeSingle();
+
+                        if (userData) {
+                            requesterPreferences = {
+                                email: userData.email_notifications ?? true,
+                                whatsapp: userData.whatsapp_notifications ?? false,
+                                push: userData.push_notifications ?? true
+                            };
+                        }
+                    }
+                } catch (profError) {
+                    console.error('Error fetching requester fallback data:', profError);
                 }
             }
+        }
+
+        // Filter out requester from admin lists to avoid duplicate notifications
+        if (requesterEmail) {
+            adminEmails = adminEmails.filter(email => email.toLowerCase() !== requesterEmail.toLowerCase());
+        }
+        if (requesterPhone) {
+            adminPhones = adminPhones.filter(phone => phone !== requesterPhone);
+        }
+
+        // Final values if enrichment failed but payload had data
+        if (!enrichedWorkOrder.order_number && (workOrder.order_number || workOrder.osNumber)) {
+            enrichedWorkOrder.order_number = workOrder.order_number || workOrder.osNumber;
         }
 
         if (event === 'test_notification') {
@@ -189,9 +255,37 @@ serve(async (req) => {
             requesterPreferences = { email: true, whatsapp: true, push: true };
         }
 
-        if (event === 'work_order_updated') {
+        if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled') {
             adminEmails = [];
             adminPhones = [];
+        }
+
+        let subject_display = "";
+        let intro_display = "";
+        const admin_name = body.adminName || "";
+        const currentStatus = enrichedWorkOrder.status || 'N/A';
+
+        if (event === 'work_order_created') {
+            subject_display = "🆕 Nova Ordem de Serviço";
+            intro_display = "foi criada";
+        } else if (event === 'work_order_reopened') {
+            subject_display = "🔄 Ordem de Serviço Reaberta";
+            intro_display = "foi reaberta";
+        } else if (event === 'work_order_cancelled') {
+            subject_display = "❌ Ordem de Serviço Cancelada";
+            intro_display = `foi cancelada${admin_name ? ` por ${admin_name}` : ''}`;
+        } else {
+            subject_display = "🔄 Atualização da Ordem de Serviço";
+            // Custom messages based on status
+            if (currentStatus === 'Recebido') {
+                intro_display = "foi recebida e está aguardando início";
+            } else if (currentStatus === 'Em Manutenção') {
+                intro_display = "entrou em manutenção";
+            } else if (currentStatus === 'Concluído') {
+                intro_display = "foi concluída com sucesso";
+            } else {
+                intro_display = `foi atualizada para o status: ${currentStatus}`;
+            }
         }
 
         const response = await fetch(settings.webhook_url, {
@@ -199,6 +293,9 @@ serve(async (req) => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 event: event,
+                subject_display,
+                intro_display,
+                admin_name,
                 timestamp: new Date().toISOString(),
                 company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,

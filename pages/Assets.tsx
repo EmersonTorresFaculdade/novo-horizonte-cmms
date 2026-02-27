@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw } from 'lucide-react';
+import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw, Wrench, Building2, Zap, Car, Monitor, MoreHorizontal, LayoutDashboard, Box } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FeedbackModal from '../components/FeedbackModal';
+import { useAuth } from '../contexts/AuthContext';
 
 interface Asset {
   id: string;
@@ -11,21 +12,45 @@ interface Asset {
   manufacturer: string;
   model: string;
   status: string;
+  category: string;
+  image_url?: string;
 }
 
 const Assets = () => {
+  const { user } = useAuth();
   const [isScanning, setIsScanning] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('Visão Geral');
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    code: '',
     name: '',
     sector: '',
-    manufacturer: '',
-    model: '',
-    status: 'Operacional'
+    category: 'Máquina',
+    image_url: ''
   });
+
+  // Atualiza a categoria padrão se o usuário não tiver acesso à categoria atual
+  useEffect(() => {
+    if (user && !editingId) {
+      setFormData(prev => {
+        if (
+          (prev.category === 'Máquina' && !user.manage_equipment) ||
+          (prev.category === 'Predial' && !user.manage_predial) ||
+          (prev.category === 'Outros' && !user.manage_others)
+        ) {
+          const defaultCat = user.manage_equipment ? 'Máquina'
+            : user.manage_predial ? 'Predial'
+              : user.manage_others ? 'Outros'
+                : 'Máquina';
+          return { ...prev, category: defaultCat };
+        }
+        return prev;
+      });
+    }
+  }, [user, editingId]);
+
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
     title: string;
@@ -33,8 +58,8 @@ const Assets = () => {
     onConfirm?: () => void;
   } | null>(null);
 
-  /* Edit State */
-  const [editingId, setEditingId] = useState<string | null>(null);
+
+
   const formRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -44,13 +69,28 @@ const Assets = () => {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('assets')
-        .select('*')
-        .order('name');
+      // Busca ativos e ordens de serviço ativas em paralelo
+      const [assetsRes, woRes] = await Promise.all([
+        supabase.from('assets').select('*').order('name'),
+        supabase.from('work_orders')
+          .select('asset_id, status, priority')
+          .not('status', 'in', '("Concluída", "Cancelada")')
+      ]);
 
-      if (error) throw error;
-      setAssets(data || []);
+      if (assetsRes.error) throw assetsRes.error;
+
+      const activeWOs = woRes.data || [];
+      const assetsWithStatus = (assetsRes.data || []).map(asset => {
+        const activeWO = activeWOs.find(wo => wo.asset_id === asset.id);
+        return {
+          ...asset,
+          // Se tiver OS ativa, o status vem da OS, senão é Operacional
+          status: activeWO ? activeWO.status : 'Operacional',
+          active_priority: activeWO?.priority
+        };
+      });
+
+      setAssets(assetsWithStatus);
     } catch (error) {
       console.error('Error fetching assets:', error);
     } finally {
@@ -58,7 +98,6 @@ const Assets = () => {
     }
   };
 
-  // Simplified input handler for cleaner code
   const handleChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -66,74 +105,114 @@ const Assets = () => {
   const handleEdit = (asset: Asset) => {
     setEditingId(asset.id);
     setFormData({
-      code: asset.code,
       name: asset.name,
       sector: asset.sector,
-      manufacturer: asset.manufacturer,
-      model: asset.model,
-      status: asset.status
+      category: asset.category || 'Máquina',
+      image_url: asset.image_url || ''
     });
-    // Scroll to form
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
     setFormData({
-      code: '',
       name: '',
       sector: '',
-      manufacturer: '',
-      model: '',
-      status: 'Operacional'
+      category: 'Máquina',
+      image_url: ''
     });
+  };
+
+  const generateAutoCode = async (category: string) => {
+    const prefix = category === 'Máquina' ? 'MAQ-' : category === 'Predial' ? 'PRE-' : 'OUT-';
+
+    // Buscar todos os ativos da categoria para encontrar o maior número sequencial
+    const { data: existingAssets, error } = await supabase
+      .from('assets')
+      .select('code')
+      .ilike('code', `${prefix}%`);
+
+    if (error) {
+      console.error('Erro ao buscar códigos existentes:', error);
+      return `${prefix}001`;
+    }
+
+    if (!existingAssets || existingAssets.length === 0) {
+      return `${prefix}001`;
+    }
+
+    // Extrair números, filtrar válidos e encontrar o máximo
+    const numbers = existingAssets
+      .map(a => {
+        const parts = a.code.split('-');
+        return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+      })
+      .filter(n => !isNaN(n));
+
+    const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+    const nextNumber = maxNumber + 1;
+
+    return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       if (editingId) {
-        console.log('Updating asset:', editingId, formData);
         // Update existing asset
-        const { data, error } = await supabase
-          .from('assets')
-          .update({
-            code: formData.code,
-            name: formData.name,
-            sector: formData.sector,
-            manufacturer: formData.manufacturer,
-            model: formData.model,
-            status: formData.status
-          })
-          .eq('id', editingId)
-          .select();
+        const currentAsset = assets.find(a => a.id === editingId);
 
-        console.log('Update result:', data, error);
+        // Comparação robusta (ignora espaços extras e diferença de maiúsculas/minúsculas)
+        const normalize = (cat: string) => (cat || '').trim().toLowerCase();
+        const categoryChanged = currentAsset && normalize(currentAsset.category) !== normalize(formData.category);
+
+        let updateData: any = {
+          name: formData.name,
+          sector: formData.sector,
+          category: formData.category,
+          model: '', // Campo não visível mas obrigatório no DB
+          manufacturer: '', // Campo não visível no DB
+          image_url: formData.image_url || null
+        };
+
+        if (categoryChanged) {
+          const newCode = await generateAutoCode(formData.category);
+          updateData.code = newCode;
+        }
+
+        const { error } = await supabase
+          .from('assets')
+          .update(updateData)
+          .eq('id', editingId);
 
         if (error) throw error;
         setFeedback({
           type: 'success',
-          title: 'Máquina Atualizada',
-          message: 'Os dados do equipamento foram atualizados com sucesso.'
+          title: 'Ativo Atualizado',
+          message: 'Os dados do ativo foram atualizados com sucesso.'
         });
       } else {
-        // Create new asset
+        // Create new asset with automatic code
+        const autoCode = await generateAutoCode(formData.category);
+
         const { error } = await supabase
           .from('assets')
           .insert([{
-            code: formData.code,
+            code: autoCode,
             name: formData.name,
             sector: formData.sector,
-            manufacturer: formData.manufacturer,
-            model: formData.model,
-            status: formData.status
+            category: formData.category,
+            status: 'Operacional',
+            model: '', // Campo não visível mas obrigatório no DB
+            manufacturer: '', // Campo não visível no DB
+            image_url: formData.image_url || null
           }]);
 
         if (error) throw error;
         setFeedback({
           type: 'success',
-          title: 'Máquina Cadastrada',
-          message: 'O novo equipamento foi registrado no sistema.'
+          title: 'Ativo Cadastrado',
+          message: `O novo ativo foi registrado com o código ${autoCode}.`
         });
       }
 
@@ -144,7 +223,7 @@ const Assets = () => {
       setFeedback({
         type: 'error',
         title: 'Erro ao Salvar',
-        message: 'Não foi possível salvar as informações da máquina.'
+        message: 'Não foi possível salvar as informações do ativo.'
       });
     }
   };
@@ -184,10 +263,27 @@ const Assets = () => {
     });
   };
 
-  const filteredAssets = assets.filter(asset =>
-    asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    asset.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredAssets = assets.filter(asset => {
+    const matchesSearch = asset.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      asset.code.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesCategory = false;
+    if (activeCategory === 'Visão Geral') {
+      const allowedCategories: string[] = [];
+      if (user?.manage_equipment) allowedCategories.push('Máquina');
+      if (user?.manage_predial) allowedCategories.push('Predial');
+      if (user?.manage_others) allowedCategories.push('Outros');
+
+      // Se não tiver nenhuma role específica, mostra Máquina como fallback (comportamento legado)
+      if (allowedCategories.length === 0) allowedCategories.push('Máquina');
+
+      matchesCategory = allowedCategories.includes(asset.category) || (allowedCategories.length === 0 && asset.category === 'Máquina');
+    } else {
+      matchesCategory = asset.category === activeCategory;
+    }
+
+    return matchesSearch && matchesCategory;
+  });
 
   return (
     <div className="flex flex-col gap-6 relative">
@@ -243,8 +339,8 @@ const Assets = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-slate-900">Cadastro de Máquinas</h2>
-          <p className="text-sm text-slate-500">Gerencie o parque industrial e ativos.</p>
+          <h2 className="text-2xl font-bold text-slate-900">Gestão de Ativos</h2>
+          <p className="text-sm text-slate-500">Gerencie máquinas, prédios, frota e infraestrutura.</p>
         </div>
 
         <div className="flex gap-2">
@@ -269,9 +365,9 @@ const Assets = () => {
       <div ref={formRef} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div>
-            <h3 className="text-base font-semibold text-slate-900">{editingId ? 'Editar Máquina' : 'Nova Máquina'}</h3>
+            <h3 className="text-base font-semibold text-slate-900">{editingId ? 'Editar Ativo' : 'Novo Ativo'}</h3>
             <p className="text-sm text-slate-500 mt-0.5">
-              {editingId ? 'Atualize os dados do equipamento abaixo.' : 'Preencha os dados abaixo para cadastrar um novo equipamento.'}
+              {editingId ? 'Atualize os dados do ativo abaixo.' : 'Preencha os dados abaixo para cadastrar um novo ativo no sistema.'}
             </p>
           </div>
           <div className="text-primary bg-primary/10 p-2 rounded-lg">
@@ -279,86 +375,59 @@ const Assets = () => {
           </div>
         </div>
         <div className="p-6">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Código</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-                  <QrCode size={18} />
-                </div>
-                <input
-                  value={formData.code}
-                  onChange={(e) => handleChange('code', e.target.value)}
-                  className="pl-10 block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 outline-none border px-3"
-                  placeholder="EX: MQ-001"
-                  type="text"
-                  required
-                />
-              </div>
-            </div>
-            <div className="flex flex-col gap-2 lg:col-span-2">
-              <label className="text-sm font-medium text-slate-700">Nome da Máquina</label>
+              <label className="text-sm font-medium text-slate-700">Nome do Ativo</label>
               <input
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
                 className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="Ex: Torno CNC 2000"
+                placeholder="Ex: Torno CNC, Ar Condicionado, Compressor"
                 type="text"
                 required
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Setor</label>
+              <label className="text-sm font-medium text-slate-700">Categoria</label>
               <select
+                value={formData.category}
+                onChange={(e) => handleChange('category', e.target.value)}
+                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                required
+              >
+                {user?.manage_equipment && <option value="Máquina">Máquina</option>}
+                {user?.manage_predial && <option value="Predial">Predial</option>}
+                {user?.manage_others && <option value="Outros">Outros</option>}
+                {(!user?.manage_equipment && !user?.manage_predial && !user?.manage_others) && <option value="Máquina">Máquina</option>}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-slate-700">Local / Setor</label>
+              <input
                 value={formData.sector}
                 onChange={(e) => handleChange('sector', e.target.value)}
                 className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                placeholder="Ex: Sala TI, Ferramentaria, Produção"
+                type="text"
                 required
-              >
-                <option value="" disabled>Selecione um setor</option>
-                <option value="Produção">Produção</option>
-                <option value="Manutenção">Manutenção</option>
-                <option value="Logística">Logística</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Fabricante</label>
-              <input
-                value={formData.manufacturer}
-                onChange={(e) => handleChange('manufacturer', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="Ex: Siemens"
-                type="text"
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Modelo</label>
-              <input
-                value={formData.model}
-                onChange={(e) => handleChange('model', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="Ex: S7-1200"
-                type="text"
               />
             </div>
 
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Status Inicial</label>
-              <select
-                value={formData.status}
-                onChange={(e) => handleChange('status', e.target.value)}
+              <label className="text-sm font-medium text-slate-700">Imagem do Ativo (URL)</label>
+              <input
+                value={formData.image_url}
+                onChange={(e) => handleChange('image_url', e.target.value)}
                 className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                disabled={!!editingId} // Disable manual status edit if editing, let the trigger handle it? Actually user might want to manually set it for downtime not related to WO. But the trigger will override it if there's a WO. Let's keep it enabled but warn? Or just enable it. The trigger fires on Work Order changes, not Asset changes, unless we add a trigger on Assets too. But the requirement is about Sync. Let's keep it enabled.
-              >
-                <option value="Operacional">Operacional</option>
-                <option value="Parada">Parada</option>
-                <option value="Em Manutenção">Em Manutenção</option>
-              </select>
+                placeholder="https://exemplo.com/imagem.jpg"
+                type="url"
+              />
             </div>
 
-            <div className="lg:col-span-3 flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
-              {editingId && (
+            <div className="lg:col-span-4 flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
+              {editingId ? (
                 <button
                   type="button"
                   onClick={handleCancelEdit}
@@ -366,23 +435,55 @@ const Assets = () => {
                 >
                   Cancelar Edição
                 </button>
-              )}
-              {!editingId && (
-                <button type="button" onClick={() => setFormData({ code: '', name: '', sector: '', manufacturer: '', model: '', status: 'Operacional' })} className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setFormData({
+                    name: '',
+                    sector: '',
+                    category: user?.manage_equipment ? 'Máquina' : user?.manage_predial ? 'Predial' : user?.manage_others ? 'Outros' : 'Máquina',
+                    image_url: ''
+                  })}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                >
+                  Limpar
+                </button>
               )}
               <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg flex items-center gap-2">
                 <Save size={18} />
-                {editingId ? 'Atualizar Máquina' : 'Salvar Máquina'}
+                {editingId ? 'Atualizar Ativo' : 'Salvar Ativo'}
               </button>
             </div>
           </form>
         </div>
       </div>
 
+      {/* Tabs / Filter categories */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {[
+          { id: 'Visão Geral', label: 'Visão Geral', icon: LayoutDashboard, show: true },
+          { id: 'Máquina', label: 'Máquinas', icon: Wrench, show: !!user?.manage_equipment },
+          { id: 'Predial', label: 'Predial', icon: Building2, show: !!user?.manage_predial },
+          { id: 'Outros', label: 'Outros', icon: Box, show: !!user?.manage_others },
+        ].filter(t => t.show !== false).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveCategory(tab.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${activeCategory === tab.id
+              ? 'bg-primary text-white shadow-md shadow-primary/20'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+          >
+            {activeCategory === tab.id ? <tab.icon size={16} /> : <tab.icon size={16} className="text-slate-400" />}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       {/* List */}
       <div className="bg-white rounded-xl shadow-sm border border-slate-100">
         <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-slate-900">Máquinas Cadastradas</h3>
+          <h3 className="font-bold text-slate-900">Ativos no Sistema</h3>
           <div className="flex gap-2">
             <div className="relative">
               <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -394,9 +495,6 @@ const Assets = () => {
                 className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
               />
             </div>
-            <button className="p-1.5 border border-slate-200 rounded-lg text-slate-500 hover:bg-slate-50">
-              <Filter size={18} />
-            </button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -405,13 +503,13 @@ const Assets = () => {
               <Loader2 className="animate-spin text-primary" />
             </div>
           ) : filteredAssets.length === 0 ? (
-            <div className="text-center p-8 text-slate-500">Nenhuma máquina encontrada.</div>
+            <div className="text-center p-8 text-slate-500">Nenhum ativo encontrado nesta categoria.</div>
           ) : (
             <table className="w-full text-left text-sm text-slate-600">
               <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
                 <tr>
-                  <th className="px-6 py-3">Código</th>
-                  <th className="px-6 py-3">Nome</th>
+                  <th className="px-6 py-3">CÓDIGO</th>
+                  <th className="px-6 py-3">NOME</th>
                   <th className="px-6 py-3">Setor</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3 text-right">Ações</th>
@@ -420,12 +518,32 @@ const Assets = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredAssets.map(asset => (
                   <tr key={asset.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 font-medium text-slate-900">{asset.code}</td>
-                    <td className="px-6 py-4">{asset.name}</td>
+                    <td className="px-6 py-4 font-bold text-slate-900">{asset.code}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        {asset.image_url ? (
+                          <img
+                            src={asset.image_url}
+                            alt={asset.name}
+                            className="w-10 h-10 rounded-lg object-cover border border-slate-200 flex-shrink-0"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
+                            {asset.category === 'Máquina' ? <Wrench size={18} /> :
+                              asset.category === 'Predial' ? <Building2 size={18} /> :
+                                <MoreHorizontal size={18} />}
+                          </div>
+                        )}
+                        <span className="font-medium text-slate-700">{asset.name}</span>
+                      </div>
+                    </td>
                     <td className="px-6 py-4">{asset.sector}</td>
                     <td className="px-6 py-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${asset.status === 'Operacional' ? 'bg-green-100 text-green-800' :
-                        asset.status === 'Parada' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold shadow-sm ${asset.status === 'Operacional' || asset.status === 'Ativo' ? 'bg-green-100 text-green-700' :
+                        asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-amber-100 text-amber-700' :
+                          asset.status === 'Crítico' ? 'bg-red-100 text-red-700' :
+                            'bg-blue-100 text-blue-700'
                         }`}>
                         {asset.status}
                       </span>

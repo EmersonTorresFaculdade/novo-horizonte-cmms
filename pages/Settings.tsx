@@ -192,11 +192,7 @@ const Settings = () => {
         <div className="flex flex-col gap-6">
             {/* Header */}
             <div className="flex flex-col gap-2">
-                <nav className="flex items-center text-sm text-slate-500 mb-1">
-                    <a href="#" className="hover:text-primary">Início</a>
-                    <ChevronRight size={14} className="mx-1" />
-                    <span className="text-slate-900 font-medium">Configurações</span>
-                </nav>
+
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                     <div>
                         <h2 className="text-3xl font-black text-slate-900 tracking-tight">Configurações</h2>

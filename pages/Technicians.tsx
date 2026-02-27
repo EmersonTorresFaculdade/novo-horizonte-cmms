@@ -1,202 +1,119 @@
-import React, { useState, useEffect } from 'react';
-import { UserPlus, Search, Edit2, Trash2, Loader2 } from 'lucide-react';
-import TechnicianModal, { TechnicianData } from '../components/TechnicianModal';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+    Users, Search, UserPlus, MoreVertical, Star, Clock,
+    Calendar as CalendarIcon, Filter, Download, Mail, Phone,
+    MapPin, Shield, Zap, ChevronRight, Award, TrendingUp,
+    ExternalLink, Edit2, Trash2, Building2, Wrench, User,
+    ChevronLeft, Loader2
+} from 'lucide-react';
+import { supabase, supabaseUntyped } from '../lib/supabase';
+import { Technician, ThirdPartyCompany } from '../types';
+import TechnicianModal from '../components/TechnicianModal';
+import ThirdPartyModal from '../components/ThirdPartyModal';
 import FeedbackModal from '../components/FeedbackModal';
+import { useNavigate } from 'react-router-dom';
 
-interface Technician {
-    id: string;
-    name: string;
-    specialty: string;
-    contact: string;
-    status: string;
-    avatar: string | null;
-    performance_open: number;
-    performance_closed: number;
-    hourly_rate?: number;
-}
-
-const Technicians = () => {
-    const [technicians, setTechnicians] = useState<Technician[]>([]);
-    const [filteredTechnicians, setFilteredTechnicians] = useState<Technician[]>([]);
+const Technicians: React.FC = () => {
+    const navigate = useNavigate();
+    const [mainTab, setMainTab] = useState<'internos' | 'terceirizados'>('internos');
+    const [activeTab, setActiveTab] = useState('Todos');
     const [searchTerm, setSearchTerm] = useState('');
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedTechnician, setSelectedTechnician] = useState<TechnicianData | null>(null);
+    const [technicians, setTechnicians] = useState<Technician[]>([]);
+    const [thirdPartyCompanies, setThirdPartyCompanies] = useState<ThirdPartyCompany[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [feedback, setFeedback] = useState<{
-        type: 'success' | 'error' | 'confirm' | 'info';
-        title: string;
-        message: string;
-        onConfirm?: () => void;
-    } | null>(null);
-    const [stats, setStats] = useState({
-        total: 0,
-        available: 0,
-        inField: 0,
-        inactive: 0
-    });
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [isThirdPartyModalOpen, setIsThirdPartyModalOpen] = useState(false);
+    const [selectedTechnician, setSelectedTechnician] = useState<Technician | null>(null);
+    const [selectedThirdParty, setSelectedThirdParty] = useState<ThirdPartyCompany | null>(null);
+    const [feedback, setFeedback] = useState<{ type: 'success' | 'error' | 'info'; title: string; message: string; onConfirm?: () => void } | null>(null);
+
+    // Pagination
+    const [currentPage, setCurrentPage] = useState(1);
+    const itemsPerPage = 8;
 
     useEffect(() => {
-        loadTechnicians();
+        loadData();
     }, []);
 
     useEffect(() => {
-        // Filter technicians based on search
-        if (searchTerm) {
-            const filtered = technicians.filter(tech =>
-                tech.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                tech.specialty.toLowerCase().includes(searchTerm.toLowerCase())
-            );
-            setFilteredTechnicians(filtered);
-        } else {
-            setFilteredTechnicians(technicians);
-        }
-    }, [searchTerm, technicians]);
+        setCurrentPage(1);
+    }, [searchTerm, activeTab]);
 
-    useEffect(() => {
-        // Calculate stats
-        const total = technicians.length;
-        const available = technicians.filter(t => t.status === 'Ativo').length;
-        const inField = technicians.filter(t => t.status === 'Em Campo').length;
-        const inactive = technicians.filter(t => t.status === 'Inativo').length;
-
-        setStats({ total, available, inField, inactive });
-    }, [technicians]);
-
-    const loadTechnicians = async () => {
+    const loadData = async () => {
+        setIsLoading(true);
         try {
-            setIsLoading(true);
-
-            // 1. Fetch Technicians
-            const { data: techs, error: techError } = await supabase
-                .from('technicians')
-                .select('*')
-                .order('name');
-
-            if (techError) throw techError;
-
-            // 2. Fetch Work Orders to calculate performance
-            const { data: orders, error: orderError } = await supabase
-                .from('work_orders')
-                .select('technician_id, status');
-
-            if (orderError) throw orderError;
-
-            // 3. Merge data
-            const computedTechs = (techs || []).map((tech: any) => {
-                // Filter orders for this technician using ID
-                const techOrders = orders?.filter((o: any) => o.technician_id === tech.id) || [];
-
-                const openCount = techOrders.filter((o: any) => ['Pendente', 'Em Andamento', 'Em Manutenção'].includes(o.status)).length;
-                const closedCount = techOrders.filter((o: any) => o.status === 'Concluído').length;
-
-                return {
-                    ...tech,
-                    performance_open: openCount,
-                    performance_closed: closedCount
-                };
-            });
-
-            setTechnicians(computedTechs);
+            await Promise.all([
+                loadTechnicians(),
+                loadThirdParties()
+            ]);
         } catch (error) {
-            console.error('Erro ao carregar técnicos:', error);
-            setFeedback({
-                type: 'error',
-                title: 'Erro de Carregamento',
-                message: 'Não foi possível carregar a lista de técnicos.'
-            });
+            console.error('Error loading data:', error);
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleSaveTechnician = async (technicianData: TechnicianData) => {
-        try {
-            if (technicianData.id) {
-                // Update existing
-                const { error } = await supabase
-                    .from('technicians')
-                    .update({
-                        name: technicianData.name,
-                        specialty: technicianData.specialty,
-                        contact: technicianData.contact,
-                        status: technicianData.status,
-                        avatar: technicianData.avatar,
-                        hourly_rate: technicianData.hourly_rate
-                    })
-                    .eq('id', technicianData.id);
+    const loadTechnicians = async () => {
+        const { data: techs, error } = await supabase
+            .from('technicians')
+            .select('*')
+            .order('name');
 
-                if (error) throw error;
-            } else {
-                // Create new
-                const { error } = await supabase
-                    .from('technicians')
-                    .insert([{
-                        name: technicianData.name,
-                        specialty: technicianData.specialty,
-                        contact: technicianData.contact,
-                        status: technicianData.status,
-                        avatar: technicianData.avatar,
-                        performance_open: 0,
-                        performance_closed: 0,
-                        hourly_rate: technicianData.hourly_rate || 50
-                    }]);
+        if (error) throw error;
 
-                if (error) throw error;
-            }
+        // Load all work orders to calculate performance and status
+        const { data: workOrders, error: woError } = await supabaseUntyped
+            .from('work_orders')
+            .select('technician_id, status');
 
-            await loadTechnicians();
-            setIsModalOpen(false);
-            setSelectedTechnician(null);
-        } catch (error) {
-            console.error('Erro ao salvar técnico:', error);
-            throw error;
-        }
+        if (woError) throw woError;
+
+        const enrichedTechs = (techs || []).map(tech => {
+            const techOrders = workOrders?.filter(wo => wo.technician_id === tech.id) || [];
+            const completedOrders = techOrders.filter(wo => wo.status === 'Concluído').length;
+            const openOrders = techOrders.filter(wo => wo.status !== 'Concluído' && wo.status !== 'Cancelado').length;
+            const hasActiveOrder = techOrders.some(wo => wo.status === 'Em Progresso');
+
+            return {
+                ...tech,
+                status: (tech.status === 'Ativo' && hasActiveOrder) ? 'Em Campo' : tech.status,
+                open_orders: openOrders,
+                completed_orders: completedOrders
+            };
+        });
+
+        setTechnicians(enrichedTechs as any);
     };
 
-    const handleDeleteTechnician = async (id: string, name: string) => {
-        setFeedback({
-            type: 'confirm',
-            title: 'Excluir Técnico?',
-            message: `Tem certeza que deseja excluir o técnico ${name}? Esta ação não pode ser desfeita.`,
-            onConfirm: async () => {
-                try {
-                    const { error } = await supabase
-                        .from('technicians')
-                        .delete()
-                        .eq('id', id);
+    const loadThirdParties = async () => {
+        const { data: companies, error: companiesError } = await supabase
+            .from('third_party_companies')
+            .select('*')
+            .order('name');
 
-                    if (error) throw error;
+        if (companiesError) throw companiesError;
 
-                    await loadTechnicians();
-                    setFeedback({
-                        type: 'success',
-                        title: 'Técnico Excluído',
-                        message: 'O cadastro do técnico foi removido com sucesso.'
-                    });
-                } catch (error) {
-                    console.error('Erro ao excluir técnico:', error);
-                    setFeedback({
-                        type: 'error',
-                        title: 'Erro ao Excluir',
-                        message: 'Não foi possível remover o técnico no momento.'
-                    });
-                }
-            }
+        const { data: workOrders, error: woError } = await supabaseUntyped
+            .from('work_orders')
+            .select('third_party_company_id, status');
+
+        if (woError) throw woError;
+
+        const enrichedCompanies = (companies || []).map(company => {
+            const companyOrders = workOrders?.filter(wo => wo.third_party_company_id === company.id) || [];
+            const completedOrders = companyOrders.filter(wo => wo.status === 'Concluído').length;
+            const openOrders = companyOrders.filter(wo => wo.status !== 'Concluído' && wo.status !== 'Cancelado').length;
+            const hasActiveOrder = companyOrders.some(wo => wo.status === 'Em Progresso');
+
+            return {
+                ...company,
+                status: (company.status === 'Ativo' && hasActiveOrder) ? 'Em Campo' : company.status,
+                open_orders: openOrders,
+                completed_orders: completedOrders
+            };
         });
-    };
 
-    const handleEditTechnician = (tech: Technician) => {
-        setSelectedTechnician({
-            id: tech.id,
-            name: tech.name,
-            specialty: tech.specialty,
-            contact: tech.contact,
-            status: tech.status,
-            avatar: tech.avatar || '',
-            hourly_rate: tech.hourly_rate
-        });
-        setIsModalOpen(true);
+        setThirdPartyCompanies(enrichedCompanies as any);
     };
 
     const handleNewTechnician = () => {
@@ -204,189 +121,705 @@ const Technicians = () => {
         setIsModalOpen(true);
     };
 
-    const getInitials = (name: string) => {
-        const parts = name.split(' ');
-        if (parts.length >= 2) {
-            return (parts[0][0] + parts[1][0]).toUpperCase();
-        }
-        return name.substring(0, 2).toUpperCase();
+    const handleEditTechnician = (tech: Technician) => {
+        setSelectedTechnician(tech);
+        setIsModalOpen(true);
     };
 
-    const getSpecialtyColor = (specialty: string) => {
-        const colors: Record<string, string> = {
-            'Mecânica': 'bg-blue-50 text-blue-700',
-            'Elétrica': 'bg-amber-50 text-amber-700',
-            'Hidráulica': 'bg-cyan-50 text-cyan-700',
-            'Pneumática': 'bg-purple-50 text-purple-700',
-            'Eletrônica': 'bg-green-50 text-green-700',
-            'Instrumentação': 'bg-pink-50 text-pink-700',
-            'Geral': 'bg-slate-50 text-slate-700'
-        };
-        return colors[specialty] || 'bg-slate-50 text-slate-700';
+    const handleSaveTechnician = async (techData: any) => {
+        try {
+            // Sanitizar dados para o banco (remover campos virtuais e metadados)
+            const { open_orders, completed_orders, id, created_at, updated_at, ...dataToSave } = techData;
+
+            // Se o status for 'Em Campo', salvar como 'Ativo' no banco
+            if (dataToSave.status === 'Em Campo') {
+                dataToSave.status = 'Ativo';
+            }
+
+            if (selectedTechnician) {
+                const { error } = await supabase
+                    .from('technicians')
+                    .update(dataToSave)
+                    .eq('id', selectedTechnician.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from('technicians')
+                    .insert([dataToSave]);
+                if (error) throw error;
+            }
+            setIsModalOpen(false);
+            loadTechnicians();
+            setFeedback({
+                type: 'success',
+                title: 'Sucesso!',
+                message: `Técnico ${selectedTechnician ? 'atualizado' : 'cadastrado'} com sucesso.`
+            });
+        } catch (error: any) {
+            setFeedback({
+                type: 'error',
+                title: 'Erro',
+                message: error.message || 'Erro ao salvar técnico.'
+            });
+        }
+    };
+
+    const handleDeleteTechnician = async (id: string, name: string) => {
+        setFeedback({
+            type: 'info',
+            title: 'Confirmar Exclusão',
+            message: `Tem certeza que deseja excluir o técnico ${name}?`,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('technicians')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+                    loadTechnicians();
+                    setFeedback({
+                        type: 'success',
+                        title: 'Excluído',
+                        message: 'Técnico removido com sucesso.'
+                    });
+                } catch (error: any) {
+                    setFeedback({
+                        type: 'error',
+                        title: 'Erro',
+                        message: 'Não foi possível excluir o técnico. Verifique se existem registros vinculados.'
+                    });
+                }
+            }
+        });
+    };
+
+    const handleNewThirdParty = () => {
+        setSelectedThirdParty(null);
+        setIsThirdPartyModalOpen(true);
+    };
+
+    const handleEditThirdParty = (company: ThirdPartyCompany) => {
+        setSelectedThirdParty(company);
+        setIsThirdPartyModalOpen(true);
+    };
+
+    const handleSaveThirdParty = async (companyData: any) => {
+        console.log('Technicians: handleSaveThirdParty INITIAL input:', companyData);
+        try {
+            // Sanitizar dados para o banco (remover campos virtuais e metadados)
+            const { open_orders, completed_orders, id, created_at, updated_at, ...dataToSave } = companyData;
+            console.log('Technicians: handleSaveThirdParty AFTER sanitization:', dataToSave);
+
+            // Se o status for 'Em Campo', salvar como 'Ativo' no banco
+            if (dataToSave.status === 'Em Campo') {
+                dataToSave.status = 'Ativo';
+            }
+
+            const targetId = companyData.id || (selectedThirdParty ? selectedThirdParty.id : null);
+
+            if (targetId) {
+                console.log('Technicians: Updating company with ID:', targetId, dataToSave);
+                const { data, error } = await supabase
+                    .from('third_party_companies')
+                    .update(dataToSave)
+                    .eq('id', targetId)
+                    .select();
+
+                console.log('Technicians: Supabase update response data:', data);
+                console.log('Technicians: Supabase update response error:', error);
+
+                if (error) {
+                    console.error('Erro no update do Supabase:', error);
+                    throw error;
+                }
+
+                if (!data || data.length === 0) {
+                    console.warn('Technicians: No rows updated. ID mismatch or RLS issue?');
+                }
+            } else {
+                console.log('Technicians: Inserting nova empresa:', dataToSave);
+                const { error } = await supabase
+                    .from('third_party_companies')
+                    .insert([dataToSave]);
+                if (error) {
+                    console.error('Erro no insert do Supabase:', error);
+                    throw error;
+                }
+            }
+            setIsThirdPartyModalOpen(false);
+            loadThirdParties();
+            setFeedback({
+                type: 'success',
+                title: 'Sucesso!',
+                message: `Empresa ${selectedThirdParty ? 'atualizada' : 'cadastrada'} com sucesso.`
+            });
+        } catch (error: any) {
+            setFeedback({
+                type: 'error',
+                title: 'Erro',
+                message: error.message || 'Erro ao salvar empresa.'
+            });
+        }
+    };
+
+    const handleDeleteThirdParty = async (id: string, name: string) => {
+        setFeedback({
+            type: 'info',
+            title: 'Confirmar Exclusão',
+            message: `Tem certeza que deseja excluir a empresa ${name}?`,
+            onConfirm: async () => {
+                try {
+                    const { error } = await supabase
+                        .from('third_party_companies')
+                        .delete()
+                        .eq('id', id);
+                    if (error) throw error;
+                    loadThirdParties();
+                    setFeedback({
+                        type: 'success',
+                        title: 'Excluído',
+                        message: 'Empresa removida com sucesso.'
+                    });
+                } catch (error: any) {
+                    setFeedback({
+                        type: 'error',
+                        title: 'Erro',
+                        message: 'Não foi possível excluir a empresa. Verifique se existem registros vinculados.'
+                    });
+                }
+            }
+        });
+    };
+
+    const getInitials = (name: string) => {
+        return name
+            .split(' ')
+            .map(n => n[0])
+            .slice(0, 2)
+            .join('')
+            .toUpperCase();
     };
 
     const getAvatarColor = (name: string) => {
         const colors = [
-            'bg-indigo-100 text-indigo-600',
-            'bg-amber-100 text-amber-600',
-            'bg-green-100 text-green-600',
-            'bg-pink-100 text-pink-600',
-            'bg-purple-100 text-purple-600',
-            'bg-cyan-100 text-cyan-600'
+            { bg: '#EFF6FF', text: '#2563EB' },
+            { bg: '#F5F3FF', text: '#7C3AED' },
+            { bg: '#ECFDF5', text: '#059669' },
+            { bg: '#FFF7ED', text: '#EA580C' },
+            { bg: '#FFF1F2', text: '#E11D48' },
         ];
-        const index = name.charCodeAt(0) % colors.length;
+        const index = name.length % colors.length;
         return colors[index];
     };
 
+    const filteredTechnicians = useMemo(() => {
+        return technicians.filter(tech => {
+            const safeName = tech.name || '';
+            const safeSpecialty = tech.specialty || '';
+            const searchLower = searchTerm.toLowerCase();
+
+            const matchesSearch = safeName.toLowerCase().includes(searchLower) ||
+                safeSpecialty.toLowerCase().includes(searchLower);
+
+            const matchesTab = activeTab === 'Todos' || tech.specialty === activeTab;
+
+            return matchesSearch && matchesTab;
+        });
+    }, [technicians, searchTerm, activeTab]);
+
+    const filteredThirdParties = useMemo(() => {
+        return thirdPartyCompanies.filter(company => {
+            const safeName = company.name || '';
+            const safeContact = company.contact_name || '';
+            const safeSpecialty = company.specialty || '';
+            const searchLower = searchTerm.toLowerCase();
+
+            const matchesSearch = safeName.toLowerCase().includes(searchLower) ||
+                safeContact.toLowerCase().includes(searchLower) ||
+                safeSpecialty.toLowerCase().includes(searchLower);
+
+            const matchesTab = activeTab === 'Todos' || company.specialty === activeTab;
+
+            return matchesSearch && matchesTab;
+        });
+    }, [thirdPartyCompanies, searchTerm, activeTab]);
+
+    const topPerformers = useMemo(() => {
+        return [...technicians]
+            .sort((a, b) => (b.completed_orders || 0) - (a.completed_orders || 0))
+            .slice(0, 5);
+    }, [technicians]);
+
+    const topCompanies = useMemo(() => {
+        return [...thirdPartyCompanies]
+            .sort((a, b) => (b.completed_orders || 0) - (a.completed_orders || 0))
+            .slice(0, 5);
+    }, [thirdPartyCompanies]);
+
+    const getPerformancePercentage = (entity: any) => {
+        const total = (entity.completed_orders || 0) + (entity.open_orders || 0);
+        if (total === 0) return 0;
+        return Math.round((entity.completed_orders || 0) / total * 100);
+    };
+
+    const paginatedTechnicians = filteredTechnicians.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
+
+    const totalPages = Math.ceil(filteredTechnicians.length / itemsPerPage);
+
     return (
-        <div className="flex flex-col gap-6">
-            <div className="flex flex-col md:flex-row justify-between items-end gap-4">
-                <div>
-                    <h2 className="text-2xl font-bold text-slate-900">Gestão de Técnicos</h2>
-                    <p className="text-sm text-slate-500">Gerencie a equipe de manutenção e especialidades.</p>
-                </div>
+        <div style={{ maxWidth: 1400, margin: '0 auto', padding: '24px 32px' }}>
+            {/* Main Tabs */}
+            <div style={{ display: 'flex', gap: 32, borderBottom: '1px solid #E2E8F0', marginBottom: 28 }}>
                 <button
-                    onClick={handleNewTechnician}
-                    className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 shadow-sm transition-all"
+                    onClick={() => { setMainTab('internos'); setActiveTab('Todos'); setCurrentPage(1); }}
+                    style={{
+                        paddingBottom: 12, fontSize: '1rem', fontWeight: 600, border: 'none', background: 'none',
+                        color: mainTab === 'internos' ? '#2563EB' : '#64748B', cursor: 'pointer', position: 'relative'
+                    }}
                 >
-                    <UserPlus size={18} />
-                    Novo Técnico
+                    Equipe Interna
+                    {mainTab === 'internos' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: '#2563EB' }} />}
+                </button>
+                <button
+                    onClick={() => { setMainTab('terceirizados'); setActiveTab('Todos'); setCurrentPage(1); }}
+                    style={{
+                        paddingBottom: 12, fontSize: '1rem', fontWeight: 600, border: 'none', background: 'none',
+                        color: mainTab === 'terceirizados' ? '#2563EB' : '#64748B', cursor: 'pointer', position: 'relative'
+                    }}
+                >
+                    Parceiros de Terceiros
+                    {mainTab === 'terceirizados' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: '#2563EB' }} />}
                 </button>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-sm text-slate-500">Total</p>
-                    <h3 className="text-2xl font-bold text-slate-900">{stats.total}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-sm text-slate-500">Disponíveis</p>
-                    <h3 className="text-2xl font-bold text-slate-900">{stats.available}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-sm text-slate-500">Em Campo</p>
-                    <h3 className="text-2xl font-bold text-slate-900">{stats.inField}</h3>
-                </div>
-                <div className="bg-white p-4 rounded-xl border border-slate-100 shadow-sm">
-                    <p className="text-sm text-slate-500">Inativos</p>
-                    <h3 className="text-2xl font-bold text-red-500">{stats.inactive}</h3>
-                </div>
-            </div>
+            <div style={{ display: 'flex', gap: 24 }}>
+                {/* Left Content Area */}
+                <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 24 }}>
+                    {mainTab === 'internos' ? (
+                        <>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                                        Corpo Técnico
+                                    </h2>
+                                    <p style={{ fontSize: '0.875rem', color: '#64748B', marginTop: 4 }}>
+                                        Gerencie sua equipe, escalas e performance.
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div style={{ position: 'relative', width: 280 }}>
+                                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar por nome, especialidade..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            style={{ width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: '0.875rem', border: '1px solid #E2E8F0', borderRadius: 10, outline: 'none', background: '#FFFFFF', color: '#334155' }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleNewTechnician}
+                                        style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                                    >
+                                        <UserPlus size={18} />
+                                        Novo Técnico
+                                    </button>
+                                </div>
+                            </div>
 
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">Lista de Técnicos</h3>
-                    <div className="relative w-64">
-                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nome ou especialidade"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 w-full py-2 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
-                        />
-                    </div>
-                </div>
+                            {/* Specialty Filter */}
+                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                                {['Todos', 'Máquinas', 'Predial', 'Outros', 'Geral'].map(specialty => (
+                                    <button
+                                        key={specialty}
+                                        onClick={() => setActiveTab(specialty)}
+                                        style={{
+                                            padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
+                                            border: `1px solid ${activeTab === specialty ? '#DBEAFE' : '#E2E8F0'}`,
+                                            background: activeTab === specialty ? '#EFF6FF' : '#FFFFFF',
+                                            color: activeTab === specialty ? '#2563EB' : '#64748B'
+                                        }}
+                                    >
+                                        {specialty}
+                                    </button>
+                                ))}
+                            </div>
 
-                <div className="overflow-x-auto">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-12">
-                            <Loader2 size={32} className="animate-spin text-primary" />
-                        </div>
-                    ) : filteredTechnicians.length === 0 ? (
-                        <div className="text-center py-12">
-                            <p className="text-slate-500">Nenhum técnico encontrado</p>
-                        </div>
-                    ) : (
-                        <table className="w-full text-left text-sm text-slate-600">
-                            <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
-                                <tr>
-                                    <th className="px-6 py-4">Técnico</th>
-                                    <th className="px-6 py-4">Especialidade</th>
-                                    <th className="px-6 py-4">Contato</th>
-                                    <th className="px-6 py-4">Status</th>
-                                    <th className="px-6 py-4">Performance (Chamados)</th>
-                                    <th className="px-6 py-4 text-right">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {filteredTechnicians.map((tech) => (
-                                    <tr key={tech.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-4 flex items-center gap-3">
-                                            {tech.avatar ? (
-                                                <img
-                                                    src={tech.avatar}
-                                                    alt={tech.name}
-                                                    className="size-10 rounded-full object-cover border-2 border-slate-200"
-                                                />
-                                            ) : (
-                                                <div className={`size-10 rounded-full ${getAvatarColor(tech.name)} flex items-center justify-center font-bold text-sm`}>
-                                                    {getInitials(tech.name)}
-                                                </div>
-                                            )}
-                                            <div>
-                                                <p className="font-medium text-slate-900">{tech.name}</p>
-                                                <p className="text-xs text-slate-400">#TEC-{tech.id.substring(0, 6).toUpperCase()}</p>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <span className={`${getSpecialtyColor(tech.specialty)} px-2 py-1 rounded text-xs font-medium`}>
-                                                {tech.specialty}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">{tech.contact}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${tech.status === 'Ativo' ? 'bg-green-50 text-green-700 border border-green-100' :
-                                                tech.status === 'Em Campo' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                                    'bg-slate-50 text-slate-700 border border-slate-100'
-                                                }`}>
-                                                <span className={`size-1.5 rounded-full ${tech.status === 'Ativo' ? 'bg-green-500' :
-                                                    tech.status === 'Em Campo' ? 'bg-blue-500' :
-                                                        'bg-slate-500'
-                                                    }`}></span>
-                                                {tech.status}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex gap-4">
-                                                <div>
-                                                    <span className="block text-xs text-slate-400 uppercase">Abertos</span>
-                                                    <span className={`font-bold ${tech.performance_open > 10 ? 'text-red-600' : 'text-slate-900'}`}>
-                                                        {tech.performance_open || 0}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    <span className="block text-xs text-slate-400 uppercase">Concluídos</span>
-                                                    <span className="font-bold text-slate-900">{tech.performance_closed || 0}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <button
-                                                    onClick={() => handleEditTechnician(tech)}
-                                                    className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                                                    title="Editar técnico"
-                                                >
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                                {paginatedTechnicians.map(tech => {
+                                    const avColor = getAvatarColor(tech.name);
+                                    return (
+                                        <div key={tech.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-blue-200 group">
+                                            <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', items: 'center', gap: 8 }}>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: 6,
+                                                    fontSize: '0.625rem',
+                                                    fontWeight: 700,
+                                                    textTransform: 'uppercase',
+                                                    background: tech.status === 'Ativo' ? '#ECFDF5' : tech.status === 'Em Campo' ? '#EFF6FF' : '#FEF2F2',
+                                                    color: tech.status === 'Ativo' ? '#059669' : tech.status === 'Em Campo' ? '#2563EB' : '#EF4444',
+                                                    border: `1px solid ${tech.status === 'Ativo' ? '#D1FAE5' : tech.status === 'Em Campo' ? '#DBEAFE' : '#FEE2E2'}`
+                                                }}>
+                                                    {tech.status}
+                                                </span>
+                                                <button onClick={() => handleEditTechnician(tech)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-blue-600">
                                                     <Edit2 size={16} />
                                                 </button>
-                                                <button
-                                                    onClick={() => handleDeleteTechnician(tech.id, tech.name)}
-                                                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                                    title="Excluir técnico"
-                                                >
+                                            </div>
+
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                                                {tech.avatar ? (
+                                                    <img src={tech.avatar} alt={tech.name} style={{ width: 56, height: 56, borderRadius: 16, objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }} />
+                                                ) : (
+                                                    <div style={{ width: 56, height: 56, borderRadius: 16, background: avColor.bg, color: avColor.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: '1.25rem', border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
+                                                        {getInitials(tech.name)}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>{tech.name}</h3>
+                                                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#F1F5F9', color: '#475569', borderRadius: 6, fontSize: '0.6875rem', fontWeight: 600, marginTop: 4 }}>
+                                                        <Wrench size={10} />
+                                                        {tech.specialty}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                                <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
+                                                    <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Concluídas</p>
+                                                    <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#0F172A' }}>{tech.completed_orders || 0}</p>
+                                                </div>
+                                                <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
+                                                    <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Em Aberto</p>
+                                                    <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#3B82F6' }}>{tech.open_orders || 0}</p>
+                                                </div>
+                                            </div>
+
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.8125rem', color: '#64748B' }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <Phone size={14} style={{ color: '#94A3B8' }} />
+                                                    {tech.phone}
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                    <Clock size={14} style={{ color: '#94A3B8' }} />
+                                                    {tech.on_night_shift ? 'Disponível para Plantão' : 'Horário Comercial'}
+                                                </div>
+                                            </div>
+
+                                            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', gap: 8 }}>
+                                                <button onClick={() => navigate(`/technicians/${tech.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-blue-600 hover:text-white">
+                                                    Ver Perfil
+                                                    <ExternalLink size={14} />
+                                                </button>
+                                                <button onClick={() => handleDeleteTechnician(tech.id, tech.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-red-600 hover:text-white">
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
-                                        </td>
-                                    </tr>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Pagination */}
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
+                                <p style={{ fontSize: '0.875rem', color: '#94A3B8' }}>
+                                    Mostrando <b>{paginatedTechnicians.length}</b> de <b>{filteredTechnicians.length}</b> técnicos
+                                </p>
+                                {totalPages > 1 && (
+                                    <div style={{ display: 'flex', gap: 4 }}>
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                            disabled={currentPage === 1}
+                                            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: currentPage === 1 ? '#CBD5E1' : '#475569', cursor: currentPage === 1 ? 'default' : 'pointer', display: 'flex', transition: 'all 0.2s' }}
+                                        >
+                                            <ChevronLeft size={16} />
+                                        </button>
+                                        {[...Array(totalPages)].map((_, i) => (
+                                            <button
+                                                key={i}
+                                                onClick={() => setCurrentPage(i + 1)}
+                                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid', borderColor: currentPage === i + 1 ? '#3B82F6' : '#E2E8F0', background: currentPage === i + 1 ? '#3B82F6' : '#fff', color: currentPage === i + 1 ? '#fff' : '#475569', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                                            >
+                                                {i + 1}
+                                            </button>
+                                        ))}
+                                        <button
+                                            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                            disabled={currentPage === totalPages}
+                                            style={{ padding: '6px 8px', borderRadius: 8, border: '1px solid #E2E8F0', background: '#fff', color: currentPage === totalPages ? '#CBD5E1' : '#475569', cursor: currentPage === totalPages ? 'default' : 'pointer', display: 'flex', transition: 'all 0.2s' }}
+                                        >
+                                            <ChevronRight size={16} />
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div>
+                                    <h2 style={{ fontSize: '1.5rem', fontWeight: 700, color: '#0F172A', margin: 0 }}>
+                                        Empresas Parceiras
+                                    </h2>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <div style={{ position: 'relative', width: 280 }}>
+                                        <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8' }} />
+                                        <input
+                                            type="text"
+                                            placeholder="Buscar empresa, contato ou especialidade..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            style={{ width: '100%', paddingLeft: 36, paddingRight: 12, paddingTop: 9, paddingBottom: 9, fontSize: '0.875rem', border: '1px solid #E2E8F0', borderRadius: 10, outline: 'none', background: '#FFFFFF', color: '#334155' }}
+                                        />
+                                    </div>
+                                    <button
+                                        onClick={handleNewThirdParty}
+                                        style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                                    >
+                                        <Building2 size={18} />
+                                        Nova Empresa
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
+                                {['Todos', 'Máquinas', 'Predial', 'Outros', 'Geral'].map(specialty => (
+                                    <button
+                                        key={specialty}
+                                        onClick={() => setActiveTab(specialty)}
+                                        style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s', border: `1px solid ${activeTab === specialty ? '#DBEAFE' : '#E2E8F0'}`, background: activeTab === specialty ? '#EFF6FF' : '#FFFFFF', color: activeTab === specialty ? '#2563EB' : '#64748B' }}
+                                    >
+                                        {specialty}
+                                    </button>
                                 ))}
-                            </tbody>
-                        </table>
+                            </div>
+
+                            {isLoading ? (
+                                <div className="flex justify-center items-center py-20">
+                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                </div>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
+                                    {filteredThirdParties.length > 0 ? (
+                                        filteredThirdParties.map(company => {
+                                            return (
+                                                <div key={company.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-blue-200 group">
+                                                    <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <span style={{
+                                                            padding: '4px 8px',
+                                                            borderRadius: 6,
+                                                            fontSize: '0.625rem',
+                                                            fontWeight: 700,
+                                                            textTransform: 'uppercase',
+                                                            background: company.status === 'Ativo' ? '#ECFDF5' : company.status === 'Em Campo' ? '#EFF6FF' : '#FEF2F2',
+                                                            color: company.status === 'Ativo' ? '#059669' : company.status === 'Em Campo' ? '#2563EB' : '#EF4444',
+                                                            border: `1px solid ${company.status === 'Ativo' ? '#D1FAE5' : company.status === 'Em Campo' ? '#DBEAFE' : '#FEE2E2'}`
+                                                        }}>
+                                                            {company.status}
+                                                        </span>
+                                                        <button onClick={() => handleEditThirdParty(company)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-blue-600">
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                                                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center bg-slate-50 text-slate-600 border border-slate-100 shadow-sm overflow-hidden">
+                                                            {company.logo_url ? (
+                                                                <img src={company.logo_url} alt={company.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <Building2 size={24} />
+                                                            )}
+                                                        </div>
+                                                        <div>
+                                                            <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: '#0F172A' }}>{company.name}</h3>
+                                                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 8px', background: '#F1F5F9', color: '#475569', borderRadius: 6, fontSize: '0.6875rem', fontWeight: 600, marginTop: 4 }}>
+                                                                <Wrench size={10} />
+                                                                {company.specialty}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                                        <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
+                                                            <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Concluídas</p>
+                                                            <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#0F172A' }}>{company.completed_orders || 0}</p>
+                                                        </div>
+                                                        <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
+                                                            <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Em Aberto</p>
+                                                            <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#3B82F6' }}>{company.open_orders || 0}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.8125rem', color: '#64748B' }}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            <User size={14} style={{ color: '#94A3B8' }} />
+                                                            {company.contact_name}
+                                                        </div>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                            <Phone size={14} style={{ color: '#94A3B8' }} />
+                                                            {company.phone}
+                                                        </div>
+                                                    </div>
+
+                                                    <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', gap: 8 }}>
+                                                        <button onClick={() => navigate(`/parceiros/${company.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-blue-600 hover:text-white">
+                                                            Ver Perfil
+                                                            <ExternalLink size={14} />
+                                                        </button>
+                                                        <button onClick={() => handleDeleteThirdParty(company.id, company.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-red-600 hover:text-white">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    ) : (
+                                        <div style={{ gridColumn: '1 / -1', padding: '40px 20px', textAlign: 'center', color: '#64748B', background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0' }}>
+                                            <Building2 size={32} style={{ margin: '0 auto 12px', opacity: 0.5 }} />
+                                            <p style={{ fontSize: '0.875rem' }}>Nenhuma empresa parceira encontrada.</p>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </>
                     )}
+                </div>
+
+                {/* Right Sidebar */}
+                <div style={{ width: 280, flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 16 }} className="hidden xl:flex">
+                    {mainTab === 'internos' ? (
+                        <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #F1F5F9', padding: '20px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                                <h4 style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                    Escala do Dia
+                                </h4>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10 }}>
+                                    <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Clock size={16} style={{ color: '#3B82F6' }} />
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A' }}>Turno Matutino</p>
+                                        <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>
+                                            {technicians.filter(t => t.status === 'Ativo' || t.status === 'Em Campo').length} técnicos escalados hoje
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10 }}>
+                                    <div style={{ width: 36, height: 36, borderRadius: 10, background: '#FFF7ED', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Star size={16} style={{ color: '#F59E0B' }} />
+                                    </div>
+                                    <div>
+                                        <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A' }}>Plantão Noturno</p>
+                                        <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>
+                                            {technicians.filter(t => t.on_night_shift).length} técnicos de sobreaviso
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {technicians.filter(t => t.on_night_shift).length > 0 && (
+                                    <div style={{ marginTop: 4 }}>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, paddingLeft: 4 }}>
+                                            {technicians.filter(t => t.on_night_shift).map(t => {
+                                                const avColor = getAvatarColor(t.name);
+                                                return t.avatar ? (
+                                                    <img key={t.id} src={t.avatar} alt={t.name} title={t.name} style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', border: '2px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }} />
+                                                ) : (
+                                                    <div key={t.id} title={t.name} style={{ width: 28, height: 28, borderRadius: '50%', background: avColor.bg, color: avColor.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.625rem', border: '2px solid #fff', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                                                        {getInitials(t.name)}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #F1F5F9', padding: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                                <div style={{ width: 40, height: 40, borderRadius: 12, background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748B' }}>
+                                    <Building2 size={20} />
+                                </div>
+                                <div>
+                                    <h4 style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                        Parceiros Ativos
+                                    </h4>
+                                    <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>{thirdPartyCompanies.length} empresas cadastradas</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <div style={{ background: '#FFFFFF', borderRadius: 14, border: '1px solid #F1F5F9', padding: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16 }}>
+                            <h4 style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 700, color: '#0F172A', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                Top Performance {mainTab === 'terceirizados' ? 'Empresas' : 'Técnicos'}
+                            </h4>
+                            <span style={{ fontSize: '0.75rem' }}>⚡</span>
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                            {(mainTab === 'terceirizados' ? topCompanies : topPerformers).map((entity, idx) => {
+                                const name = (entity as any).name;
+                                const avatarColor = getAvatarColor(name);
+                                const perfPercent = getPerformancePercentage(entity);
+                                const isCompany = mainTab === 'terceirizados';
+
+                                return (
+                                    <div key={entity.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: idx === 0 ? '#FFFBEB' : 'transparent', cursor: 'pointer' }}
+                                        onClick={() => navigate(isCompany ? `/parceiros/${entity.id}` : `/technicians/${entity.id}`)}
+                                    >
+                                        {isCompany ? (
+                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
+                                                <Building2 size={16} />
+                                            </div>
+                                        ) : (entity as any).avatar ? (
+                                            <img src={(entity as any).avatar} alt={name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                                        ) : (
+                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarColor.bg, color: avatarColor.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+                                                {getInitials(name)}
+                                            </div>
+                                        )}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                            <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                {name}
+                                            </p>
+                                            <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>
+                                                {perfPercent}% de SLA atendido
+                                            </p>
+                                        </div>
+                                        {idx === 0 && <span style={{ fontSize: '1rem' }}>🥇</span>}
+                                        {idx === 1 && <span style={{ fontSize: '1rem' }}>🥈</span>}
+                                        {idx === 2 && <span style={{ fontSize: '1rem' }}>🥉</span>}
+                                    </div>
+                                );
+                            })}
+
+                            {(mainTab === 'terceirizados' ? topCompanies : topPerformers).length === 0 && (
+                                <p style={{ fontSize: '0.8125rem', color: '#94A3B8', textAlign: 'center', padding: 12 }}>Sem dados ainda</p>
+                            )}
+                        </div>
+
+                        <div style={{ marginTop: 14, padding: '10px 12px', background: '#EFF6FF', borderRadius: 10, border: '1px solid #DBEAFE' }}>
+                            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: '#3B82F6' }}>Dica do Sistema</p>
+                            <p style={{ margin: '4px 0 0', fontSize: '0.6875rem', color: '#64748B', lineHeight: 1.4 }}>
+                                {mainTab === 'terceirizados' ? 'Acompanhe a avaliação dos seus parceiros para garantir a qualidade do serviço.' : 'Técnicos com SLA acima de 90% podem ser elegíveis para bonificação este mês.'}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
+            {/* Modals */}
             <TechnicianModal
                 isOpen={isModalOpen}
                 onClose={() => {
@@ -397,7 +830,16 @@ const Technicians = () => {
                 technician={selectedTechnician}
             />
 
-            {/* Feedback Modal Reutilizável */}
+            <ThirdPartyModal
+                isOpen={isThirdPartyModalOpen}
+                onClose={() => {
+                    setIsThirdPartyModalOpen(false);
+                    setSelectedThirdParty(null);
+                }}
+                onSave={handleSaveThirdParty}
+                company={selectedThirdParty}
+            />
+
             {feedback && (
                 <FeedbackModal
                     isOpen={!!feedback}

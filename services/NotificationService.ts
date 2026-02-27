@@ -11,6 +11,7 @@ interface WorkOrderPayload {
     assignedTo?: string;
     requesterId?: string; // ID of the user who requested the work order
     technical_report?: string;
+    technicianName?: string;
 }
 
 export const NotificationService = {
@@ -22,7 +23,15 @@ export const NotificationService = {
         await this.sendWebhook('work_order_updated', workOrder);
     },
 
-    async sendWebhook(event: string, workOrder: WorkOrderPayload) {
+    async notifyWorkOrderReopened(workOrder: WorkOrderPayload) {
+        await this.sendWebhook('work_order_reopened', workOrder);
+    },
+
+    async notifyWorkOrderCancelled(workOrder: WorkOrderPayload, adminName?: string) {
+        await this.sendWebhook('work_order_cancelled', workOrder, adminName);
+    },
+
+    async sendWebhook(event: string, workOrder: WorkOrderPayload, adminName?: string) {
         try {
             // Get current user session for Authorization
             const { data: { session } } = await supabase.auth.getSession();
@@ -36,6 +45,7 @@ export const NotificationService = {
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
                     event,
+                    adminName,
                     workOrder: {
                         ...workOrder,
                         // Include hash router for production compatibility

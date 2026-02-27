@@ -64,10 +64,48 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
                 return;
             }
 
+            // Filtragem por Categoria (para notificações vinculadas a OS)
+            const workOrderNotifications = (data || []).filter(n => n.link?.startsWith('/work-orders/'));
+            const otherNotifications = (data || []).filter(n => !n.link?.startsWith('/work-orders/'));
+
+            let filteredWorkOrderNotifications = workOrderNotifications;
+
+            if (workOrderNotifications.length > 0) {
+                // Extrair IDs das OS
+                const woIds = workOrderNotifications.map(n => n.link?.split('/').pop()).filter(Boolean);
+
+                // Buscar categorias das OS
+                const { data: woData } = await supabase
+                    .from('work_orders')
+                    .select('id, maintenance_category')
+                    .in('id', woIds);
+
+                if (woData) {
+                    const woCategoryMap = new Map(woData.map(wo => [wo.id, wo.maintenance_category || 'Equipamento']));
+
+                    // Filtrar notificações de OS que o usuário não tem permissão
+                    filteredWorkOrderNotifications = workOrderNotifications.filter(n => {
+                        const woId = n.link?.split('/').pop();
+                        const woCategory = woCategoryMap.get(woId);
+
+                        // Se não encontrou a OS (ex: deletada), mantém a notificação ou remove? 
+                        // Vamos manter para evitar sumiços misteriosos, mas filtrar se a categoria for conhecida.
+                        if (!woCategory) return true;
+
+                        if (woCategory === 'Equipamento' && user.manage_equipment) return true;
+                        if (woCategory === 'Predial' && user.manage_predial) return true;
+                        if (woCategory === 'Outros' && user.manage_others) return true;
+
+                        return false;
+                    });
+                }
+            }
+
+            const combinedNotifications = [...filteredWorkOrderNotifications, ...otherNotifications];
+
             // Deduplicar por ID e normalizar is_read
-            const uniqueNotifications = (data || []).reduce((acc: Notification[], current) => {
+            const uniqueNotifications = combinedNotifications.reduce((acc: Notification[], current) => {
                 if (!acc.find(n => n.id === current.id)) {
-                    // Garantir que is_read seja boolean (tratar null como false)
                     acc.push({
                         ...current,
                         is_read: !!current.is_read
@@ -75,6 +113,9 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
                 }
                 return acc;
             }, []);
+
+            // Ordenar por data novamente após o merge
+            uniqueNotifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
             setNotifications(uniqueNotifications);
         } catch (error) {

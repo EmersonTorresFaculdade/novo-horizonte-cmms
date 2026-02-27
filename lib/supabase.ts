@@ -9,3 +9,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+// Client sem tipagem para tabelas não geradas (ex: work_order_activities)
+export const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey);

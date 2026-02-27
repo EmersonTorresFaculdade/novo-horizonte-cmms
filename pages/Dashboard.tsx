@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 // Interfaces for chart data
 interface TechnicianPerf {
@@ -33,11 +34,14 @@ interface TimelineEvent {
 
 interface WorkOrder {
   id: string;
+  order_number: string;
   asset_name: string;
   issue: string; // Changed from description to issue
   status: string;
   technician_name: string;
+  requester_name: string;
   date: string;
+  maintenance_category?: string;
 }
 
 interface DashboardKPIs {
@@ -56,6 +60,7 @@ interface DashboardKPIs {
 }
 
 const Dashboard = () => {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [kpis, setKpis] = useState<DashboardKPIs>({
     mttr: '0h 0m',
@@ -92,13 +97,29 @@ const Dashboard = () => {
         .select(`
           *,
           assets (name, sector),
-          technicians (name)
+          technicians (name),
+          requester:users!requester_id (name)
         `)
         .order('date', { ascending: false });
 
       if (orderError) throw orderError;
 
-      const orders = (allOrders as any[]) || [];
+      let orders = (allOrders as any[]) || [];
+
+      // Filter by Permission (Maintenance Category)
+      // Filter by Permission (Maintenance Category)
+      const allowedCategories: string[] = [];
+      if (user?.manage_equipment) allowedCategories.push('Equipamento');
+      if (user?.manage_predial) allowedCategories.push('Predial');
+      if (user?.manage_others) allowedCategories.push('Outros');
+
+      orders = orders.filter(o => allowedCategories.includes(o.maintenance_category || 'Equipamento'));
+
+      // Fetch dynamic active machines count
+      const { count: assetsCount } = await supabase
+        .from('assets')
+        .select('*', { count: 'exact', head: true });
+      const totalMachines = assetsCount || 1;
 
       // --- Calculate KPIs ---
       const totalOrders = orders.length;
@@ -132,46 +153,42 @@ const Dashboard = () => {
       const mttrM = Math.round((avgRepairHours - mttrH) * 60);
 
       // 3. Total Downtime & Average Wait
-      const totalDowntimeVal = orders.reduce((acc, o) => acc + (Number(o.downtime_hours) || 0), 0);
-
-      // MTTA Abertura -> Em Manutenção
-      // Consideramos orders que já têm response_hours OU que estão em Manutenção/Concluídas (usando updated_at como proxy se response_hours for 0)
-      const respondedOrders = orders.filter(o =>
-        (Number(o.response_hours) > 0) ||
-        (o.status?.toLowerCase() === 'em manutenção' || o.status?.toLowerCase() === 'concluído')
-      );
-
-      const totalResponseHours = respondedOrders.reduce((acc, o) => {
-        const storedResponse = Number(o.response_hours) || 0;
-        if (storedResponse > 0) return acc + storedResponse;
-
-        // Fallback: se está em manutenção mas não tem valor salvo, usa a diferença de tempo
-        if (o.created_at) {
-          const start = new Date(o.created_at).getTime();
-          const end = o.updated_at ? new Date(o.updated_at).getTime() : new Date().getTime();
-          const diff = (end - start) / (1000 * 60 * 60);
-          return acc + Math.max(0, diff);
+      const totalDowntimeVal = orders.reduce((acc, o) => {
+        let downtime = Number(o.downtime_hours) || 0;
+        // Count downtime live for any order that hasn't finished
+        if (o.status?.toLowerCase() !== 'concluído' && o.status?.toLowerCase() !== 'cancelado') {
+          const start = new Date(o.created_at || o.date).getTime();
+          downtime = Math.max(Number(o.downtime_hours) || 0.1, (new Date().getTime() - start) / (1000 * 60 * 60));
         }
-        return acc;
+        return acc + downtime;
       }, 0);
 
-      const avgWaitVal = respondedOrders.length > 0 ? totalResponseHours / respondedOrders.length : 0; // Isso agora é o MTTA
+      // Média Total (Abertura -> Conclusão)
+      // We will compute the average downtime per order instead of MTTA wait time.
+      const avgWaitVal = totalOrders > 0 ? totalDowntimeVal / totalOrders : 0; // Using this var to pass to the same field
 
 
 
       // 4. MTBF (Simplified: Total Time Window / Failures)
-      const timeWindowHours = 30 * 24; // 30 days
-      const mtbfVal = totalOrders > 0 ? (timeWindowHours * 5) / totalOrders : 0;
+      const timeWindowHours = 30 * 24; // 30 days = 720 hours
+      // To prevent absurd numbers, we cap the max MTBF to the window size if there are few failures
+      // Usually, failures are only Corrective maintenance
+      const failures = orders.filter(o => o.type?.toLowerCase() === 'corretiva' || !o.type).length || 1;
+      const totalOperationHours = (timeWindowHours * totalMachines) - totalDowntimeVal; // total time machines could have worked minus downtime
+      let mtbfVal = totalOperationHours / failures;
+
+      // Cap at 720 hours (1 month) so it doesn't show 1800h for a small plant
+      if (mtbfVal > timeWindowHours) mtbfVal = timeWindowHours;
 
       // 5. Downtime Rate
-      const downtimeRateVal = (totalDowntimeVal / (timeWindowHours * 10)) * 100;
+      const downtimeRateVal = (totalDowntimeVal / (timeWindowHours * totalMachines)) * 100;
 
       setKpis({
         mttr: `${mttrH}h ${mttrM}m`,
         mtbf: `${Math.round(mtbfVal)}h`,
         openTickets: openCount,
         downtimeRate: `${downtimeRateVal.toFixed(1)}%`,
-        totalDowntime: totalDowntimeVal,
+        totalDowntime: Number(totalDowntimeVal.toFixed(1)),
         avgWait: Number(avgWaitVal.toFixed(1)),
         avgExecution: Number(avgRepairHours.toFixed(1)),
         completedTickets: completedCount,
@@ -215,9 +232,15 @@ const Dashboard = () => {
 
       orders.forEach(order => {
         const machineName = order.assets?.name || 'Desconhecido';
-        const hours = Number(order.downtime_hours) || 0;
-        if (hours > 0) {
-          machineDowntimeMap[machineName] = (machineDowntimeMap[machineName] || 0) + hours;
+        let customDowntime = Number(order.downtime_hours) || 0;
+
+        if (order.status?.toLowerCase() !== 'concluído' && order.status?.toLowerCase() !== 'cancelado') {
+          const start = new Date(order.created_at || order.date).getTime();
+          customDowntime = Math.max(Number(order.downtime_hours) || 0.1, (new Date().getTime() - start) / (1000 * 60 * 60));
+        }
+
+        if (customDowntime > 0) {
+          machineDowntimeMap[machineName] = (machineDowntimeMap[machineName] || 0) + customDowntime;
         }
       });
 
@@ -226,7 +249,7 @@ const Dashboard = () => {
           const colors = ['#ef4444', '#f97316', '#f59e0b', '#eab308', '#84cc16', '#3b82f6'];
           return {
             name,
-            value,
+            value: Number(value.toFixed(1)),
             color: colors[index % colors.length]
           };
         })
@@ -241,23 +264,38 @@ const Dashboard = () => {
       setTotalDowntime(totalDowntimeVal);
 
       // Map Timeline Data - Wait vs Execution
-      // Filter for orders that have meaningful time data
+      // Show immediately for all active OSs
       const validTimelineOrders = orders
-        .filter(o => (Number(o.downtime_hours) > 0 || Number(o.repair_hours) > 0))
+        .filter(o => o.status?.toLowerCase() !== 'cancelado')
         .slice(0, 5);
 
       const timeline = validTimelineOrders.map(order => {
-        const downtime = Number(order.downtime_hours) || 0;
-        const repair = Number(order.repair_hours) || 0;
-        // Wait Time = Total Downtime - Repair Time
-        // Ensure we don't get negative values if data is inconsistent
-        const waitTime = Math.max(0, downtime - repair);
+        let waitTime = 0;
+        let execTime = 0;
+
+        const createdDate = order.created_at ? new Date(order.created_at) : new Date(order.date);
+        const now = new Date();
+
+        if (order.status === 'Concluído') {
+          waitTime = Number(order.response_hours) || Math.max(0, Number(order.downtime_hours) - Number(order.repair_hours));
+          execTime = Number(order.repair_hours) || 0;
+        } else if (order.status === 'Em Manutenção') {
+          // Start of wait was created_at, end of wait was when it changed to Em Manutencao (updated_at)
+          const waitEnd = order.updated_at ? new Date(order.updated_at).getTime() : now.getTime();
+          waitTime = Number(order.response_hours) || Math.max(0, (waitEnd - createdDate.getTime()) / (1000 * 60 * 60));
+          const totalDowntimeSoFar = Math.max(0, (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
+          execTime = Math.max(0, totalDowntimeSoFar - waitTime);
+        } else {
+          // Pendente or Aguardando Peça
+          waitTime = Math.max(Number(order.downtime_hours) || 0.1, (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
+          execTime = 0;
+        }
 
         return {
           machine: order.assets?.name || 'Máquina',
-          date: new Date(order.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
+          date: createdDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
           waitTime: Number(waitTime.toFixed(1)),
-          execTime: Number(repair.toFixed(1))
+          execTime: Number(execTime.toFixed(1))
         };
       });
       setTimelineData(timeline);
@@ -265,11 +303,14 @@ const Dashboard = () => {
 
       // Map Recent Orders Table
       const tableData = orders.slice(0, 10).map(order => ({
-        id: order.id.substring(0, 8).toUpperCase(),
-        asset_name: order.assets?.name || 'Desconhecido',
+        id: order.id,
+        order_number: order.order_number || `OS-${order.id.substring(0, 4).toUpperCase()}`,
+        asset_name: order.assets?.name || 'Geral',
+        maintenance_category: order.maintenance_category || 'Equipamento',
         issue: order.issue || 'Sem descrição',
         status: order.status || 'Pendente',
         technician_name: order.technicians?.name || 'Não atribuído',
+        requester_name: (order as any).requester?.name || 'Administrador',
         date: new Date(order.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
       }));
       setRecentOrders(tableData);
@@ -392,10 +433,6 @@ const Dashboard = () => {
             <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
               <Timer size={24} />
             </div>
-            <span className="flex items-center text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
-              <TrendingDown size={14} className="mr-1" />
-              -5%
-            </span>
           </div>
           <p className="text-slate-500 text-sm font-medium mb-1">Tempo Médio de Reparo</p>
           <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.mttr}</h3>
@@ -407,10 +444,6 @@ const Dashboard = () => {
             <div className="p-2 bg-purple-50 rounded-lg text-purple-600">
               <Activity size={24} />
             </div>
-            <span className="flex items-center text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-full">
-              <TrendingUp size={14} className="mr-1" />
-              +8%
-            </span>
           </div>
           <p className="text-slate-500 text-sm font-medium mb-1">Tempo Médio Entre Falhas</p>
           <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.mtbf}</h3>
@@ -422,9 +455,6 @@ const Dashboard = () => {
             <div className="p-2 bg-red-50 rounded-lg text-red-600">
               <Ban size={24} />
             </div>
-            <span className="flex items-center text-xs font-semibold text-red-600 bg-red-100 px-2 py-1 rounded-full">
-              +0.5%
-            </span>
           </div>
           <p className="text-slate-500 text-sm font-medium mb-1">Taxa de Parada</p>
           <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{kpis.downtimeRate}</h3>
@@ -586,9 +616,11 @@ const Dashboard = () => {
               <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
                 <tr>
                   <th className="px-6 py-4">ID</th>
-                  <th className="px-6 py-4">Ativo</th>
+                  <th className="px-6 py-4">Categoria</th>
+                  <th className="px-6 py-4">Alvo</th>
                   <th className="px-6 py-4">Problema</th>
                   <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4">Solicitante</th>
                   <th className="px-6 py-4">Técnico</th>
                   <th className="px-6 py-4 text-right">Data</th>
                 </tr>
@@ -598,13 +630,21 @@ const Dashboard = () => {
                   const { initials, color } = getAvatarInfo(order.technician_name);
                   return (
                     <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4 font-mono text-slate-500">#OS-{order.id}</td>
+                      <td className="px-6 py-4 font-mono text-slate-500">#{order.order_number}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex py-1 px-2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+                          {order.maintenance_category}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 font-medium text-slate-900">{order.asset_name}</td>
                       <td className="px-6 py-4">{order.issue}</td>
                       <td className="px-6 py-4">
                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                           {order.status}
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm font-medium text-slate-700">{order.requester_name}</span>
                       </td>
                       <td className="px-6 py-4 flex items-center gap-2">
                         {order.technician_name !== 'Não atribuído' ? (

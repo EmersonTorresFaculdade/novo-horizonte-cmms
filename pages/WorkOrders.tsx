@@ -12,16 +12,20 @@ import {
   AlertTriangle,
   Info,
   Trash2,
-  Pencil
+  Pencil,
+  Search,
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { useSearchParams } from 'react-router-dom';
 import FeedbackModal from '../components/FeedbackModal';
 
 interface WorkOrder {
   id: string;
   order_number: string;
   issue: string; // desc
+  maintenance_category?: string;
   failure_type: string;
   status: string;
   priority: string;
@@ -33,8 +37,12 @@ interface WorkOrder {
   assets: {
     name: string;
     model: string;
+    code?: string;
   };
   technicians?: {
+    name: string;
+  } | null;
+  requester?: {
     name: string;
   } | null;
 }
@@ -44,9 +52,12 @@ const WorkOrders = () => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
   const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [searchParams] = useSearchParams();
+  const initialSearch = searchParams.get('search') || '';
 
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
+  const [searchTerm, setSearchTerm] = useState(initialSearch);
   const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'maintenance' | 'waiting' | 'completed'>('all');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
@@ -59,6 +70,14 @@ const WorkOrders = () => {
     fetchOrders();
   }, []);
 
+  useEffect(() => {
+    const q = searchParams.get('search');
+    console.log('DEBUG: URL Search Param changed:', q);
+    if (q !== null) {
+      setSearchTerm(q);
+    }
+  }, [searchParams]);
+
   const fetchOrders = async () => {
     try {
       const { data, error } = await supabase
@@ -66,8 +85,9 @@ const WorkOrders = () => {
         .select(`
                 *,
                 failure_type,
-                assets (name, model),
-                technicians (name)
+                assets (id, name, model, code, sector),
+                technicians (name),
+                requester:users!requester_id (name)
             `)
         .order('created_at', { ascending: false });
 
@@ -81,12 +101,34 @@ const WorkOrders = () => {
   };
 
   const filteredOrders = orders.filter(order => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'pending') return order.status === 'Pendente';
-    if (filterStatus === 'maintenance') return order.status === 'Em Manutenção';
-    if (filterStatus === 'waiting') return order.status === 'Aguardando Peça';
-    if (filterStatus === 'completed') return order.status === 'Concluído';
-    return true;
+    // Status filter
+    const matchesStatus =
+      filterStatus === 'all' ||
+      (filterStatus === 'pending' && order.status === 'Pendente') ||
+      (filterStatus === 'maintenance' && order.status === 'Em Manutenção') ||
+      (filterStatus === 'waiting' && order.status === 'Aguardando Peça') ||
+      (filterStatus === 'completed' && order.status === 'Concluído');
+
+    // Search filter
+    const searchLower = searchTerm.toLowerCase();
+    const assetsData = order.assets as any;
+    const matchesSearch =
+      searchTerm === '' ||
+      order.order_number.toLowerCase().includes(searchLower) ||
+      order.issue.toLowerCase().includes(searchLower) ||
+      (order.assets?.name || '').toLowerCase().includes(searchLower) ||
+      (assetsData?.code || '').toLowerCase().includes(searchLower);
+
+    // Filter by Permission (Maintenance Category)
+    const allowedCategories: string[] = [];
+    if (user?.manage_equipment) allowedCategories.push('Equipamento');
+    if (user?.manage_predial) allowedCategories.push('Predial');
+    if (user?.manage_others) allowedCategories.push('Outros');
+
+    // If order has no category, treat it as Equipamento (legacy or default)
+    const matchesPermission = allowedCategories.includes(order.maintenance_category || 'Equipamento');
+
+    return matchesStatus && matchesSearch && matchesPermission;
   });
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -156,11 +198,6 @@ const WorkOrders = () => {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-2">
         <div className="flex flex-col gap-2">
-          <nav className="flex items-center text-sm text-slate-500 mb-1">
-            <button onClick={() => navigate('/dashboard')} className="hover:text-primary">Início</button>
-            <ChevronRight size={14} className="mx-1" />
-            <span className="text-slate-900 font-medium">Ordens de Serviço</span>
-          </nav>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Gestão de Ordens</h2>
           <p className="text-slate-500 max-w-2xl">Gerencie solicitações, atribua técnicos e acompanhe o status dos reparos.</p>
         </div>
@@ -209,6 +246,25 @@ const WorkOrders = () => {
               Concluídos ({orders.filter(o => o.status === 'Concluído').length})
             </button>
           </div>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <input
+              type="text"
+              placeholder="Buscar por OS, ativo ou descrição..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-slate-100 border border-slate-200 rounded-lg text-sm w-full md:w-64 outline-none focus:bg-white focus:border-primary transition-all"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => setSearchTerm('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3 ml-auto">
@@ -250,12 +306,14 @@ const WorkOrders = () => {
                     <thead>
                       <tr className="bg-slate-50/50 border-b border-slate-100">
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">ID</th>
-                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Máquina</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Categoria</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Alvo</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Tipo</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Problema</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Setor</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Prioridade</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Status</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Solicitante</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Técnico</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-40 text-right">Ação</th>
                       </tr>
@@ -265,9 +323,14 @@ const WorkOrders = () => {
                         <tr key={order.id} onClick={() => navigate(`/work-orders/${order.id}`)} className="group hover:bg-slate-50 transition-colors cursor-pointer">
                           <td className="p-4 text-sm font-medium text-primary">#{order.order_number}</td>
                           <td className="p-4">
+                            <span className="inline-flex py-1 px-2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
+                              {order.maintenance_category || 'Equipamento'}
+                            </span>
+                          </td>
+                          <td className="p-4">
                             <div className="flex flex-col">
-                              <span className="text-sm font-semibold text-slate-900">{order.assets?.name}</span>
-                              <span className="text-xs text-slate-500">{order.assets?.model}</span>
+                              <span className="text-sm font-semibold text-slate-900">{order.assets?.name || 'Geral'}</span>
+                              <span className="text-xs text-slate-500">{order.assets?.model || '-'}</span>
                             </div>
                           </td>
                           <td className="p-4">
@@ -276,7 +339,7 @@ const WorkOrders = () => {
                             </span>
                           </td>
                           <td className="p-4 text-sm text-slate-700">{order.issue}</td>
-                          <td className="p-4 text-sm text-slate-700">{order.sector}</td>
+                          <td className="p-4 text-sm text-slate-700">{order.assets?.sector || order.sector || '-'}</td>
                           <td className="p-4">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getPriorityColor(order.priority)}`}>
                               {order.priority}
@@ -284,6 +347,9 @@ const WorkOrders = () => {
                           </td>
                           <td className="p-4">
                             {getStatusBadge(order.status)}
+                          </td>
+                          <td className="p-4">
+                            <span className="text-sm font-medium text-slate-700">{order.requester?.name || 'Administrador'}</span>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2 text-slate-500 text-sm">
@@ -343,21 +409,21 @@ const WorkOrders = () => {
                     </span>
                   </div>
                   <div className="p-3 flex-1 overflow-y-auto space-y-3 min-h-[200px]">
-                    {filteredOrders.filter(o => o.status === status).map(card => (
-                      <div key={card.id} onClick={() => navigate(`/work-orders/${card.id}`)} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-shadow relative group">
+                    {filteredOrders.filter(o => o.status === status).map(order => (
+                      <div key={order.id} onClick={() => navigate(`/work-orders/${order.id}`)} className="bg-white p-4 rounded-lg shadow-sm border border-slate-200 cursor-pointer hover:shadow-md transition-shadow relative group">
                         <div className="flex justify-between items-start">
-                          <span className="font-mono text-xs font-bold text-slate-400">#{card.order_number}</span>
+                          <span className="font-mono text-xs font-bold text-slate-400">#{order.order_number}</span>
                           {isAdmin && (
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded-md shadow-sm border border-slate-100 absolute top-2 right-2">
                               <button
-                                onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${card.id}/edit`); }}
+                                onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${order.id}/edit`); }}
                                 className="text-slate-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50"
                                 title="Editar"
                               >
                                 <Pencil size={14} />
                               </button>
                               <button
-                                onClick={(e) => handleDelete(e, card.id)}
+                                onClick={(e) => handleDelete(e, order.id)}
                                 className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-50"
                                 title="Excluir"
                               >
@@ -366,15 +432,18 @@ const WorkOrders = () => {
                             </div>
                           )}
                         </div>
-                        <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{card.assets?.name}</h4>
-                        <div className="mb-2">
+                        <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{order.assets?.name || 'Geral'}</h4>
+                        <div className="mb-2 flex items-center gap-1 flex-wrap">
                           <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                            {card.failure_type || 'Geral'}
+                            {order.maintenance_category || 'Equipamento'}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                            {order.failure_type || 'Geral'}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 line-clamp-2 mb-2">{card.issue}</p>
+                        <p className="text-xs text-slate-500 line-clamp-2 mb-2">{order.issue}</p>
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(card.priority)}`}>{card.priority}</span>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded border ${getPriorityColor(order.priority)}`}>{order.priority}</span>
                         </div>
                       </div>
                     ))}

@@ -21,6 +21,9 @@ export interface User {
     push_notifications?: boolean;
     daily_report?: boolean;
     report_frequency?: string;
+    manage_equipment?: boolean;
+    manage_predial?: boolean;
+    manage_others?: boolean;
 }
 
 interface AuthContextType {
@@ -35,6 +38,7 @@ interface AuthContextType {
     getPendingUsers: () => Promise<{ data: User[] | null; error: any }>;
     approveUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
     rejectUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
+    resetUserPassword: (userId: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -296,6 +300,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const resetUserPassword = async (userId: string, newPassword: string) => {
+        try {
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash(newPassword, salt);
+
+            const { error } = await supabase
+                .from('users')
+                .update({ password_hash: passwordHash })
+                .eq('id', userId);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error: any) {
+            console.error('Error resetting password:', error);
+            return { success: false, error: error.message };
+        }
+    };
+
     const value: AuthContextType = {
         user,
         loading,
@@ -307,7 +329,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         isAdminRoot,
         getPendingUsers,
         approveUser,
-        rejectUser
+        rejectUser,
+        resetUserPassword
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
