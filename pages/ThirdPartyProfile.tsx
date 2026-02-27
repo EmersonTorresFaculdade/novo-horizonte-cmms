@@ -171,7 +171,7 @@ const ThirdPartyProfile = () => {
     if (isLoading) {
         return (
             <div className="flex items-center justify-center min-h-[400px]">
-                <div className="size-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin"></div>
+                <div className="size-12 border-4 border-primary-light/20 border-t-primary-light rounded-full animate-spin"></div>
             </div>
         );
     }
@@ -204,7 +204,7 @@ const ThirdPartyProfile = () => {
                         </div>
 
                         <h2 className="text-2xl font-black text-slate-900 tracking-tight">{company.name}</h2>
-                        <p className="text-blue-600 font-bold text-sm mb-2">{company.specialty}</p>
+                        <p className="text-primary font-bold text-sm mb-2">{company.specialty}</p>
                         <p className="text-slate-400 text-xs font-semibold mb-6">CNPJ: {company.cnpj || '—'}</p>
 
                         <div className="flex flex-col w-full gap-3">
@@ -257,8 +257,8 @@ const ThirdPartyProfile = () => {
                                 <h4 className="text-lg font-black text-slate-900">{mttr.label}</h4>
                                 <p className="text-[10px] text-slate-400 font-semibold">{completedOrders} OS concluída{completedOrders !== 1 ? 's' : ''}</p>
                             </div>
-                            <div className="size-10 rounded-xl bg-blue-50 flex items-center justify-center">
-                                <Clock size={20} className="text-blue-600" />
+                            <div className="size-10 rounded-xl bg-emerald-50/50 flex items-center justify-center">
+                                <Clock size={20} className="text-primary" />
                             </div>
                         </div>
 
@@ -303,7 +303,7 @@ const ThirdPartyProfile = () => {
                         <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-3">
                                 <div className="size-10 rounded-xl bg-blue-100 flex items-center justify-center">
-                                    <CalendarIcon size={20} className="text-blue-600" />
+                                    <CalendarIcon size={20} className="text-primary" />
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900">Cronograma de Atendimentos</h3>
                             </div>
@@ -353,7 +353,7 @@ const ThirdPartyProfile = () => {
                                         days.push(
                                             <div key={d} className="p-3 border-r border-b border-slate-50 relative group/cell hover:bg-slate-50/50 transition-all">
                                                 <span className={`text-xs font-bold ${new Date().toISOString().startsWith(dateStr)
-                                                    ? 'size-6 flex items-center justify-center bg-blue-600 text-white rounded-lg -mt-1 -ml-1'
+                                                    ? 'size-6 flex items-center justify-center bg-primary text-white rounded-lg -mt-1 -ml-1'
                                                     : 'text-slate-400'
                                                     }`}>
                                                     {d}
@@ -373,7 +373,7 @@ const ThirdPartyProfile = () => {
                                                                 <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 bg-white rounded-xl shadow-2xl border border-slate-200 p-3 opacity-0 invisible group-hover/badge:opacity-100 group-hover/badge:visible transition-all duration-200 z-50 pointer-events-none">
                                                                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 rotate-45 w-2.5 h-2.5 bg-white border-r border-b border-slate-200"></div>
                                                                     <div className="flex items-center justify-between mb-2">
-                                                                        <span className="text-[10px] font-black text-blue-600 uppercase">#{order.order_number}</span>
+                                                                        <span className="text-[10px] font-black text-primary uppercase">#{order.order_number}</span>
                                                                         <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${colors.bgColor} ${colors.color} ${colors.borderColor} border`}>{order.status}</span>
                                                                     </div>
                                                                     <p className="text-xs font-bold text-slate-800 mb-2 line-clamp-2">{order.title || order.issue || 'Sem título'}</p>
@@ -424,12 +424,12 @@ const ThirdPartyProfile = () => {
                             {todayTasks.slice(0, 5).map(order => (
                                 <div
                                     key={order.id}
-                                    className={`bg-white rounded-2xl border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:border-blue-300 transition-all cursor-pointer group ${order.status === 'Concluído' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}
+                                    className={`bg-white rounded-2xl border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-sm hover:border-primary-light/40 transition-all cursor-pointer group ${order.status === 'Concluído' ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200'}`}
                                     onClick={() => navigate(`/work-orders/${order.id}`)}
                                 >
                                     <div className="flex gap-4 min-w-0">
                                         <div className={`size-12 rounded-2xl flex items-center justify-center shrink-0 shadow-sm ${order.status === 'Concluído' ? 'bg-emerald-100 text-emerald-600' :
-                                            order.priority === 'Alta' ? 'bg-red-50 text-red-500' : 'bg-amber-50 text-amber-500'
+                                            order.priority === 'Alta' ? 'bg-red-50 text-brand-alert' : 'bg-amber-50 text-amber-500'
                                             }`}>
                                             {order.status === 'Concluído' ? <CheckCircle size={24} /> : <AlertTriangle size={24} />}
                                         </div>
@@ -445,14 +445,14 @@ const ThirdPartyProfile = () => {
                                                     );
                                                 })()}
                                             </div>
-                                            <h4 className="text-base font-black text-slate-900 group-hover:text-blue-600 transition-colors truncate text-left">{order.title}</h4>
+                                            <h4 className="text-base font-black text-slate-900 group-hover:text-primary transition-colors truncate text-left">{order.title}</h4>
                                             <p className="text-xs font-semibold text-slate-500 flex items-center gap-1.5 mt-0.5">
                                                 <Wrench size={12} /> {order.asset_name || 'Geral'} • <Clock size={12} /> {new Date(order.created_at).toLocaleDateString('pt-BR')}
                                             </p>
                                         </div>
                                     </div>
 
-                                    <button className="px-5 py-2.5 bg-slate-50 group-hover:bg-blue-600 text-slate-400 group-hover:text-white border border-slate-200 group-hover:border-blue-600 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">
+                                    <button className="px-5 py-2.5 bg-slate-50 group-hover:bg-primary-dark text-slate-400 group-hover:text-white border border-slate-200 group-hover:border-primary rounded-xl text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap">
                                         Ver Detalhes
                                     </button>
                                 </div>

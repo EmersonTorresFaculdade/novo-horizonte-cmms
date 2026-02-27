@@ -267,7 +267,7 @@ const Settings = () => {
                                                 {settings.companyLogo && (
                                                     <button
                                                         onClick={handleRemoveLogo}
-                                                        className="absolute -top-2 -right-2 p-1 bg-red-500 rounded-full text-white hover:bg-red-600 transition-colors shadow-md"
+                                                        className="absolute -top-2 -right-2 p-1 bg-brand-alert rounded-full text-white hover:bg-brand-alert transition-colors shadow-md"
                                                         title="Remover logo"
                                                     >
                                                         <X size={14} />
@@ -355,10 +355,10 @@ const Settings = () => {
                             <div className="p-6">
                                 <h3 className="text-lg font-bold text-slate-900 mb-6">Integrações (n8n)</h3>
                                 <div className="space-y-6">
-                                    <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                                    <div className="p-4 bg-emerald-50/50 border border-primary-light/10 rounded-lg">
                                         <div className="flex gap-4">
                                             <div className="p-2 bg-blue-100 rounded-lg h-fit">
-                                                <Webhook size={24} className="text-blue-600" />
+                                                <Webhook size={24} className="text-primary" />
                                             </div>
                                             <div>
                                                 <h4 className="font-bold text-slate-900">Webhook de Notificações</h4>
@@ -408,6 +408,22 @@ const Settings = () => {
                                         </div>
                                         <p className="text-xs text-slate-500 mt-2">
                                             O sistema enviará um JSON com os dados da OS para esta URL.
+                                        </p>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 pt-6">
+                                        <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
+                                            <Mail size={16} />
+                                            E-mails da Diretoria (Relatório Estratégico)
+                                        </label>
+                                        <textarea
+                                            placeholder="diretor1@empresa.com, diretor2@empresa.com"
+                                            value={settings.boardEmails || ''}
+                                            onChange={(e) => updateSettings({ boardEmails: e.target.value })}
+                                            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none h-24 resize-none"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-2">
+                                            Separe os e-mails por vírgula. Estes endereços receberão o Relatório Executivo quando o botão "Enviar Diretoria" for acionado.
                                         </p>
                                     </div>
                                 </div>

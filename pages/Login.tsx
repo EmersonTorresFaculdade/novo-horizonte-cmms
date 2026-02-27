@@ -100,7 +100,7 @@ const Login = () => {
       {/* Left Side: Visual */}
       <div className="hidden lg:flex w-1/2 relative bg-primary items-center justify-center overflow-hidden">
         <div className="absolute inset-0 z-0">
-          <div className="absolute inset-0 bg-blue-600/80 mix-blend-multiply z-10"></div>
+          <div className="absolute inset-0 bg-primary/80 mix-blend-multiply z-10"></div>
           <img
             src={IMAGES.loginBackground}
             alt="Fábrica"
@@ -140,7 +140,7 @@ const Login = () => {
             </p>
 
             {/* Hint para admin root */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-slate-600">
+            <div className="mt-4 bg-emerald-50/50 border border-primary-light/20 rounded-lg p-3 text-xs text-slate-600">
               <p><strong>Admin Root:</strong> usuário: <code className="bg-blue-100 px-1 py-0.5 rounded">admin</code> | senha: <code className="bg-blue-100 px-1 py-0.5 rounded">admin</code></p>
             </div>
           </div>
@@ -211,7 +211,7 @@ const Login = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="flex w-full justify-center rounded-lg bg-primary px-3 py-3.5 text-sm font-bold leading-6 text-white shadow-sm hover:bg-green-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex w-full justify-center rounded-lg bg-primary px-3 py-3.5 text-sm font-bold leading-6 text-white shadow-sm hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary transition-all duration-200 items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <>
@@ -292,7 +292,7 @@ const Login = () => {
                   <p className="text-xs text-green-700">
                     Sua conta foi criada e está aguardando aprovação.
                   </p>
-                  <div className="bg-green-100 rounded p-2 text-xs text-green-800">
+                  <div className="bg-emerald-50/50 rounded p-2 text-xs text-green-800">
                     {registerRole === 'admin'
                       ? '⚡ Aguardando aprovação do Administrador Root'
                       : '👥 Aguardando aprovação de um Administrador'
@@ -445,7 +445,7 @@ const Login = () => {
 
                   <div className={`border-l-4 rounded-lg p-3 text-xs ${registerRole === 'admin'
                     ? 'bg-amber-50 border-amber-500 text-amber-900'
-                    : 'bg-blue-50 border-blue-500 text-blue-900'
+                    : 'bg-emerald-50/50 border-primary-light text-blue-900'
                     }`}>
                     <div className="flex items-start gap-2">
                       <AlertTriangle size={16} className="flex-shrink-0 mt-0.5" />
@@ -459,7 +459,7 @@ const Login = () => {
                   <button
                     type="submit"
                     disabled={registerLoading}
-                    className="w-full flex justify-center items-center gap-2 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex justify-center items-center gap-2 bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {registerLoading ? (
                       <>

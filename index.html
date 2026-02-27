@@ -18,10 +18,12 @@
             display: ['Inter', 'sans-serif'],
           },
           colors: {
-            primary: "var(--primary-color)",
-            "primary-dark": "var(--primary-dark-color)",
-            "brand-dark": "#0e1b2a",
-            "brand-accent": "#f59e0b",
+            primary: "var(--primary-color)",           /* O Verde bonito que o usuário gostava */
+            "primary-dark": "var(--primary-dark-color)", /* O verde mais escuro/Preto pro hover */
+            "primary-light": "var(--primary-light-color)", /* Um verde suave/transparente */
+            "brand-dark": "#0e1b2a",                     /* Fundo lateral (sidebar) */
+            "brand-accent": "#f59e0b",                   /* Amarelo de notificações de ordens (recuperado) */
+            "brand-alert": "#d9534f",                    /* Vermelho para avisos */
             background: "var(--bg-color)",
           }
         },
@@ -30,9 +32,15 @@
   </script>
   <style>
     :root {
+      /* O Preto e Verde antigo melhorado */
       --primary-color: #11d473;
-      --primary-dark-color: #0ea65a;
+      /* Verde Principal Antigo super limpo */
+      --primary-dark-color: #0d1620;
+      /* Preto pro Hover ou fundos densos, combinando com a sidebar */
+      --primary-light-color: #11d473;
+      /* Mantemos o Primary Light puxado pro verde pra anéis de foco */
       --bg-color: #f6f8f7;
+      /* Fundo limpo que ele gostava antes */
       --text-main: #1e293b;
       --text-muted: #64748b;
     }
@@ -67,6 +75,45 @@
 
     ::-webkit-scrollbar-thumb:hover {
       background: #94a3b8;
+    }
+
+    @media print {
+
+      .no-print,
+      button,
+      nav,
+      aside,
+      .sticky-bar,
+      .action-bar {
+        display: none !important;
+      }
+
+      body {
+        background: white !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+
+      .print-only {
+        display: block !important;
+      }
+
+      .content-wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+      }
+
+      #root>div>div {
+        margin-left: 0 !important;
+        padding: 0 !important;
+      }
+
+      .card,
+      .bg-white {
+        box-shadow: none !important;
+        border: 1px solid #eee !important;
+      }
     }
   </style>
   <script type="importmap">

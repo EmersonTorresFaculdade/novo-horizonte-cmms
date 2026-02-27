@@ -217,7 +217,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 <Bell size={20} />
                 <span className="text-sm font-medium">Notificações</span>
                 {unreadCount > 0 && (
-                  <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
+                  <span className="ml-auto bg-brand-alert text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center">
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -325,7 +325,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                   setIsProfileOpen(false);
                   navigate('/');
                 }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-brand-alert/10 hover:text-red-300 transition-colors text-left"
               >
                 <LogOut size={18} />
                 <span className="text-sm font-medium">Sair da Conta</span>

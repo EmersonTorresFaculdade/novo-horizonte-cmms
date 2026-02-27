@@ -302,7 +302,7 @@ const Technicians: React.FC = () => {
 
     const getAvatarColor = (name: string) => {
         const colors = [
-            { bg: '#EFF6FF', text: '#2563EB' },
+            { bg: 'rgba(17, 212, 115, 0.1)', text: 'var(--primary-color)' },
             { bg: '#F5F3FF', text: '#7C3AED' },
             { bg: '#ECFDF5', text: '#059669' },
             { bg: '#FFF7ED', text: '#EA580C' },
@@ -377,21 +377,21 @@ const Technicians: React.FC = () => {
                     onClick={() => { setMainTab('internos'); setActiveTab('Todos'); setCurrentPage(1); }}
                     style={{
                         paddingBottom: 12, fontSize: '1rem', fontWeight: 600, border: 'none', background: 'none',
-                        color: mainTab === 'internos' ? '#2563EB' : '#64748B', cursor: 'pointer', position: 'relative'
+                        color: mainTab === 'internos' ? 'var(--primary-color)' : '#64748B', cursor: 'pointer', position: 'relative'
                     }}
                 >
                     Equipe Interna
-                    {mainTab === 'internos' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: '#2563EB' }} />}
+                    {mainTab === 'internos' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: 'var(--primary-color)' }} />}
                 </button>
                 <button
                     onClick={() => { setMainTab('terceirizados'); setActiveTab('Todos'); setCurrentPage(1); }}
                     style={{
                         paddingBottom: 12, fontSize: '1rem', fontWeight: 600, border: 'none', background: 'none',
-                        color: mainTab === 'terceirizados' ? '#2563EB' : '#64748B', cursor: 'pointer', position: 'relative'
+                        color: mainTab === 'terceirizados' ? 'var(--primary-color)' : '#64748B', cursor: 'pointer', position: 'relative'
                     }}
                 >
                     Parceiros de Terceiros
-                    {mainTab === 'terceirizados' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: '#2563EB' }} />}
+                    {mainTab === 'terceirizados' && <div style={{ position: 'absolute', bottom: -1, left: 0, right: 0, height: 2, background: 'var(--primary-color)' }} />}
                 </button>
             </div>
 
@@ -422,7 +422,7 @@ const Technicians: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleNewTechnician}
-                                        style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                                        className="bg-primary hover:bg-primary-dark text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-all"
                                     >
                                         <UserPlus size={18} />
                                         Novo Técnico
@@ -438,9 +438,9 @@ const Technicians: React.FC = () => {
                                         onClick={() => setActiveTab(specialty)}
                                         style={{
                                             padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
-                                            border: `1px solid ${activeTab === specialty ? '#DBEAFE' : '#E2E8F0'}`,
-                                            background: activeTab === specialty ? '#EFF6FF' : '#FFFFFF',
-                                            color: activeTab === specialty ? '#2563EB' : '#64748B'
+                                            border: `1px solid ${activeTab === specialty ? 'var(--primary-color)' : '#E2E8F0'}`,
+                                            background: activeTab === specialty ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF',
+                                            color: activeTab === specialty ? 'var(--primary-color)' : '#64748B'
                                         }}
                                     >
                                         {specialty}
@@ -452,7 +452,7 @@ const Technicians: React.FC = () => {
                                 {paginatedTechnicians.map(tech => {
                                     const avColor = getAvatarColor(tech.name);
                                     return (
-                                        <div key={tech.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-blue-200 group">
+                                        <div key={tech.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-primary-light/30 group">
                                             <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', items: 'center', gap: 8 }}>
                                                 <span style={{
                                                     padding: '4px 8px',
@@ -460,13 +460,13 @@ const Technicians: React.FC = () => {
                                                     fontSize: '0.625rem',
                                                     fontWeight: 700,
                                                     textTransform: 'uppercase',
-                                                    background: tech.status === 'Ativo' ? '#ECFDF5' : tech.status === 'Em Campo' ? '#EFF6FF' : '#FEF2F2',
-                                                    color: tech.status === 'Ativo' ? '#059669' : tech.status === 'Em Campo' ? '#2563EB' : '#EF4444',
-                                                    border: `1px solid ${tech.status === 'Ativo' ? '#D1FAE5' : tech.status === 'Em Campo' ? '#DBEAFE' : '#FEE2E2'}`
+                                                    background: tech.status === 'Ativo' ? '#ECFDF5' : tech.status === 'Em Campo' ? 'rgba(17, 212, 115, 0.1)' : '#FEF2F2',
+                                                    color: tech.status === 'Ativo' ? '#059669' : tech.status === 'Em Campo' ? 'var(--primary-color)' : '#EF4444',
+                                                    border: `1px solid ${tech.status === 'Ativo' ? '#D1FAE5' : tech.status === 'Em Campo' ? 'rgba(17, 212, 115, 0.2)' : '#FEE2E2'}`
                                                 }}>
                                                     {tech.status}
                                                 </span>
-                                                <button onClick={() => handleEditTechnician(tech)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-blue-600">
+                                                <button onClick={() => handleEditTechnician(tech)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-primary">
                                                     <Edit2 size={16} />
                                                 </button>
                                             </div>
@@ -495,7 +495,7 @@ const Technicians: React.FC = () => {
                                                 </div>
                                                 <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
                                                     <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Em Aberto</p>
-                                                    <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#3B82F6' }}>{tech.open_orders || 0}</p>
+                                                    <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary-color)' }}>{tech.open_orders || 0}</p>
                                                 </div>
                                             </div>
 
@@ -511,11 +511,11 @@ const Technicians: React.FC = () => {
                                             </div>
 
                                             <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', gap: 8 }}>
-                                                <button onClick={() => navigate(`/technicians/${tech.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-blue-600 hover:text-white">
+                                                <button onClick={() => navigate(`/technicians/${tech.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-primary-dark hover:text-white">
                                                     Ver Perfil
                                                     <ExternalLink size={14} />
                                                 </button>
-                                                <button onClick={() => handleDeleteTechnician(tech.id, tech.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-red-600 hover:text-white">
+                                                <button onClick={() => handleDeleteTechnician(tech.id, tech.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-brand-alert hover:text-white">
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
@@ -542,7 +542,7 @@ const Technicians: React.FC = () => {
                                             <button
                                                 key={i}
                                                 onClick={() => setCurrentPage(i + 1)}
-                                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid', borderColor: currentPage === i + 1 ? '#3B82F6' : '#E2E8F0', background: currentPage === i + 1 ? '#3B82F6' : '#fff', color: currentPage === i + 1 ? '#fff' : '#475569', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
+                                                style={{ minWidth: 32, height: 32, borderRadius: 8, border: '1px solid', borderColor: currentPage === i + 1 ? 'var(--primary-color)' : '#E2E8F0', background: currentPage === i + 1 ? 'var(--primary-color)' : '#fff', color: currentPage === i + 1 ? '#fff' : '#475569', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }}
                                             >
                                                 {i + 1}
                                             </button>
@@ -579,7 +579,7 @@ const Technicians: React.FC = () => {
                                     </div>
                                     <button
                                         onClick={handleNewThirdParty}
-                                        style={{ background: 'linear-gradient(135deg, #3B82F6, #2563EB)', color: '#fff', border: 'none', padding: '9px 18px', borderRadius: 10, fontSize: '0.875rem', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.2)' }}
+                                        className="bg-primary hover:bg-primary-dark text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition-all"
                                     >
                                         <Building2 size={18} />
                                         Nova Empresa
@@ -592,7 +592,7 @@ const Technicians: React.FC = () => {
                                     <button
                                         key={specialty}
                                         onClick={() => setActiveTab(specialty)}
-                                        style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s', border: `1px solid ${activeTab === specialty ? '#DBEAFE' : '#E2E8F0'}`, background: activeTab === specialty ? '#EFF6FF' : '#FFFFFF', color: activeTab === specialty ? '#2563EB' : '#64748B' }}
+                                        style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s', border: `1px solid ${activeTab === specialty ? 'var(--primary-color)' : '#E2E8F0'}`, background: activeTab === specialty ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF', color: activeTab === specialty ? 'var(--primary-color)' : '#64748B' }}
                                     >
                                         {specialty}
                                     </button>
@@ -601,14 +601,14 @@ const Technicians: React.FC = () => {
 
                             {isLoading ? (
                                 <div className="flex justify-center items-center py-20">
-                                    <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+                                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
                                 </div>
                             ) : (
                                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
                                     {filteredThirdParties.length > 0 ? (
                                         filteredThirdParties.map(company => {
                                             return (
-                                                <div key={company.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-blue-200 group">
+                                                <div key={company.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-primary-light/30 group">
                                                     <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                                                         <span style={{
                                                             padding: '4px 8px',
@@ -616,13 +616,13 @@ const Technicians: React.FC = () => {
                                                             fontSize: '0.625rem',
                                                             fontWeight: 700,
                                                             textTransform: 'uppercase',
-                                                            background: company.status === 'Ativo' ? '#ECFDF5' : company.status === 'Em Campo' ? '#EFF6FF' : '#FEF2F2',
-                                                            color: company.status === 'Ativo' ? '#059669' : company.status === 'Em Campo' ? '#2563EB' : '#EF4444',
-                                                            border: `1px solid ${company.status === 'Ativo' ? '#D1FAE5' : company.status === 'Em Campo' ? '#DBEAFE' : '#FEE2E2'}`
+                                                            background: company.status === 'Ativo' ? '#ECFDF5' : company.status === 'Em Campo' ? 'rgba(17, 212, 115, 0.1)' : '#FEF2F2',
+                                                            color: company.status === 'Ativo' ? '#059669' : company.status === 'Em Campo' ? 'var(--primary-color)' : '#EF4444',
+                                                            border: `1px solid ${company.status === 'Ativo' ? '#D1FAE5' : company.status === 'Em Campo' ? 'rgba(17, 212, 115, 0.2)' : '#FEE2E2'}`
                                                         }}>
                                                             {company.status}
                                                         </span>
-                                                        <button onClick={() => handleEditThirdParty(company)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-blue-600">
+                                                        <button onClick={() => handleEditThirdParty(company)} style={{ padding: 6, color: '#94A3B8', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer' }} className="hover:bg-slate-50 hover:text-primary">
                                                             <Edit2 size={16} />
                                                         </button>
                                                     </div>
@@ -651,7 +651,7 @@ const Technicians: React.FC = () => {
                                                         </div>
                                                         <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: 12 }}>
                                                             <p style={{ margin: 0, fontSize: '0.625rem', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 700 }}>Em Aberto</p>
-                                                            <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: '#3B82F6' }}>{company.open_orders || 0}</p>
+                                                            <p style={{ margin: '2px 0 0', fontSize: '1.125rem', fontWeight: 700, color: 'var(--primary-color)' }}>{company.open_orders || 0}</p>
                                                         </div>
                                                     </div>
 
@@ -667,11 +667,11 @@ const Technicians: React.FC = () => {
                                                     </div>
 
                                                     <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #F1F5F9', display: 'flex', gap: 8 }}>
-                                                        <button onClick={() => navigate(`/parceiros/${company.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-blue-600 hover:text-white">
+                                                        <button onClick={() => navigate(`/parceiros/${company.id}`)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: '#F1F5F9', color: '#475569', border: 'none', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }} className="hover:bg-primary-dark hover:text-white">
                                                             Ver Perfil
                                                             <ExternalLink size={14} />
                                                         </button>
-                                                        <button onClick={() => handleDeleteThirdParty(company.id, company.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-red-600 hover:text-white">
+                                                        <button onClick={() => handleDeleteThirdParty(company.id, company.name)} style={{ padding: '8px', borderRadius: 10, background: '#FEF2F2', color: '#EF4444', border: 'none', cursor: 'pointer', transition: 'all 0.2s' }} className="hover:bg-brand-alert hover:text-white">
                                                             <Trash2 size={16} />
                                                         </button>
                                                     </div>
@@ -702,8 +702,8 @@ const Technicians: React.FC = () => {
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: '#F8FAFC', borderRadius: 10 }}>
-                                    <div style={{ width: 36, height: 36, borderRadius: 10, background: '#EFF6FF', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                        <Clock size={16} style={{ color: '#3B82F6' }} />
+                                    <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(17, 212, 115, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                        <Clock size={16} style={{ color: 'var(--primary-color)' }} />
                                     </div>
                                     <div>
                                         <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A' }}>Turno Matutino</p>
@@ -809,8 +809,8 @@ const Technicians: React.FC = () => {
                             )}
                         </div>
 
-                        <div style={{ marginTop: 14, padding: '10px 12px', background: '#EFF6FF', borderRadius: 10, border: '1px solid #DBEAFE' }}>
-                            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: '#3B82F6' }}>Dica do Sistema</p>
+                        <div style={{ marginTop: 14, padding: '10px 12px', background: 'rgba(17, 212, 115, 0.05)', borderRadius: 10, border: '1px solid rgba(17, 212, 115, 0.2)' }}>
+                            <p style={{ margin: 0, fontSize: '0.6875rem', fontWeight: 600, color: 'var(--primary-color)' }}>Dica do Sistema</p>
                             <p style={{ margin: '4px 0 0', fontSize: '0.6875rem', color: '#64748B', lineHeight: 1.4 }}>
                                 {mainTab === 'terceirizados' ? 'Acompanhe a avaliação dos seus parceiros para garantir a qualidade do serviço.' : 'Técnicos com SLA acima de 90% podem ser elegíveis para bonificação este mês.'}
                             </p>

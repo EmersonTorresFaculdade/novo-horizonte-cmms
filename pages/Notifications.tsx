@@ -46,7 +46,7 @@ const Notifications = () => {
     const getIcon = (type: string) => {
         switch (type) {
             case 'user_approval':
-                return <div className="p-2 bg-blue-50 text-blue-600 rounded-lg"><User size={20} /></div>;
+                return <div className="p-2 bg-emerald-50/50 text-primary rounded-lg"><User size={20} /></div>;
             case 'admin_approval':
                 return <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><Shield size={20} /></div>;
             case 'work_order':
@@ -190,7 +190,7 @@ const Notifications = () => {
                                                     e.stopPropagation();
                                                     deleteNotification(n.id);
                                                 }}
-                                                className="p-1.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                className="p-1.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-brand-alert hover:bg-red-50 rounded-lg transition-all"
                                                 title="Excluir"
                                             >
                                                 <Trash2 size={16} />

@@ -19,7 +19,8 @@ import {
   Info,
   Settings,
   Wrench,
-  Building2
+  Building2,
+  Box
 } from 'lucide-react';
 import { supabase, supabaseUntyped } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -206,9 +207,9 @@ const NewWorkOrder = () => {
   };
 
   const categoryIcons = [
-    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-900', iconColor: 'text-blue-600', permission: 'manage_equipment' },
+    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-emerald-50/50', border: 'border-primary-light/30', text: 'text-blue-900', iconColor: 'text-primary', permission: 'manage_equipment' },
     { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-indigo-50', border: 'border-indigo-300', text: 'text-indigo-900', iconColor: 'text-indigo-600', permission: 'manage_predial' },
-    { id: 'Outros', icon: MoreHorizontal, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900', iconColor: 'text-slate-600', permission: 'manage_others' }
+    { id: 'Outros', icon: Box, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-300', text: 'text-slate-900', iconColor: 'text-slate-600', permission: 'manage_others' }
   ].filter(cat => {
     // Verifica permissão específica do perfil (incluindo administradores)
     const permKey = cat.permission as keyof typeof user;
@@ -279,9 +280,9 @@ const NewWorkOrder = () => {
 
   const priorities = [
     { id: 'Baixa', label: 'Baixa', icon: CheckCircle2, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700', iconColor: 'text-emerald-500' },
-    { id: 'Média', label: 'Média', icon: AlertTriangle, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', iconColor: 'text-blue-500' },
+    { id: 'Média', label: 'Média', icon: AlertTriangle, bg: 'bg-emerald-50/50', border: 'border-primary-light/20', text: 'text-blue-700', iconColor: 'text-primary' },
     { id: 'Alta', label: 'Alta', icon: AlertTriangle, bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', iconColor: 'text-orange-500' },
-    { id: 'Crítica', label: 'Emergência', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', iconColor: 'text-red-500' },
+    { id: 'Crítica', label: 'Emergência', icon: AlertOctagon, bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', iconColor: 'text-brand-alert' },
   ];
 
   const filteredAssets = assets
@@ -307,7 +308,7 @@ const NewWorkOrder = () => {
             Envie um novo chamado para problemas de manutenção. Preencha todos os detalhes com atenção.
           </p>
         </div>
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100/50">
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 text-blue-700 rounded-full border border-primary-light/10/50">
           <Info size={14} />
           <span className="text-xs font-bold uppercase tracking-wide">Status: Será Pendente</span>
         </div>
@@ -357,7 +358,7 @@ const NewWorkOrder = () => {
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    Ativo vinculado a {maintenanceCategory === 'Equipamento' ? 'Máquina' : maintenanceCategory === 'Predial' ? 'Predial' : 'Geral'} <span className="text-red-500">*</span>
+                    Ativo vinculado a {maintenanceCategory === 'Equipamento' ? 'Máquina' : maintenanceCategory === 'Predial' ? 'Predial' : 'Geral'} <span className="text-brand-alert">*</span>
                   </label>
                   <button
                     type="button"
@@ -474,7 +475,7 @@ const NewWorkOrder = () => {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Descrição do Problema <span className="text-red-500">*</span></label>
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Descrição do Problema <span className="text-brand-alert">*</span></label>
               <textarea
                 value={issueDescription}
                 onChange={(e) => setIssueDescription(e.target.value)}
@@ -526,7 +527,7 @@ const NewWorkOrder = () => {
                 onChange={(e) => setFailureType(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:bg-white transition-all font-medium"
               >
-                <option value="mecanica">Mecânica</option>
+                <option value="mecanica">Máquinas</option>
                 <option value="eletrica">Elétrica</option>
                 <option value="hidraulica">Hidráulica</option>
                 <option value="outro">Geral</option>

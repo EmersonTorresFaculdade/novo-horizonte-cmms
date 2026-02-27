@@ -16,7 +16,6 @@ export interface TechnicianData {
     contact: string;
     status: string;
     avatar?: string;
-    hourly_rate?: number;
 }
 
 const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSave, technician }) => {
@@ -26,8 +25,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
         specialty: '',
         contact: '',
         status: 'Ativo',
-        avatar: '',
-        hourly_rate: 50
+        avatar: ''
     });
     const [isSaving, setIsSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -40,8 +38,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
     useEffect(() => {
         if (technician) {
             setFormData({
-                ...technician,
-                hourly_rate: technician.hourly_rate || 50
+                ...technician
             });
         } else {
             setFormData({
@@ -49,8 +46,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                 specialty: '',
                 contact: '',
                 status: 'Ativo',
-                avatar: '',
-                hourly_rate: 50
+                avatar: ''
             });
         }
         setErrors({});
@@ -82,9 +78,6 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
         }
         if (!formData.contact.trim()) {
             newErrors.contact = 'Contato é obrigatório';
-        }
-        if (!formData.hourly_rate || formData.hourly_rate <= 0) {
-            newErrors.hourly_rate = 'Valor hora deve ser maior que zero';
         }
 
         setErrors(newErrors);
@@ -171,9 +164,8 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                     </div>
 
                     <div className="space-y-4">
-                        {/* Nome e Valor Hora */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="md:col-span-2">
+                        <div className="grid grid-cols-1 gap-4">
+                            <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                                     <User size={16} />
                                     Nome Completo *
@@ -187,26 +179,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                     placeholder="Ex: João da Silva"
                                 />
                                 {errors.name && (
-                                    <p className="text-sm text-red-600 mt-1">{errors.name}</p>
-                                )}
-                            </div>
-                            <div>
-                                <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
-                                    <DollarSign size={16} />
-                                    Valor Hora (R$) *
-                                </label>
-                                <input
-                                    type="number"
-                                    value={formData.hourly_rate}
-                                    onChange={(e) => setFormData({ ...formData, hourly_rate: parseFloat(e.target.value) })}
-                                    className={`w-full px-4 py-3 rounded-lg border ${errors.hourly_rate ? 'border-red-300 bg-red-50' : 'border-slate-200'
-                                        } focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all`}
-                                    placeholder="50.00"
-                                    step="0.01"
-                                    min="0"
-                                />
-                                {errors.hourly_rate && (
-                                    <p className="text-sm text-red-600 mt-1">{errors.hourly_rate}</p>
+                                    <p className="text-sm text-brand-alert mt-1">{errors.name}</p>
                                 )}
                             </div>
                         </div>
@@ -231,7 +204,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                     <option value="Geral">Geral</option>
                                 </select>
                                 {errors.specialty && (
-                                    <p className="text-sm text-red-600 mt-1">{errors.specialty}</p>
+                                    <p className="text-sm text-brand-alert mt-1">{errors.specialty}</p>
                                 )}
                             </div>
 
@@ -266,7 +239,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                 placeholder="(11) 99999-9999"
                             />
                             {errors.contact && (
-                                <p className="text-sm text-red-600 mt-1">{errors.contact}</p>
+                                <p className="text-sm text-brand-alert mt-1">{errors.contact}</p>
                             )}
                         </div>
                     </div>

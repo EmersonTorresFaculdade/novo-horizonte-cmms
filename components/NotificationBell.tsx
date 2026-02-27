@@ -42,7 +42,7 @@ const NotificationBell = () => {
     const getIcon = (type: string) => {
         switch (type) {
             case 'user_approval':
-                return <User size={16} className="text-blue-600" />;
+                return <User size={16} className="text-primary" />;
             case 'admin_approval':
                 return <Shield size={16} className="text-amber-600" />;
             default:
@@ -61,7 +61,7 @@ const NotificationBell = () => {
             >
                 <Bell size={20} />
                 {unreadCount > 0 && (
-                    <span className="absolute top-0 right-0 h-5 w-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                    <span className="absolute top-0 right-0 h-5 w-5 bg-brand-alert text-white text-xs font-bold rounded-full flex items-center justify-center">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -95,7 +95,7 @@ const NotificationBell = () => {
                             recentNotifications.map(notification => (
                                 <div
                                     key={notification.id}
-                                    className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${!notification.is_read ? 'bg-blue-50/50' : ''
+                                    className={`p-4 border-b border-slate-100 hover:bg-slate-50 cursor-pointer transition-colors ${!notification.is_read ? 'bg-emerald-50/50/50' : ''
                                         }`}
                                     onClick={() => handleNotificationClick(notification)}
                                 >
@@ -107,7 +107,7 @@ const NotificationBell = () => {
                                                     {notification.title}
                                                 </h4>
                                                 {!notification.is_read && (
-                                                    <div className="h-2 w-2 bg-blue-600 rounded-full flex-shrink-0"></div>
+                                                    <div className="h-2 w-2 bg-primary rounded-full flex-shrink-0"></div>
                                                 )}
                                             </div>
                                             {notification.message && (
@@ -131,7 +131,7 @@ const NotificationBell = () => {
                                             }}
                                             className="p-1 hover:bg-red-100 rounded transition-colors"
                                         >
-                                            <X size={14} className="text-slate-400 hover:text-red-600" />
+                                            <X size={14} className="text-slate-400 hover:text-brand-alert" />
                                         </button>
                                     </div>
                                 </div>

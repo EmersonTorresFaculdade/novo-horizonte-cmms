@@ -14,6 +14,7 @@ interface UpdateAppSettingsParams {
     p_daily_report: boolean;
     p_report_frequency: string;
     p_company_email: string;
+    p_board_emails: string;
 }
 
 interface AppSettings {
@@ -36,6 +37,7 @@ interface AppSettings {
     webhookUrl?: string;
     webhookEnabled: boolean;
     reportFrequency: string;
+    boardEmails: string;
 }
 
 const defaultSettings: AppSettings = {
@@ -57,7 +59,8 @@ const defaultSettings: AppSettings = {
     passwordExpiry: 90,
     webhookUrl: '',
     webhookEnabled: true,
-    reportFrequency: 'diario'
+    reportFrequency: 'diario',
+    boardEmails: ''
 };
 
 interface SettingsContextType {
@@ -156,7 +159,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                         workOrderAlerts: dbData.work_order_alerts ?? true,
                         criticalAlerts: dbData.critical_alerts ?? true,
                         dailyReport: dbData.daily_report ?? true,
-                        reportFrequency: dbData.report_frequency ?? 'diario'
+                        reportFrequency: dbData.report_frequency ?? 'diario',
+                        boardEmails: dbData.board_emails || ''
                     };
 
                     const next = { ...prev, ...dbSettings };
@@ -202,7 +206,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
                 p_critical_alerts: settingsToSave.criticalAlerts,
                 p_daily_report: settingsToSave.dailyReport,
                 p_report_frequency: settingsToSave.reportFrequency || 'diario',
-                p_company_email: settingsToSave.companyEmail
+                p_company_email: settingsToSave.companyEmail,
+                p_board_emails: settingsToSave.boardEmails || ''
             };
 
             const { error } = await supabase.rpc('update_app_settings' as any, rpcParams as any);

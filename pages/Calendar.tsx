@@ -35,7 +35,7 @@ interface Category {
 
 const CATEGORIES: Record<string, Category> = {
   'Elétrica': { id: 'elétrica', label: 'ELÉTRICA', color: 'text-yellow-600', bgColor: 'bg-yellow-100', borderColor: 'border-yellow-200', icon: <Zap size={10} /> },
-  'Hidráulica': { id: 'hidráulica', label: 'HIDRÁULICA', color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200', icon: <Droplet size={10} /> },
+  'Hidráulica': { id: 'hidráulica', label: 'HIDRÁULICA', color: 'text-primary', bgColor: 'bg-blue-100', borderColor: 'border-primary-light/20', icon: <Droplet size={10} /> },
   'HVAC': { id: 'hvac', label: 'HVAC', color: 'text-emerald-600', bgColor: 'bg-emerald-100', borderColor: 'border-emerald-200', icon: <Wrench size={10} /> },
   'Civil': { id: 'civil', label: 'CIVIL', color: 'text-rose-600', bgColor: 'bg-rose-100', borderColor: 'border-rose-200', icon: <Hammer size={10} /> },
   'Segurança': { id: 'segurança', label: 'SEGURANÇA', color: 'text-pink-600', bgColor: 'bg-pink-100', borderColor: 'border-pink-200', icon: <ShieldAlert size={10} /> },
@@ -79,7 +79,7 @@ interface CalendarEvent {
 
 export const STATUS_COLORS: Record<string, { color: string; bgColor: string; borderColor: string }> = {
   'Pendente': { color: 'text-amber-600', bgColor: 'bg-amber-100', borderColor: 'border-amber-200' },
-  'Em Manutenção': { color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200' },
+  'Em Manutenção': { color: 'text-primary', bgColor: 'bg-blue-100', borderColor: 'border-primary-light/20' },
   'Concluído': { color: 'text-emerald-600', bgColor: 'bg-emerald-100', borderColor: 'border-emerald-200' },
   'Cancelado': { color: 'text-slate-600', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },
 };
@@ -87,6 +87,7 @@ export const STATUS_COLORS: Record<string, { color: string; bgColor: string; bor
 const Calendar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
   const [viewMode, setViewMode] = useState<'monthly' | 'annual'>('monthly');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -121,15 +122,21 @@ const Calendar = () => {
   const fetchEvents = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('work_orders')
         .select(`
                id, order_number, issue, status, priority, date, failure_type, maintenance_category,
                assets (name, sector),
                technicians (name, avatar),
-               users (name)
+               users:users!requester_id (name)
             `)
         .order('date', { ascending: true });
+
+      if (!isAdmin && user?.id) {
+        query = query.eq('requester_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
@@ -239,13 +246,13 @@ const Calendar = () => {
           <div className="flex items-center p-1 bg-slate-100/50 border border-slate-200 rounded-2xl shadow-sm backdrop-blur-sm">
             <button
               onClick={() => setViewMode('monthly')}
-              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'monthly' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'monthly' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
             >
               Mensal
             </button>
             <button
               onClick={() => setViewMode('annual')}
-              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'annual' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
+              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${viewMode === 'annual' ? 'bg-white text-primary shadow-sm' : 'text-slate-400 hover:text-slate-500'}`}
             >
               Anual
             </button>
@@ -273,7 +280,7 @@ const Calendar = () => {
                     </div>
                   ))}
                   <div className="flex items-center gap-2">
-                    <div className="size-1.5 rounded-full bg-red-500"></div>
+                    <div className="size-1.5 rounded-full bg-brand-alert"></div>
                     <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">Feriado</span>
                   </div>
                 </div>
@@ -303,7 +310,7 @@ const Calendar = () => {
                     setSelectedMonth(today.getMonth());
                     setSelectedYear(today.getFullYear());
                   }}
-                  className="px-3 py-1 text-[10px] font-black text-blue-600 hover:bg-white rounded-md transition-all uppercase tracking-widest"
+                  className="px-3 py-1 text-[10px] font-black text-primary hover:bg-white rounded-md transition-all uppercase tracking-widest"
                 >
                   Hoje
                 </button>
@@ -369,20 +376,20 @@ const Calendar = () => {
                           onMouseLeave={() => setHoveredCell(null)}
                           className={`relative group flex flex-col p-3 rounded-2xl border transition-all ${d.currentMonth
                             ? isToday
-                              ? 'bg-blue-50/50 border-blue-200 ring-2 ring-blue-500/10'
-                              : 'bg-white border-slate-100 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-200/50'
+                              ? 'bg-emerald-50/50/50 border-primary-light/20 ring-2 ring-primary-light/10'
+                              : 'bg-white border-slate-100 hover:border-primary-light/30 hover:shadow-lg hover:shadow-slate-200/50'
                             : 'bg-slate-50/30 border-transparent text-slate-200'
                             }`}
                         >
                           <div className="flex items-center justify-between mb-2">
                             <span className={`text-base font-black ${d.currentMonth
-                              ? isHoliday ? 'text-red-500' : isToday ? 'text-blue-600' : 'text-slate-900'
+                              ? isHoliday ? 'text-brand-alert' : isToday ? 'text-primary' : 'text-slate-900'
                               : 'text-slate-200'
                               }`}>
                               {d.day}
                             </span>
                             {isHoliday && (
-                              <div className="size-1.5 rounded-full bg-red-500"></div>
+                              <div className="size-1.5 rounded-full bg-brand-alert"></div>
                             )}
                           </div>
 
@@ -410,7 +417,7 @@ const Calendar = () => {
 
                           {isToday && (
                             <div className="absolute top-2 right-2 flex items-center gap-1">
-                              <div className="size-1.5 rounded-full bg-blue-600 animate-ping"></div>
+                              <div className="size-1.5 rounded-full bg-primary animate-ping"></div>
                             </div>
                           )}
                         </div>
@@ -424,7 +431,7 @@ const Calendar = () => {
                   {months.map((name, idx) => (
                     <div key={name} className={`space-y-4 group cursor-pointer transition-all ${idx === selectedMonth ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`} onClick={() => setSelectedMonth(idx)}>
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-black text-slate-900 group-hover:text-blue-600 transition-colors uppercase tracking-widest">{name}</h4>
+                        <h4 className="text-sm font-black text-slate-900 group-hover:text-primary transition-colors uppercase tracking-widest">{name}</h4>
                         <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
                           {permittedEvents.filter(e => new Date(e.date).getMonth() === idx && new Date(e.date).getFullYear() === selectedYear).length} tarefas
                         </span>
@@ -469,10 +476,10 @@ const Calendar = () => {
                                 onMouseLeave={() => setHoveredCell(null)}
                                 className={`aspect-square flex items-center justify-center text-[10px] min-h-[22px] transition-all relative ${d.currentMonth
                                   ? isToday
-                                    ? 'text-blue-600 bg-blue-50 font-black ring-2 ring-blue-500/20 rounded-sm'
+                                    ? 'text-primary bg-emerald-50/50 font-black ring-2 ring-primary-light/20 rounded-sm'
                                     : isHoliday
-                                      ? 'text-red-500 bg-red-50/50 font-black'
-                                      : 'text-slate-600 bg-white font-medium hover:bg-slate-50 hover:text-blue-600'
+                                      ? 'text-brand-alert bg-red-50/50 font-black'
+                                      : 'text-slate-600 bg-white font-medium hover:bg-slate-50 hover:text-primary'
                                   : 'text-slate-200 bg-slate-50/50'
                                   }`}
                               >
@@ -482,7 +489,7 @@ const Calendar = () => {
                                     <div className={`absolute -top-1 -right-1 size-1 rounded-full ${(STATUS_COLORS[dayEvents[0].status] || STATUS_COLORS['Pendente']).bgColor.replace('100', '500')}`}></div>
                                   )}
                                   {isHoliday && d.currentMonth && (
-                                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 size-0.5 rounded-full bg-red-500"></div>
+                                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 size-0.5 rounded-full bg-brand-alert"></div>
                                   )}
                                 </div>
                               </div>
@@ -506,11 +513,11 @@ const Calendar = () => {
 
               {isAgendaExpanded && (
                 <div className="flex-1 max-w-md relative group mx-4">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={16} />
                   <input
                     type="text"
                     placeholder="Filtrar atividades na agenda..."
-                    className="pl-10 pr-4 py-2 w-full bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-sm"
+                    className="pl-10 pr-4 py-2 w-full bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all shadow-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -519,7 +526,7 @@ const Calendar = () => {
 
               <button
                 onClick={() => setIsAgendaExpanded(!isAgendaExpanded)}
-                className="text-[10px] font-bold text-blue-600 hover:text-blue-700 uppercase tracking-widest transition-all shrink-0"
+                className="text-[10px] font-bold text-primary hover:text-primary-dark uppercase tracking-widest transition-all shrink-0"
               >
                 {isAgendaExpanded ? 'Fechar' : 'Ver tudo'}
               </button>
@@ -528,7 +535,7 @@ const Calendar = () => {
             <div className={`flex-1 overflow-y-auto pr-2 space-y-4 custom-scrollbar ${isAgendaExpanded ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 !space-y-0' : ''}`}>
               {loading ? (
                 <div className="flex flex-col items-center justify-center h-48 gap-4 text-slate-400">
-                  <div className="size-8 rounded-full border-2 border-slate-200 border-t-blue-500 animate-spin"></div>
+                  <div className="size-8 rounded-full border-2 border-slate-200 border-t-primary-light animate-spin"></div>
                   <p className="text-xs font-bold uppercase tracking-widest">Carregando Agenda...</p>
                 </div>
               ) : filteredEvents.length > 0 ? (
@@ -546,14 +553,14 @@ const Calendar = () => {
                       <div className="flex items-start justify-between">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 uppercase tracking-tighter">
+                            <span className="text-[10px] font-black text-primary bg-emerald-50/50 px-2 py-0.5 rounded-md border border-primary-light/10 uppercase tracking-tighter">
                               OS #{event.order_number}
                             </span>
                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                               {date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).toUpperCase()} • {date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </p>
                           </div>
-                          <h4 className="text-sm font-black text-slate-900 leading-tight group-hover:text-blue-600 transition-colors uppercase pt-1">
+                          <h4 className="text-sm font-black text-slate-900 leading-tight group-hover:text-primary transition-colors uppercase pt-1">
                             {event.asset_name}
                           </h4>
                           <p className="text-[11px] font-bold text-slate-500 line-clamp-2 leading-relaxed">
@@ -574,7 +581,7 @@ const Calendar = () => {
                           <span className="text-[10px] font-bold text-slate-500 truncate max-w-[120px]">{event.sector}</span>
                         </div>
                         <div className="flex items-center gap-2 pr-1">
-                          <div className="size-6 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center overflow-hidden">
+                          <div className="size-6 rounded-full bg-emerald-50/50 border border-primary-light/10 flex items-center justify-center overflow-hidden">
                             {event.technician?.avatar ? (
                               <img
                                 src={event.technician.avatar}
@@ -582,7 +589,7 @@ const Calendar = () => {
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <User size={12} className="text-blue-400" />
+                              <User size={12} className="text-primary-light/80" />
                             )}
                           </div>
                           <p className="text-[10px] font-bold text-slate-600 truncate max-w-[80px]">
@@ -623,8 +630,8 @@ const Calendar = () => {
               {hoveredCell.holiday && (
                 <div className="mb-3 last:mb-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <div className="size-2 rounded-full bg-red-500"></div>
-                    <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Feriado Nacional</span>
+                    <div className="size-2 rounded-full bg-brand-alert"></div>
+                    <span className="text-[10px] font-black text-brand-alert uppercase tracking-widest">Feriado Nacional</span>
                   </div>
                   <p className="text-sm font-black text-slate-900">{hoveredCell.holiday}</p>
                 </div>

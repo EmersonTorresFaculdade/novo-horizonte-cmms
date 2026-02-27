@@ -1,0 +1,622 @@
+{
+  "id": "Fp9YBsmgBV8TEv4pypxv4",
+  "name": "CMMS NH",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "cmms-webhook",
+        "options": {}
+      },
+      "id": "25aa5384-e4d9-4d4b-afaf-de8de031d3a3",
+      "name": "Webhook (POST)",
+      "position": [
+        -2160,
+        448
+      ],
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "webhookId": "84528c0c-8a71-4e04-87d0-60b22cd97cb7",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-1",
+              "leftValue": "={{ $json.body.adminPhones }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          }
+        },
+        "options": {}
+      },
+      "id": "aaf76de9-528f-4ac6-b024-74d89f36acfc",
+      "name": "Send WhatsApp?",
+      "position": [
+        -1936,
+        352
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-admin-email-1",
+              "leftValue": "={{ $json.body.adminEmails }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "loose"
+          }
+        },
+        "options": {}
+      },
+      "id": "2f9d0761-2fe9-465b-8d94-67c88e63875b",
+      "name": "Send Email?",
+      "position": [
+        -1936,
+        544
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.adminPhoneToUse }}"
+            },
+            {
+              "name": "text",
+              "value": "=🔔 *Novo Horizonte CMMS*\n📝 *{{ $json.body.subject_display }} #{{ $json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A' }}*\n\nOlá, Administrador Root!\nSua ordem de serviço {{ $json.body.intro_display }}. 👇\n\n🏭 *Máquina:* {{ $json.body.workOrder.assetName || 'N/A' }}\n📂 *Falha:* {{ $json.body.failure_type || 'N/A' }}\n🛠️ *Classe:* {{ $json.body.workOrder.maintenance_type || 'N/A' }}\n📄 *Descrição:* {{ $json.body.workOrder.description || 'N/A' }}\n🚦 *Status:* {{ $json.body.workOrder.status || 'N/A' }}\n👨‍🔧 *Técnico:* {{ $json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'Não atribuído' }}{{ $json.body.technical_report ? '\\n\\n🛠️ *Relatório Técnico:*\\n' + $json.body.technical_report : '' }}\n\n🔗 *Acompanhe aqui:* {{ $json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id) }}"
+            }
+          ]
+        },
+        "contentType": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "8029C030CF0D-42CD-8D34-D021CA6755DF"
+            }
+          ]
+        },
+        "method": "POST",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "url": "https://api.emersontorres.com.br/message/sendText/Trello"
+      },
+      "id": "d270650c-e5dc-4c73-80ab-296b8d4bf21e",
+      "name": "Admin WhatsApp",
+      "position": [
+        -1344,
+        224
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-req-wa-pref-1",
+              "leftValue": "={{ $json.body.preferences && $json.body.preferences.requester ? $json.body.preferences.requester.whatsapp : false }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "cond-req-wa-phone-1",
+              "leftValue": "={{ $json.body.requesterPhone }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            },
+            {
+              "id": "cond-req-wa-event-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "regex",
+                "type": "string"
+              },
+              "rightValue": "/work_order_created|work_order_updated|work_order_reopened|work_order_cancelled/"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "46204c95-18ff-4ced-ac63-441bb24deb9e",
+      "name": "Check Requester Eligibility",
+      "position": [
+        -1664,
+        448
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.body.requesterPhone }}"
+            },
+            {
+              "name": "text",
+              "value": "=🔔 *Novo Horizonte CMMS*\n📝 *{{ $json.body.subject_display }} #{{ $json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A' }}*\n\nOlá, {{ $json.body.requesterName || 'Solicitante' }}!\nSua ordem de serviço {{ $json.body.intro_display }}. 👇\n\n🏭 *Máquina:* {{ $json.body.workOrder.assetName || 'N/A' }}\n📂 *Falha:* {{ $json.body.failure_type || 'N/A' }}\n🛠️ *Classe:* {{ $json.body.workOrder.maintenance_type || 'N/A' }}\n📄 *Descrição:* {{ $json.body.workOrder.description || 'N/A' }}\n🚦 *Status:* {{ $json.body.workOrder.status || 'N/A' }}\n👨‍🔧 *Técnico:* {{ $json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'Não atribuído' }}{{ $json.body.technical_report ? '\\n\\n🛠️ *Relatório Técnico:*\\n' + $json.body.technical_report : '' }}\n\n🔗 *Acompanhe aqui:* {{ $json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id) }}"
+            }
+          ]
+        },
+        "contentType": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "8029C030CF0D-42CD-8D34-D021CA6755DF"
+            }
+          ]
+        },
+        "method": "POST",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "url": "https://api.emersontorres.com.br/message/sendText/Trello"
+      },
+      "id": "4741c452-14fa-421a-a7c8-542107a64e43",
+      "name": "Requester WhatsApp",
+      "position": [
+        -1360,
+        432
+      ],
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "ti@novohorizonte.com.br",
+        "html": "=<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Notificação CMMS</title><style>body{margin:0;padding:0;background:#F4F6F8;font-family:Arial,Helvetica,sans-serif;}.container{max-width:640px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,0.08);}.header{background:#1C1F24;color:#ffffff;padding:30px;text-align:center;}.header h1{margin:0;font-size:20px;font-weight:600;}.header span{color:#1F7A4C;}.content{padding:30px;}.intro{font-size:15px;color:#444;margin-bottom:25px;}.card{background:#F9FBFC;border-left:5px solid #1F7A4C;padding:22px;border-radius:8px;}.field{margin-bottom:18px;}.label{font-size:12px;text-transform:uppercase;color:#8a8f98;margin-bottom:5px;font-weight:600;}.value{font-size:15px;font-weight:600;color:#1C1F24;}.badge{background:#E6F4EC;color:#1F7A4C;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;}.priority{color:#D84315;}.button-container{text-align:center;margin-top:30px;}.button{display:inline-block;padding:14px 28px;background:#1F7A4C;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;}.footer{background:#1C1F24;color:#b5bcc6;padding:18px;text-align:center;font-size:12px;}</style></head><body><div class=\"container\"><div class=\"header\"><h1>{{ $json.body.subject_display }} <span>#{{ $json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A' }}</span></h1></div><div class=\"content\"><p class=\"intro\">Olá <strong>Administrador</strong>, sua ordem de serviço {{ $json.body.intro_display }}. Veja os detalhes abaixo:</p><div class=\"card\"><div class=\"field\"><div class=\"label\">Título / Descrição</div><div class=\"value\">{{ $json.body.workOrder.title || $json.body.workOrder.description || 'Não informado' }}</div></div><div class=\"field\"><div class=\"label\">Máquina / Ativo</div><div class=\"value\">{{ $json.body.workOrder.assetName ? $json.body.workOrder.assetName : 'Não informado' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Tipo de Falha</div><div class=\\\"value\\\">{{ $json.body.failure_type || 'Não especificado' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Classe de Manutenção</div><div class=\\\"value\\\">{{ $json.body.workOrder.maintenance_type || 'Não especificada' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Status</div><div class=\\\"value\\\"><span class=\\\"badge\\\">{{ $json.body.workOrder.status || 'N/A' }}</span></div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Prioridade</div><div class=\\\"value priority\\\">{{ $json.body.workOrder.priority || 'N/A' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Técnico Responsável</div><div class=\\\"value\\\">{{ $json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'Não atribuído' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Solicitante</div><div class=\\\"value\\\">{{ $json.body.requesterName || $json.body.requesterEmail || 'Não informado' }}</div></div>{{ $json.body.technical_report ? '<div class=\\\"field\\\"><div class=\\\"label\\\">Relatório Técnico</div><div class=\\\"value\\\" style=\\\"white-space:pre-wrap;background:#f8f9fa;padding:10px;border:1px solid #eee\\\">' + $json.body.technical_report + '</div></div>' : '' }}</div><div class=\\\"button-container\\\"><a href=\\\"{{ $json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id) }}\\\" class=\\\"button\\\">Acessar Ordem de Serviço</a></div></div><div class=\\\"footer\\\">Novo Horizonte CMMS • Gestão de Manutenção<br>© 2026 Novo Horizonte</div></div></body></html>",
+        "subject": "={{ $json.body.subject_display + ' #' + ($json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A') }}",
+        "toEmail": "={{ $json.body.adminEmails }}"
+      },
+      "id": "28510021-359f-4c33-a4e2-20a91b9a4927",
+      "name": "Admin Email",
+      "position": [
+        -1344,
+        640
+      ],
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "credentials": {
+        "smtp": {
+          "id": "JsuW30Y7uUGVBwb1",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-req-em-pref-1",
+              "leftValue": "={{ $json.body.preferences && $json.body.preferences.requester ? $json.body.preferences.requester.email : false }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "cond-req-em-addr-1",
+              "leftValue": "={{ $json.body.requesterEmail }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            },
+            {
+              "id": "cond-req-em-event-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "regex",
+                "type": "string"
+              },
+              "rightValue": "/work_order_created|work_order_updated|work_order_reopened|work_order_cancelled/"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "check-requester-email",
+      "name": "Check Requester Email",
+      "position": [
+        -1936,
+        736
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {
+        "fromEmail": "ti@novohorizonte.com.br",
+        "html": "=<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Notificação CMMS</title><style>body{margin:0;padding:0;background:#F4F6F8;font-family:Arial,Helvetica,sans-serif;}.container{max-width:640px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,0.08);}.header{background:#1C1F24;color:#ffffff;padding:30px;text-align:center;}.header h1{margin:0;font-size:20px;font-weight:600;}.header span{color:#1F7A4C;}.content{padding:30px;}.intro{font-size:15px;color:#444;margin-bottom:25px;}.card{background:#F9FBFC;border-left:5px solid #1F7A4C;padding:22px;border-radius:8px;}.field{margin-bottom:18px;}.label{font-size:12px;text-transform:uppercase;color:#8a8f98;margin-bottom:5px;font-weight:600;}.value{font-size:15px;font-weight:600;color:#1C1F24;}.badge{background:#E6F4EC;color:#1F7A4C;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;}.priority{color:#D84315;}.button-container{text-align:center;margin-top:30px;}.button{display:inline-block;padding:14px 28px;background:#1F7A4C;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;}.footer{background:#1C1F24;color:#b5bcc6;padding:18px;text-align:center;font-size:12px;}</style></head><body><div class=\"container\"><div class=\"header\"><h1>{{ $json.body.subject_display }} <span>#{{ $json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A' }}</span></h1></div><div class=\"content\"><p class=\"intro\">Olá <strong>{{ $json.body.requesterName || 'Solicitante' }}</strong>, sua ordem de serviço {{ $json.body.intro_display }} no sistema CMMS. Veja os detalhes abaixo:</p><div class=\"card\"><div class=\"field\"><div class=\"label\">Título / Descrição</div><div class=\"value\">{{ $json.body.workOrder.title || $json.body.workOrder.description || 'Não informado' }}</div></div><div class=\"field\"><div class=\"label\">Máquina / Ativo</div><div class=\"value\">{{ $json.body.workOrder.assetName ? $json.body.workOrder.assetName : 'Não informado' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Tipo de Falha</div><div class=\\\"value\\\">{{ $json.body.failure_type || 'Não especificado' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Classe de Manutenção</div><div class=\\\"value\\\">{{ $json.body.workOrder.maintenance_type || 'Não especificada' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Novo Status</div><div class=\\\"value\\\"><span class=\\\"badge\\\">{{ $json.body.workOrder.status || 'N/A' }}</span></div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Prioridade</div><div class=\\\"value priority\\\">{{ $json.body.workOrder.priority || 'N/A' }}</div></div><div class=\\\"field\\\"><div class=\\\"label\\\">Técnico Responsável</div><div class=\\\"value\\\">{{ $json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'Não atribuído' }}</div></div>{{ $json.body.technical_report ? '<div class=\\\"field\\\"><div class=\\\"label\\\">Relatório Técnico</div><div class=\\\"value\\\" style=\\\"white-space:pre-wrap;background:#f8f9fa;padding:10px;border:1px solid #eee\\\">' + $json.body.technical_report + '</div></div>' : '' }}</div><div class=\\\"button-container\\\"><a href=\\\"{{ $json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id) }}\\\" class=\\\"button\\\">Ver Detalhes da OS</a></div></div><div class=\\\"footer\\\">Novo Horizonte CMMS • Fique por dentro!<br>© 2026 Novo Horizonte</div></div></body></html>",
+        "subject": "={{ $json.body.subject_display + ' #' + ($json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A') }}",
+        "toEmail": "={{ $json.body.requesterEmail }}"
+      },
+      "id": "send-requester-email",
+      "name": "Send Requester Email",
+      "position": [
+        -1344,
+        816
+      ],
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "credentials": {
+        "smtp": {
+          "id": "JsuW30Y7uUGVBwb1",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-req-push-pref-1",
+              "leftValue": "={{ $json.body.preferences.requester.push }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "cond-req-push-event-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "work_order_updated"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      },
+      "id": "check-requester-push",
+      "name": "Check Requester Push",
+      "position": [
+        -1936,
+        928
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3
+    },
+    {
+      "parameters": {},
+      "id": "push-placeholder",
+      "name": "Push Notification Placeholder",
+      "position": [
+        -1664,
+        928
+      ],
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "notes": "Substitua este nó pelo serviço de Push (ex: OneSignal) quando configurado."
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\nconst allItems = $input.all();\n\nfor (let i = 0; i < allItems.length; i++) {\n  const item = allItems[i];\n  const body = item.json.body || {};\n  const adminPhones = body.adminPhones || '';\n  \n  if (adminPhones) {\n    const phones = adminPhones.split(',').map(function(p) { return p.trim(); }).filter(function(p) { return p; });\n    \n    for (let j = 0; j < phones.length; j++) {\n      const newItem = JSON.parse(JSON.stringify(item.json));\n      newItem.adminPhoneToUse = phones[j];\n      results.push({ json: newItem });\n    }\n  }\n}\n\nreturn results;"
+      },
+      "id": "split-admin-phones",
+      "name": "Split Admin Phones",
+      "position": [
+        -1616,
+        240
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "id": "ad913288-2dd1-409d-80b1-dbcfef4f2fe8",
+      "name": "Event Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -2000,
+        448
+      ],
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-exec-report-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "equals",
+                "type": "string"
+              },
+              "rightValue": "executive_report_manual"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "8c8e7c24-94fd-4636-8ec0-683648e7ac01",
+      "name": "Executive Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        -1600,
+        100
+      ],
+      "parameters": {
+        "fromEmail": "ti@novohorizonte.com.br",
+        "toEmail": "={{ $json.body.adminEmails }}"
+      },
+      "credentials": {
+        "smtp": {
+          "id": "JsuW30Y7uUGVBwb1",
+          "name": "SMTP account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "e8ee2735-a55f-425c-8ac4-8796777ed74a",
+      "name": "Executive HTML Gen",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1728,
+        100
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || {};\nconst reportData = body.reportData || {};\nconst company = body.company || 'Novo Horizonte';\nconst insights = reportData.insights || [];\n\nlet insightsHtml = '';\ninsights.forEach(i => {\n    insightsHtml += '<div style=\\\"padding:10px;margin-bottom:8px;border-radius:6px;background:#f8fafc;border-left:4px solid #3b82f6;\\\">• ' + i.text + '</div>';\n});\n\nconst html = '<html><body style=\\\"font-family:sans-serif;color:#333;\\\">' +\n    '<div style=\\\"max-width:600px;margin:20px auto;border:1px solid #eee;border-radius:12px;overflow:hidden;\\\">' +\n    '<div style=\\\"background:#0f172a;color:white;padding:30px;text-align:center;\\\">' +\n    '<h1 style=\\\"margin:0;\\\">Relatório Executivo PCM</h1>' +\n    '<p style=\\\"opacity:0.8;\\\">' + company + ' • ' + (reportData.period || 'MENSAL') + '</p></div>' +\n    '<div style=\\\"padding:30px;\\\">' +\n    '<div style=\\\"background:#f1f5f9;padding:20px;border-radius:8px;text-align:center;margin-bottom:20px;\\\">' +\n    '<div style=\\\"font-size:36px;font-weight:bold;\\\">' + (reportData.score || '0') + '</div>' +\n    '<div style=\\\"font-size:12px;color:#64748b;\\\">GLOBAL PCM SCORE</div></div>' +\n    '<div style=\\\"margin-bottom:20px;\\\"><h3 style=\\\"border-bottom:1px solid #eee;padding-bottom:8px;\\\">INSIGHTS ESTRATÉGICOS</h3>' + insightsHtml + '</div>' +\n    '<div style=\\\"text-align:center;\\\"><a href=\\\"https://manutencao.novohorizonte.com/#/reports\\\" style=\\\"display:inline-block;padding:12px 24px;background:#2563eb;color:white;text-decoration:none;border-radius:6px;font-weight:bold;\\\">Abrir Dashboard Completo</a></div></div>' +\n    '<div style=\\\"padding:20px;background:#f8fafc;text-align:center;font-size:12px;color:#94a3b8;\\\">Relatório gerado automaticamente pelo NH CMMS.</div></div></body></html>';\n\nreturn [{ json: { html, body, subject_display: body.subject_display || 'Relatório Executivo Estratégico' } }];"
+      }
+    },
+    {
+      "parameters": {
+        "options": {},
+        "responseCode": 200,
+        "responseData": "noData"
+      },
+      "id": "respond-to-webhook-1",
+      "name": "Respond to Webhook Webhook (POST)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -2160,
+        648
+      ]
+    },
+    {
+      "parameters": {
+        "options": {},
+        "responseCode": 200,
+        "responseData": "noData"
+      },
+      "id": "respond-to-webhook-2",
+      "name": "Respond to Webhook Event Router",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -2000,
+        648
+      ]
+    }
+  ],
+  "connections": {
+    "Check Requester Eligibility": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Requester WhatsApp",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Requester Email": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Send Requester Email",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Check Requester Push": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Push Notification Placeholder",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Send Email?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Admin Email",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp?": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Split Admin Phones",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Split Admin Phones": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "Admin WhatsApp",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "Webhook (POST)": {
+      "main": [
+        [
+          {
+            "node": "Event Router",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook Webhook (POST)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Event Router": {
+      "main": [
+        [
+          {
+            "node": "Executive HTML Gen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send WhatsApp?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send Email?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Requester Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Requester Push",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Check Requester Eligibility",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond to Webhook Event Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executive HTML Gen": {
+      "main": [
+        [
+          {
+            "node": "Executive Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "callerPolicy": "workflowsFromSameOwner"
+  }
+}

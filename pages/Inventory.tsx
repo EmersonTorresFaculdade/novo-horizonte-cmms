@@ -273,7 +273,7 @@ const Inventory = () => {
                         <p className="text-sm font-medium text-slate-500">Total de Itens</p>
                         <h3 className="text-2xl font-bold mt-1 text-slate-900">{stats.totalItems}</h3>
                     </div>
-                    <div className="p-2 bg-blue-50 rounded-lg text-blue-600"><Package size={20} /></div>
+                    <div className="p-2 bg-emerald-50/50 rounded-lg text-primary"><Package size={20} /></div>
                 </div>
                 <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-start justify-between">
                     <div>
@@ -284,13 +284,13 @@ const Inventory = () => {
                     </div>
                     <div className="p-2 bg-green-50 rounded-lg text-primary"><DollarSign size={20} /></div>
                 </div>
-                <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex items-start justify-between ring-1 ring-red-500/10">
+                <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex items-start justify-between ring-1 ring-brand-alert/10">
                     <div>
                         <p className="text-sm font-medium text-slate-500">Estoque Crítico</p>
-                        <h3 className="text-2xl font-bold mt-1 text-red-600">{stats.criticalStock}</h3>
-                        <p className="text-xs text-red-500 mt-1">Itens abaixo de 5 un.</p>
+                        <h3 className="text-2xl font-bold mt-1 text-brand-alert">{stats.criticalStock}</h3>
+                        <p className="text-xs text-brand-alert mt-1">Itens abaixo de 5 un.</p>
                     </div>
-                    <div className="p-2 bg-red-50 rounded-lg text-red-500"><AlertTriangle size={20} /></div>
+                    <div className="p-2 bg-red-50 rounded-lg text-brand-alert"><AlertTriangle size={20} /></div>
                 </div>
             </div>
 
@@ -442,7 +442,7 @@ const Inventory = () => {
                                             {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.unit_value * item.quantity)}
                                         </td>
                                         <td className="px-6 py-4 text-slate-500">{item.min_stock}</td>
-                                        <td className={`px-6 py-4 font-bold ${item.quantity <= item.min_stock ? 'text-red-600' : 'text-slate-900'}`}>
+                                        <td className={`px-6 py-4 font-bold ${item.quantity <= item.min_stock ? 'text-brand-alert' : 'text-slate-900'}`}>
                                             {item.quantity}
                                         </td>
                                         <td className="px-6 py-4">
@@ -464,7 +464,7 @@ const Inventory = () => {
                                             </button>
                                             <button
                                                 onClick={() => handleDelete(item.id)}
-                                                className="text-slate-400 hover:text-red-600 hover:bg-red-50 p-1 rounded transition-colors"
+                                                className="text-slate-400 hover:text-brand-alert hover:bg-red-50 p-1 rounded transition-colors"
                                                 title="Excluir"
                                             >
                                                 <Trash2 size={18} />

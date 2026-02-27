@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw, Wrench, Building2, Zap, Car, Monitor, MoreHorizontal, LayoutDashboard, Box } from 'lucide-react';
+import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw, Wrench, Building2, Zap, Car, Monitor, LayoutDashboard, Box } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FeedbackModal from '../components/FeedbackModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -292,7 +292,7 @@ const Assets = () => {
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4">
           <button
             onClick={() => setIsScanning(false)}
-            className="absolute top-6 right-6 text-white hover:text-red-500 transition-colors"
+            className="absolute top-6 right-6 text-white hover:text-brand-alert transition-colors"
           >
             <X size={32} />
           </button>
@@ -532,7 +532,7 @@ const Assets = () => {
                           <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
                             {asset.category === 'Máquina' ? <Wrench size={18} /> :
                               asset.category === 'Predial' ? <Building2 size={18} /> :
-                                <MoreHorizontal size={18} />}
+                                <Box size={18} />}
                           </div>
                         )}
                         <span className="font-medium text-slate-700">{asset.name}</span>
@@ -549,10 +549,10 @@ const Assets = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleEdit(asset)} className="text-slate-400 hover:text-blue-600 mr-2" title="Editar">
+                      <button onClick={() => handleEdit(asset)} className="text-slate-400 hover:text-primary mr-2" title="Editar">
                         <Edit size={18} />
                       </button>
-                      <button onClick={() => handleDelete(asset.id)} className="text-slate-400 hover:text-red-600" title="Excluir">
+                      <button onClick={() => handleDelete(asset.id)} className="text-slate-400 hover:text-brand-alert" title="Excluir">
                         <Trash2 size={18} />
                       </button>
                     </td>

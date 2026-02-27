@@ -80,7 +80,7 @@ const WorkOrders = () => {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('work_orders')
         .select(`
                 *,
@@ -90,6 +90,12 @@ const WorkOrders = () => {
                 requester:users!requester_id (name)
             `)
         .order('created_at', { ascending: false });
+
+      if (!isAdmin && user?.id) {
+        query = query.eq('requester_id', user.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       if (data) setOrders(data);
@@ -165,9 +171,30 @@ const WorkOrders = () => {
     switch (p) {
       case 'Alta': return 'bg-red-100 text-red-800 border-red-200';
       case 'Média': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Baixa': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Baixa': return 'bg-emerald-50/50 text-green-800 border-green-200';
       default: return 'bg-slate-100 text-slate-700 border-slate-200';
     }
+  };
+
+  const formatCategory = (cat?: string) => {
+    const c = cat?.trim().toUpperCase() || 'MÁQUINA';
+    return c === 'EQUIPAMENTO' ? 'MÁQUINA' : c;
+  };
+
+  const formatType = (type?: string, cat?: string) => {
+    const t = type?.trim().toLowerCase() || 'geral';
+    const c = cat?.trim().toLowerCase() || '';
+
+    if (t.includes('mecanica') || t === 'maquinas' || c === 'equipamento' || c === 'máquina' || c === 'maquina') {
+      return 'Máquinas';
+    }
+    if (t.includes('predial') || t.includes('preditivo') || t.includes('preditiva') || c === 'predial') {
+      return 'Predial';
+    }
+    if (t === 'outro' || t === 'outros') {
+      return 'Outros';
+    }
+    return type || 'Geral';
   };
 
   const getStatusBadge = (status: string) => {
@@ -324,7 +351,7 @@ const WorkOrders = () => {
                           <td className="p-4 text-sm font-medium text-primary">#{order.order_number}</td>
                           <td className="p-4">
                             <span className="inline-flex py-1 px-2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                              {order.maintenance_category || 'Equipamento'}
+                              {formatCategory(order.maintenance_category)}
                             </span>
                           </td>
                           <td className="p-4">
@@ -334,8 +361,8 @@ const WorkOrders = () => {
                             </div>
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200 capitalize">
-                              {order.failure_type || 'Geral'}
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
+                              {formatType(order.failure_type, order.maintenance_category)}
                             </span>
                           </td>
                           <td className="p-4 text-sm text-slate-700">{order.issue}</td>
@@ -355,7 +382,7 @@ const WorkOrders = () => {
                             <div className="flex items-center gap-2 text-slate-500 text-sm">
                               {order.technicians ? (
                                 <>
-                                  <div className="size-6 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-[10px] font-bold">
+                                  <div className="size-6 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[10px] font-bold">
                                     {order.technicians.name.substring(0, 2).toUpperCase()}
                                   </div>
                                   <span>{order.technicians.name}</span>
@@ -373,14 +400,14 @@ const WorkOrders = () => {
                                 <>
                                   <button
                                     onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${order.id}/edit`); }}
-                                    className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-all"
+                                    className="p-2 text-slate-400 hover:text-primary hover:bg-emerald-50/50 rounded-lg transition-all"
                                     title="Editar"
                                   >
                                     <Pencil size={16} />
                                   </button>
                                   <button
                                     onClick={(e) => handleDelete(e, order.id)}
-                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                    className="p-2 text-slate-400 hover:text-brand-alert hover:bg-red-50 rounded-lg transition-all"
                                     title="Excluir"
                                   >
                                     <Trash2 size={16} />
@@ -417,14 +444,14 @@ const WorkOrders = () => {
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 p-1 rounded-md shadow-sm border border-slate-100 absolute top-2 right-2">
                               <button
                                 onClick={(e) => { e.stopPropagation(); navigate(`/work-orders/${order.id}/edit`); }}
-                                className="text-slate-400 hover:text-blue-500 p-1 rounded hover:bg-blue-50"
+                                className="text-slate-400 hover:text-primary p-1 rounded hover:bg-emerald-50/50"
                                 title="Editar"
                               >
                                 <Pencil size={14} />
                               </button>
                               <button
                                 onClick={(e) => handleDelete(e, order.id)}
-                                className="text-slate-400 hover:text-red-500 p-1 rounded hover:bg-red-50"
+                                className="text-slate-400 hover:text-brand-alert p-1 rounded hover:bg-red-50"
                                 title="Excluir"
                               >
                                 <Trash2 size={14} />
@@ -435,10 +462,10 @@ const WorkOrders = () => {
                         <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{order.assets?.name || 'Geral'}</h4>
                         <div className="mb-2 flex items-center gap-1 flex-wrap">
                           <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                            {order.maintenance_category || 'Equipamento'}
+                            {formatCategory(order.maintenance_category)}
                           </span>
                           <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                            {order.failure_type || 'Geral'}
+                            {formatType(order.failure_type, order.maintenance_category)}
                           </span>
                         </div>
                         <p className="text-xs text-slate-500 line-clamp-2 mb-2">{order.issue}</p>

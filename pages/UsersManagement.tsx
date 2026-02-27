@@ -255,7 +255,7 @@ const UsersManagement = () => {
                     </button>
                     <button
                         onClick={() => setFilterStatus('blocked')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'blocked' ? 'bg-red-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
+                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'blocked' ? 'bg-brand-alert text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
                     >
                         Bloqueados
                     </button>
@@ -299,7 +299,7 @@ const UsersManagement = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <div className="flex gap-1">
-                                            {u.manage_equipment && <span className="size-2 rounded-full bg-blue-500" title="Mecânica"></span>}
+                                            {u.manage_equipment && <span className="size-2 rounded-full bg-primary" title="Mecânica"></span>}
                                             {u.manage_predial && <span className="size-2 rounded-full bg-orange-500" title="Predial"></span>}
                                             {u.manage_others && <span className="size-2 rounded-full bg-slate-400" title="Outros"></span>}
                                             {(!u.manage_equipment && !u.manage_predial && !u.manage_others) && <span className="text-[10px] text-slate-400 italic">Nenhum</span>}

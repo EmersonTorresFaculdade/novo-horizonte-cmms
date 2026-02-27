@@ -106,7 +106,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                 {/* Header */}
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                        <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-primary">
                             <Building2 size={20} />
                         </div>
                         <div>
@@ -129,8 +129,8 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                 {/* Form */}
                 <form id="third-party-form" onSubmit={handleSubmit} className="p-6 overflow-y-auto flex-1 config-scrollbar">
                     {error && (
-                        <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-xl text-sm border border-red-100 flex items-center gap-2">
-                            <div className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                        <div className="mb-6 p-4 bg-red-50 text-brand-alert rounded-xl text-sm border border-red-100 flex items-center gap-2">
+                            <div className="w-1.5 h-1.5 rounded-full bg-brand-alert" />
                             {error}
                         </div>
                     )}
@@ -141,12 +141,12 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                             <div className="relative group">
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all overflow-hidden"
+                                    className="w-24 h-24 rounded-2xl bg-slate-50 border-2 border-dashed border-slate-200 flex items-center justify-center cursor-pointer hover:border-primary-light/50 hover:bg-emerald-50/50 transition-all overflow-hidden"
                                 >
                                     {formData.logo_url ? (
                                         <img src={formData.logo_url} alt="Logo preview" className="w-full h-full object-cover" />
                                     ) : (
-                                        <div className="flex flex-col items-center text-slate-400 group-hover:text-blue-500">
+                                        <div className="flex flex-col items-center text-slate-400 group-hover:text-primary">
                                             <Camera size={24} />
                                             <span className="text-[10px] font-medium mt-1">Logo</span>
                                         </div>
@@ -168,7 +168,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                     type="text"
                                     value={formData.logo_url}
                                     onChange={e => setFormData({ ...formData, logo_url: e.target.value })}
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                     placeholder="https://exemplo.com/logo.png"
                                 />
                             </div>
@@ -184,7 +184,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         type="text"
                                         value={formData.name}
                                         onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                         placeholder="Nome da empresa"
                                     />
                                 </div>
@@ -199,7 +199,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         type="text"
                                         value={formData.cnpj || ''}
                                         onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                         placeholder="00.000.000/0000-00"
                                     />
                                 </div>
@@ -214,7 +214,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                 type="text"
                                 value={formData.contact_name}
                                 onChange={e => setFormData({ ...formData, contact_name: e.target.value })}
-                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                 placeholder="Nome do representante principal"
                             />
                         </div>
@@ -230,7 +230,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         type="text"
                                         value={formData.phone}
                                         onChange={e => setFormData({ ...formData, phone: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                         placeholder="(11) 99999-9999"
                                     />
                                 </div>
@@ -245,7 +245,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         type="email"
                                         value={formData.email}
                                         onChange={e => setFormData({ ...formData, email: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                         placeholder="contato@empresa.com"
                                     />
                                 </div>
@@ -262,7 +262,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                     <select
                                         value={formData.specialty}
                                         onChange={e => setFormData({ ...formData, specialty: e.target.value })}
-                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
+                                        className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none"
                                     >
                                         <option value="">Selecione...</option>
                                         <option value="Máquinas">Máquinas</option>
@@ -279,7 +279,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                 <select
                                     value={formData.status}
                                     onChange={e => setFormData({ ...formData, status: e.target.value as any })}
-                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all appearance-none"
+                                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none"
                                 >
                                     <option value="Ativo">Ativo</option>
                                     <option value="Inativo">Inativo</option>
@@ -304,7 +304,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                         type="button"
                         onClick={handleSubmit}
                         disabled={isLoading}
-                        className="px-6 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
+                        className="px-6 py-2 text-sm font-semibold text-white bg-primary rounded-lg hover:bg-primary-dark transition-colors shadow-sm disabled:opacity-70 disabled:cursor-not-allowed flex items-center gap-2"
                     >
                         {isLoading ? (
                             <>

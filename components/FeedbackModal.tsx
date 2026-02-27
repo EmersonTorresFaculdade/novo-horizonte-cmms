@@ -30,13 +30,13 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
 
     const icons = {
         success: <CheckCircle2 className="text-green-600" size={40} />,
-        error: <XCircle className="text-red-600" size={40} />,
+        error: <XCircle className="text-brand-alert" size={40} />,
         confirm: <AlertTriangle className="text-amber-600" size={40} />,
-        info: <Info className="text-blue-600" size={40} />,
+        info: <Info className="text-primary" size={40} />,
     };
 
     const colors = {
-        success: 'bg-green-100',
+        success: 'bg-emerald-50/50',
         error: 'bg-red-100',
         confirm: 'bg-amber-100',
         info: 'bg-blue-100',
@@ -85,7 +85,7 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
                     <div className="mt-8">
                         <button
                             onClick={onClose}
-                            className="w-full px-4 py-2.5 rounded-xl bg-green-600 text-white font-bold hover:bg-green-700 transition-all shadow-lg shadow-green-200"
+                            className="w-full px-4 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-all shadow-lg shadow-green-200"
                         >
                             Ok
                         </button>
@@ -95,9 +95,9 @@ const FeedbackModal: React.FC<FeedbackModalProps> = ({
                 {showLoadingDots && (
                     <>
                         <div className="mt-8 flex justify-center">
-                            <div className="size-2 bg-green-500 rounded-full animate-bounce [animation-delay:-0.3s] mx-1"></div>
-                            <div className="size-2 bg-green-500 rounded-full animate-bounce [animation-delay:-0.15s] mx-1"></div>
-                            <div className="size-2 bg-green-500 rounded-full animate-bounce mx-1"></div>
+                            <div className="size-2 bg-primary rounded-full animate-bounce [animation-delay:-0.3s] mx-1"></div>
+                            <div className="size-2 bg-primary rounded-full animate-bounce [animation-delay:-0.15s] mx-1"></div>
+                            <div className="size-2 bg-primary rounded-full animate-bounce mx-1"></div>
                         </div>
                         <p className="text-[10px] text-slate-400 mt-4 uppercase font-bold tracking-widest">{loadingText}</p>
                     </>

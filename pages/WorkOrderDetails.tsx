@@ -302,7 +302,7 @@ const WorkOrderDetails = () => {
    const fetchOrderDetails = async () => {
       try {
          // Fetch Order
-         const { data, error } = await supabase
+         let query = supabase
             .from('work_orders')
             .select(`
                 *,
@@ -311,8 +311,13 @@ const WorkOrderDetails = () => {
                 third_party_companies (name),
                 requester:users!requester_id (name, role)
             `)
-            .eq('id', id)
-            .single();
+            .eq('id', id);
+
+         if (!isAdmin && user?.id) {
+            query = query.eq('requester_id', user.id);
+         }
+
+         const { data, error } = await query.single();
 
          if (error) throw error;
          console.log('DEBUG: Raw Supabase Data:', data);
@@ -496,7 +501,8 @@ const WorkOrderDetails = () => {
             slaUpdates.resolved_at = now.toISOString();
          }
 
-         const isThirdParty = technicians.find(t => t.id === selectedTechId)?.is_third_party;
+         const selectedEntity = technicians.find(t => t.id === selectedTechId);
+         const isThirdParty = selectedEntity?.is_third_party;
 
          const { error } = await supabase
             .from('work_orders')
@@ -511,7 +517,7 @@ const WorkOrderDetails = () => {
                maintenance_type: editMaintenanceType,
                estimated_hours: 0,
                technical_report: report,
-               hourly_rate: hourlyRate,
+               hourly_rate: isThirdParty ? hourlyRate : 0, // Labor cost only for third parties
                response_hours: finalResponseHours,
                repair_hours: finalRepairHours,
                downtime_hours: finalDowntimeHours,
@@ -634,7 +640,7 @@ const WorkOrderDetails = () => {
 
    const statusSteps = [
       { id: 'Pendente', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
-      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-blue-500', bg: 'bg-blue-50' },
+      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-primary', bg: 'bg-emerald-50/50' },
       { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-amber-500', bg: 'bg-amber-50' },
       { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' }
    ];
@@ -651,13 +657,31 @@ const WorkOrderDetails = () => {
    return (
       <div className="min-h-screen bg-slate-50/50 pb-20">
          <div className="max-w-[1440px] mx-auto px-6 py-8 space-y-6">
+            {/* Cabeçalho de Impressão (Apenas PDF) */}
+            <div className="hidden print:flex items-center justify-between border-b-2 border-slate-900 pb-6 mb-8">
+               <div className="flex items-center gap-4">
+                  <div className="size-16 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-2xl">
+                     NH
+                  </div>
+                  <div>
+                     <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter">Novo Horizonte</h1>
+                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-tight">Gestão de Manutenção Industrial</p>
+                  </div>
+               </div>
+               <div className="text-right">
+                  <h2 className="text-xl font-bold text-slate-900">Relatório de Ordem de Serviço</h2>
+                  <p className="text-lg font-black text-primary bg-primary/5 px-2 py-1 rounded mt-1 inline-block">OS: #{workOrder.order_number}</p>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">Gerado em: {new Date().toLocaleString('pt-BR')}</p>
+               </div>
+            </div>
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                <div className="space-y-1">
                   <div className="flex items-center gap-4">
-                     <div className={`size-3 rounded-full animate-ping ${workOrder.priority === 'Crítica' ? 'bg-red-600' :
+                     <div className={`size-3 rounded-full animate-ping ${workOrder.priority === 'Crítica' ? 'bg-brand-alert' :
                         workOrder.priority === 'Alta' ? 'bg-orange-600' :
-                           workOrder.priority === 'Média' ? 'bg-blue-600' :
+                           workOrder.priority === 'Média' ? 'bg-primary' :
                               'bg-emerald-600'}`}></div>
                      <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
                         {workOrder.order_number}: {workOrder.issue}
@@ -666,7 +690,7 @@ const WorkOrderDetails = () => {
                         <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border
                            ${workOrder.priority === 'Crítica' ? 'bg-red-50 text-red-700 border-red-100' :
                               workOrder.priority === 'Alta' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                                 workOrder.priority === 'Média' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                 workOrder.priority === 'Média' ? 'bg-emerald-50/50 text-blue-700 border-primary-light/10' :
                                     'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
                            Prioridade {workOrder.priority}
                         </span>
@@ -682,6 +706,8 @@ const WorkOrderDetails = () => {
                      Aberta Por <span className="font-semibold text-slate-700">{workOrder.requester?.name || 'Administrador'}</span> em {new Date(workOrder.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })} às {new Date(workOrder.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </p>
                </div>
+
+
             </div>
 
             {/* Timeline Section */}
@@ -785,7 +811,7 @@ const WorkOrderDetails = () => {
 
                            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase border
                                ${status === 'Pendente' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                                 status === 'Recebido' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                 status === 'Recebido' ? 'bg-blue-50 text-blue-700 border-primary-light/20' :
                                     status === 'Em Manutenção' ? 'bg-amber-50 text-amber-700 border-amber-200' :
                                        status === 'Cancelado' ? 'bg-slate-900 text-white border-slate-900' :
                                           'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
@@ -860,7 +886,7 @@ const WorkOrderDetails = () => {
                               <div className="space-y-4 text-center">
                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Início Manutenção</p>
                                  {(workOrder as any).responded_at ? (
-                                    <div className="p-3 bg-blue-50 rounded-xl text-sm font-bold text-blue-700">
+                                    <div className="p-3 bg-emerald-50/50 rounded-xl text-sm font-bold text-blue-700">
                                        {new Date((workOrder as any).responded_at).toLocaleDateString('pt-BR')} {new Date((workOrder as any).responded_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                                     </div>
                                  ) : (
@@ -884,6 +910,31 @@ const WorkOrderDetails = () => {
                            </div>
                         </div>
 
+                        {(() => {
+                           const selectedTech = technicians.find(t => t.id === selectedTechId);
+                           if (selectedTech?.is_third_party) {
+                              return (
+                                 <div className="space-y-4 max-w-xs transition-all animate-in fade-in slide-in-from-top-1">
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Custo de Mão de Obra (Empresa Parceira)</p>
+                                    <div className="relative">
+                                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
+                                       <input
+                                          type="number"
+                                          step="0.01"
+                                          value={hourlyRate}
+                                          onChange={(e) => setHourlyRate(Number(e.target.value))}
+                                          disabled={isConcluded || !isAdmin}
+                                          placeholder="0,00"
+                                          className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary transition-all shadow-sm focus:ring-4 focus:ring-primary/5"
+                                       />
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 italic">Insira o valor total cobrado pela empresa parceira para esta OS.</p>
+                                 </div>
+                              );
+                           }
+                           return null;
+                        })()}
+
                         <div className="space-y-4">
                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Relatório Técnico / Solução</p>
                            <textarea
@@ -905,8 +956,8 @@ const WorkOrderDetails = () => {
                                  disabled={isConcluded || !isAdmin}
                                  className="text-[10px] font-bold text-primary uppercase flex items-center gap-1 hover:opacity-70 transition-all"
                               >
-                                 <Plus size={14} className={`transition-transform duration-300 ${showAddPart ? 'rotate-45 text-red-500' : ''}`} />
-                                 {showAddPart ? <span className="text-red-500 font-bold">Cancelar</span> : 'Adicionar Item'}
+                                 <Plus size={14} className={`transition-transform duration-300 ${showAddPart ? 'rotate-45 text-brand-alert' : ''}`} />
+                                 {showAddPart ? <span className="text-brand-alert font-bold">Cancelar</span> : 'Adicionar Item'}
                               </button>
                            </div>
 
@@ -999,7 +1050,7 @@ const WorkOrderDetails = () => {
                                           <td className="px-4 py-3 text-right">
                                              <button onClick={() => handleRemovePart(part.id)} disabled={isConcluded || !isAdmin}
 
-                                                className="text-red-400 hover:text-red-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+                                                className="text-red-400 hover:text-brand-alert transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                                                 <Trash2 size={14} />
                                              </button>
                                           </td>
@@ -1025,7 +1076,7 @@ const WorkOrderDetails = () => {
                   {/* Widget: Tempos da OS */}
                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
                      <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                        <Timer size={14} className="text-blue-500" />
+                        <Timer size={14} className="text-primary" />
                         Tempos da OS
                      </h4>
 
@@ -1111,7 +1162,7 @@ const WorkOrderDetails = () => {
                            <span className="text-slate-500">Mão de Obra</span>
                            <span className="font-semibold text-slate-700">
                               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                 (workOrder.repair_hours || 0) * (workOrder.hourly_rate || 0)
+                                 ((workOrder as any).third_party_company_id || (workOrder as any).third_party_companies) ? (workOrder.hourly_rate || 0) : 0
                               )}
                            </span>
                         </div>
@@ -1127,16 +1178,16 @@ const WorkOrderDetails = () => {
                            <span className="text-xs font-bold text-slate-900 uppercase">Total Estimado</span>
                            <span className="text-lg font-black text-emerald-600">
                               {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                 ((workOrder.repair_hours || 0) * (workOrder.hourly_rate || 0)) +
+                                 ((((workOrder as any).third_party_company_id || (workOrder as any).third_party_companies) ? (workOrder.hourly_rate || 0) : 0)) +
                                  usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
                               )}
                            </span>
                         </div>
                      </div>
 
-                     <div className="p-3 bg-amber-50 border border-amber-100 rounded-lg">
-                        <p className="text-[10px] text-amber-700 leading-tight">
-                           * Os valores de mão de obra são calculados com base nas horas de reparo registradas e no valor hora do técnico.
+                     <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
+                        <p className="text-[10px] text-slate-500 leading-tight italic">
+                           * Custos de mão de obra são aplicáveis apenas para serviços executados por empresas parceiras.
                         </p>
                      </div>
                   </div>
@@ -1261,6 +1312,13 @@ const WorkOrderDetails = () => {
                      }`}>{status}</span>
                </div>
                <div className="flex items-center gap-3">
+                  <button
+                     onClick={() => window.print()}
+                     className="hidden sm:flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all no-print"
+                  >
+                     <FileText size={16} />
+                     Imprimir OS
+                  </button>
                   {isAdmin && status !== 'Cancelado' && !isConcluded && (
                      <button
                         onClick={async () => {
@@ -1319,7 +1377,7 @@ const WorkOrderDetails = () => {
                               }
                            });
                         }}
-                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg text-xs md:text-sm font-bold hover:bg-red-50 transition-all"
+                        className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-red-200 text-brand-alert rounded-lg text-xs md:text-sm font-bold hover:bg-red-50 transition-all"
                      >
                         <X size={16} />
                         <span className="hidden sm:inline">Cancelar OS</span>

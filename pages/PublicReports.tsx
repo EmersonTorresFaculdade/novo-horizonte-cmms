@@ -70,7 +70,7 @@ class ErrorBoundary extends React.Component<
                     </p>
                     <button
                         onClick={() => window.location.reload()}
-                        className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                        className="mt-4 px-4 py-2 bg-brand-alert text-white rounded hover:bg-[#c9302c]"
                     >
                         Recarregar Página
                     </button>
@@ -236,7 +236,7 @@ const ReportsContent = () => {
             const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção').length;
 
             const totalAssets = assetData.length;
-            const criticalAssets = assetData.filter(a => a.status === 'Crítico' || a.status === 'Parado').length;
+            const criticalAssets = assetData.filter((a: any) => a.status === 'Crítico' || a.status === 'Parado').length;
             const inventoryVal = invData.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_value)), 0);
 
             // --- Advanced Analytics ---
@@ -285,14 +285,11 @@ const ReportsContent = () => {
 
             const mtta = respondedWO.length > 0 ? (totalResponseHours / respondedWO.length).toFixed(1) : 0;
 
-            // Labor Cost Calculation - Include closed and maintenance for total estimate
-            const laborCost = woData.reduce((acc, wo) => {
-                const status = wo.status?.toLowerCase();
-                if (status === 'pendente') return acc;
-
-                const hours = Number(wo.repair_hours) || Number(wo.downtime_hours) || 0;
-                const rate = Number(wo.hourly_rate) || 50;
-                return acc + (hours * rate);
+            // Labor Cost Calculation - Only for third-party companies
+            const laborCost = woData.reduce((acc, wo: any) => {
+                const isThirdParty = wo.third_party_company_id;
+                if (!isThirdParty) return acc;
+                return acc + (Number(wo.hourly_rate) || 0);
             }, 0);
 
             const partsCostEst = (woData as any[]).reduce((acc, wo) => acc + (Number(wo.parts_cost) || 0), 0);
@@ -330,7 +327,7 @@ const ReportsContent = () => {
             }, {});
             const priorityData = Object.keys(priorityCount).map(key => ({ name: key, value: priorityCount[key] }));
 
-            const assetStatusCount = assetData.reduce((acc: any, curr) => {
+            const assetStatusCount = assetData.reduce((acc: any, curr: any) => {
                 acc[curr.status] = (acc[curr.status] || 0) + 1;
                 return acc;
             }, {});
@@ -350,9 +347,9 @@ const ReportsContent = () => {
 
             const problematicAssets = Object.entries(assetDowntimeMap)
                 .map(([id, hours]) => {
-                    const asset = assetData.find(a => a.id === id);
+                    const asset = assetData.find((a: any) => a.id === id);
                     return {
-                        name: asset ? asset.name : 'Desconhecido',
+                        name: asset ? (asset as any).name : 'Desconhecido',
                         hours: hours,
                         id: id
                     };
@@ -464,7 +461,7 @@ const ReportsContent = () => {
                     {/* 1. Executive Summary KPIs - 4 Column Layout as requested */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
-                            <h3 className="text-3xl font-black text-blue-600 mb-1">{stats.totalWorkOrders}</h3>
+                            <h3 className="text-3xl font-black text-primary mb-1">{stats.totalWorkOrders}</h3>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total</p>
                         </div>
                         <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm text-center">
@@ -495,7 +492,7 @@ const ReportsContent = () => {
                             <div className="absolute top-0 right-0 p-3 opacity-10"><CheckCircle size={40} /></div>
                             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">MTBF (Confiabilidade)</p>
                             <h3 className="text-2xl font-black text-slate-900">{stats.mtbf} <span className="text-sm font-normal text-slate-500">horas</span></h3>
-                            <p className="text-xs text-blue-600 mt-2 font-medium">Entre falhas</p>
+                            <p className="text-xs text-primary mt-2 font-medium">Entre falhas</p>
                         </div>
                         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
                             <div className="absolute top-0 right-0 p-3 opacity-10"><ThumbsUp size={40} /></div>
@@ -560,7 +557,7 @@ const ReportsContent = () => {
                                             chartData.topProblematicAssets.map((asset, index) => (
                                                 <tr key={index} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
                                                     <td className="px-4 py-3 font-medium text-slate-900">{asset.name}</td>
-                                                    <td className="px-4 py-3 text-right font-bold text-red-600">{asset.hours}h</td>
+                                                    <td className="px-4 py-3 text-right font-bold text-brand-alert">{asset.hours}h</td>
                                                 </tr>
                                             ))
                                         ) : (
@@ -606,7 +603,7 @@ const ReportsContent = () => {
                                     </div>
                                     <div className="w-full bg-slate-100 rounded-full h-2">
                                         <div
-                                            className="bg-blue-500 h-2 rounded-full"
+                                            className="bg-primary h-2 rounded-full"
                                             style={{ width: `${stats.totalMaintenanceCost > 0 ? (stats.estimatedLaborCost / stats.totalMaintenanceCost) * 100 : 0}%` }}
                                         ></div>
                                     </div>

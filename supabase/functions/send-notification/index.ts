@@ -19,7 +19,7 @@ function formatPhone(phone: string | null): string | null {
     return cleaned;
 }
 
-serve(async (req) => {
+serve(async (req: Request) => {
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
     }
@@ -28,8 +28,9 @@ serve(async (req) => {
         const body = await req.json().catch(() => ({}));
 
         let event = body.event;
-        let workOrder = body.workOrder || body.data;
+        let workOrder: any = body.workOrder || body.data;
         let company = body.company;
+        let reportData = body.reportData;
 
         if (!event && body.type) {
             if (body.type === 'INSERT') event = 'work_order_created';
@@ -37,11 +38,20 @@ serve(async (req) => {
             workOrder = body.record;
         }
 
-        if (!event || !workOrder) {
-            return new Response(JSON.stringify({ message: 'Missing event or workOrder' }), {
+        // Allow report events to proceed without a workOrder if reportData is present
+        const isReportEvent = event === 'executive_report_manual';
+
+        if (!event || (!workOrder && !isReportEvent)) {
+            return new Response(JSON.stringify({
+                message: 'Missing event or workOrder',
+                received: { event, hasWorkOrder: !!workOrder, hasReportData: !!reportData }
+            }), {
                 status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
         }
+
+        // Ensure workOrder is at least an empty object for downstream logic
+        if (!workOrder) workOrder = {};
 
         console.log(`Processing event: ${event}`);
 
@@ -53,7 +63,7 @@ serve(async (req) => {
         // 1. Fetch Webhook URL & Settings
         const { data: settings, error: settingsError } = await supabaseAdmin
             .from('app_settings')
-            .select('webhook_url, webhook_enabled')
+            .select('webhook_url, webhook_enabled, board_emails')
             .single()
 
         if (settingsError) throw new Error('Failed to fetch app settings.')
@@ -66,64 +76,64 @@ serve(async (req) => {
             )
         }
 
-        // 2. Fetch Admin(s) with individual preferences and category permissions
-        const { data: adminUsers } = await supabaseAdmin
-            .from('users')
-            .select('id, phone, email, email_notifications, whatsapp_notifications, manage_equipment, manage_predial, manage_others')
-            .in('role', ['admin_root', 'admin'])
-
+        // 2. Handle recipients based on event
         let adminPhone = null;
         let adminEmails: string[] = [];
         let adminPhones: string[] = [];
 
-        if (adminUsers && adminUsers.length > 0) {
-            const adminIds = adminUsers.map(u => u.id);
-            const { data: profiles } = await supabaseAdmin
-                .from('user_profiles')
-                .select('id, phone, email')
-                .in('id', adminIds);
+        if (event === 'executive_report_manual') {
+            // Use configured board emails for the strategic report
+            if (settings.board_emails) {
+                adminEmails = settings.board_emails.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
+            }
+        } else {
+            // Fetch Admin(s) for standard work order notifications
+            const { data: adminUsers } = await supabaseAdmin
+                .from('users')
+                .select('id, phone, email, email_notifications, whatsapp_notifications, manage_equipment, manage_predial, manage_others')
+                .in('role', ['admin_root', 'admin'])
 
-            const profileMap = new Map(profiles?.map(p => [p.id, p]));
-            const uniqueEmails = new Set<string>();
-            const uniquePhones = new Set<string>();
+            if (adminUsers && adminUsers.length > 0) {
+                const adminIds = adminUsers.map((u: any) => u.id);
+                const { data: profiles } = await supabaseAdmin
+                    .from('user_profiles')
+                    .select('id, phone, email')
+                    .in('id', adminIds);
 
-            // Get maintenance category from work order (default to Equipamento if not present)
-            const woCategory = workOrder.maintenance_category || 'Equipamento';
+                const profileMap = new Map(profiles?.map((p: any) => [p.id, p]));
+                const uniqueEmails = new Set<string>();
+                const uniquePhones = new Set<string>();
 
-            adminUsers.forEach(user => {
-                // Category filtering logic
-                let hasCategoryPermission = false;
-                if (user.manage_equipment && woCategory === 'Equipamento') hasCategoryPermission = true;
-                if (user.manage_predial && woCategory === 'Predial') hasCategoryPermission = true;
-                if (user.manage_others && woCategory === 'Outros') hasCategoryPermission = true;
+                const woCategory = workOrder.maintenance_category || 'Equipamento';
 
-                // admin_root sees everything by default if they have at least one key? 
-                // Wait, last session we decided universally even admin_root is filtered.
-                // Let's stick to the strict category matching.
+                adminUsers.forEach((user: any) => {
+                    let hasCategoryPermission = false;
+                    if (user.manage_equipment && woCategory === 'Equipamento') hasCategoryPermission = true;
+                    if (user.manage_predial && woCategory === 'Predial') hasCategoryPermission = true;
+                    if (user.manage_others && woCategory === 'Outros') hasCategoryPermission = true;
 
-                if (!hasCategoryPermission) return;
+                    if (!hasCategoryPermission) return;
 
-                const profile = profileMap.get(user.id);
+                    const profile = profileMap.get(user.id);
 
-                // Respect individual email preference
-                const emailEnabled = user.email_notifications ?? true;
-                if (emailEnabled) {
-                    const email = (profile?.email && profile.email.trim() !== '') ? profile.email : user.email;
-                    if (email && email.trim() !== '') uniqueEmails.add(email);
-                }
+                    const emailEnabled = user.email_notifications ?? true;
+                    if (emailEnabled) {
+                        const email = (profile?.email && profile.email.trim() !== '') ? profile.email : user.email;
+                        if (email && email.trim() !== '') uniqueEmails.add(email);
+                    }
 
-                // Respect individual whatsapp preference
-                const whatsappEnabled = user.whatsapp_notifications ?? false;
-                if (whatsappEnabled) {
-                    const rawPhone = (profile?.phone && profile.phone.trim() !== '') ? profile.phone : user.phone;
-                    const formattedPhone = formatPhone(rawPhone);
-                    if (formattedPhone) uniquePhones.add(formattedPhone);
-                }
-            });
+                    const whatsappEnabled = user.whatsapp_notifications ?? false;
+                    if (whatsappEnabled) {
+                        const rawPhone = (profile?.phone && profile.phone.trim() !== '') ? profile.phone : user.phone;
+                        const formattedPhone = formatPhone(rawPhone);
+                        if (formattedPhone) uniquePhones.add(formattedPhone);
+                    }
+                });
 
-            adminEmails = Array.from(uniqueEmails);
-            adminPhones = Array.from(uniquePhones);
-            if (adminPhones.length > 0) adminPhone = adminPhones[0];
+                adminEmails = Array.from(uniqueEmails);
+                adminPhones = Array.from(uniquePhones);
+                if (adminPhones.length > 0) adminPhone = adminPhones[0];
+            }
         }
 
         // 3. Enrich Work Order Data
@@ -274,6 +284,9 @@ serve(async (req) => {
         } else if (event === 'work_order_cancelled') {
             subject_display = "❌ Ordem de Serviço Cancelada";
             intro_display = `foi cancelada${admin_name ? ` por ${admin_name}` : ''}`;
+        } else if (event === 'executive_report_manual') {
+            subject_display = "📊 Relatório Executivo Estratégico";
+            intro_display = "foi gerado manualmente pela diretoria";
         } else {
             subject_display = "🔄 Atualização da Ordem de Serviço";
             // Custom messages based on status
@@ -299,6 +312,7 @@ serve(async (req) => {
                 timestamp: new Date().toISOString(),
                 company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,
+                reportData: reportData, // Inclusion of report data
                 preferences: {
                     requester: requesterPreferences
                 },

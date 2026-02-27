@@ -711,7 +711,7 @@ const Profile = () => {
                         <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                                    <div className="p-2 bg-emerald-50/50 text-primary rounded-lg">
                                         <Mail size={20} />
                                     </div>
                                     <div>
@@ -847,7 +847,7 @@ const Profile = () => {
                                 <p className="text-sm text-slate-500">Selecione quais setores você gerencia. Ao ativar um setor, você terá acesso à gestão de suas Ordens de Serviço, Ativos correspondentes, e será notificado sobre as atividades deste setor.</p>
                                 <div className="space-y-2 mt-4">
                                     {[
-                                        { id: 'manageEquipment', label: 'Máquinas', color: 'bg-blue-500' },
+                                        { id: 'manageEquipment', label: 'Máquinas', color: 'bg-primary' },
                                         { id: 'managePredial', label: 'Predial', color: 'bg-indigo-500' },
                                         { id: 'manageOthers', label: 'Outros', color: 'bg-slate-500' }
                                     ].map((s) => (
