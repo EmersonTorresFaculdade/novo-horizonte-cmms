@@ -11,11 +11,14 @@ import Technicians from './pages/Technicians';
 import Inventory from './pages/Inventory';
 import Calendar from './pages/Calendar';
 import Profile from './pages/Profile';
+import TechnicianProfile from './pages/TechnicianProfile';
+import ThirdPartyProfile from './pages/ThirdPartyProfile';
 
 import Reports from './pages/Reports';
 import PublicReports from './pages/PublicReports';
 import Settings from './pages/Settings';
 import UsersPending from './pages/UsersPending';
+import UsersManagement from './pages/UsersManagement';
 import Notifications from './pages/Notifications';
 import { ProfileProvider } from './contexts/ProfileContext';
 import { AuthProvider } from './contexts/AuthContext';
@@ -46,7 +49,11 @@ const App = () => {
                   <Route path="/work-orders" element={<WorkOrders />} />
                   <Route path="/work-orders/new" element={<NewWorkOrder />} />
                   <Route path="/work-orders/:id" element={<WorkOrderDetails />} />
-                  <Route path="/work-orders/:id/edit" element={<WorkOrderDetails />} />
+                  <Route path="/work-orders/:id/edit" element={
+                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                      <WorkOrderDetails />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/notifications" element={<Notifications />} />
@@ -60,6 +67,16 @@ const App = () => {
                   <Route path="/technicians" element={
                     <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
                       <Technicians />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/technicians/:id" element={
+                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                      <TechnicianProfile />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/parceiros/:id" element={
+                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                      <ThirdPartyProfile />
                     </ProtectedRoute>
                   } />
                   <Route path="/inventory" element={
@@ -81,6 +98,11 @@ const App = () => {
                   <Route path="/users/pending" element={
                     <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
                       <UsersPending />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/users" element={
+                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                      <UsersManagement />
                     </ProtectedRoute>
                   } />
                   <Route path="/users/pending/:id" element={

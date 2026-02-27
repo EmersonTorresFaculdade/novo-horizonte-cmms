@@ -12,7 +12,8 @@ import {
   ChevronDown,
   LogOut,
   User,
-  Bell
+  Bell,
+  Clock
 } from 'lucide-react';
 import { IMAGES } from '../constants';
 import { supabase } from '../lib/supabase';
@@ -20,7 +21,8 @@ import { useProfile } from '../contexts/ProfileContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import { useNotifications } from '../contexts/NotificationsContext';
-import { X } from 'lucide-react'; // Import X icon for close button
+import { X, HelpCircle } from 'lucide-react'; // Import X icon for close button
+import FeedbackModal from './FeedbackModal';
 
 interface SidebarProps {
   isOpen?: boolean;
@@ -36,6 +38,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
   const { unreadCount } = useNotifications();
 
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
+  const [showHelp, setShowHelp] = useState(false);
 
   React.useEffect(() => {
     fetchOpenOrdersCount();
@@ -179,7 +182,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 }
               >
                 <Factory size={20} />
-                <span className="text-sm font-medium">Máquinas & Ativos</span>
+                <span className="text-sm font-medium">Gestão de Ativos</span>
               </NavLink>
 
               <NavLink
@@ -190,7 +193,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 }
               >
                 <Users size={20} />
-                <span className="text-sm font-medium">Técnicos</span>
+                <span className="text-sm font-medium">Técnicos e Terceirizados</span>
               </NavLink>
 
               <NavLink
@@ -247,13 +250,24 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               </NavLink>
 
               <NavLink
-                to="/users/pending"
+                to="/users"
                 className={({ isActive }) =>
                   `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
                 <Users size={20} />
+                <span className="text-sm font-medium">Gestão de Usuários</span>
+              </NavLink>
+
+              <NavLink
+                to="/users/pending"
+                className={({ isActive }) =>
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  }`
+                }
+              >
+                <Clock size={20} />
                 <span className="text-sm font-medium">Aprovações</span>
               </NavLink>
             </>
@@ -298,6 +312,17 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <button
                 onClick={() => {
                   setIsProfileOpen(false);
+                  setShowHelp(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors text-left"
+              >
+                <HelpCircle size={18} />
+                <span className="text-sm font-medium">Ajuda & Suporte</span>
+              </button>
+              <div className="h-px bg-slate-700"></div>
+              <button
+                onClick={() => {
+                  setIsProfileOpen(false);
                   navigate('/');
                 }}
                 className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors text-left"
@@ -309,6 +334,15 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
           )}
         </div>
       </aside>
+
+      {/* Help Modal */}
+      <FeedbackModal
+        isOpen={showHelp}
+        onClose={() => setShowHelp(false)}
+        type="info"
+        title="Central de Ajuda"
+        message="Para suporte, entre em contato com o administrador do sistema ou consulte a documentação na intranet.\n\nVersão do Sistema: 1.0.0"
+      />
     </>
   );
 };
