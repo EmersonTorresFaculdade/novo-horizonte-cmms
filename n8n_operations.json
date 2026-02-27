@@ -1,0 +1,186 @@
+[
+  {
+    "type": "updateNode",
+    "nodeName": "Admin WhatsApp",
+    "updates": {
+      "parameters": {
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.adminPhoneToUse }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ `\ud83d\udd14 *Novo Horizonte CMMS*\n\ud83d\udcdd *${$json.body.subject_display} #${$json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A'}*\n\nOl\u00e1, Administrador Root!\nSua ordem de servi\u00e7o ${$json.body.intro_display}. \ud83d\udc47\n\n\ud83c\udfed *M\u00e1quina:* ${$json.body.workOrder.assetName || 'N/A'}\n\ud83d\udcc2 *Falha:* ${$json.body.failure_type || 'N/A'}\n\ud83d\udee0\ufe0f *Classe:* ${$json.body.workOrder.maintenance_type || 'N/A'}\n\ud83d\udcc4 *Descri\u00e7\u00e3o:* ${$json.body.workOrder.description || 'N/A'}\n\ud83d\udea6 *Status:* ${$json.body.workOrder.status || 'N/A'}\n\ud83d\udc68\u200d\ud83d\udd27 *T\u00e9cnico:* ${$json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'N\u00e3o atribu\u00eddo'}${ $json.body.technical_report ? '\\n\ud83d\udee0\ufe0f *Relat\u00f3rio T\u00e9cnico:*\\n' + $json.body.technical_report : '' }\n\n\ud83d\udd17 *Acompanhe aqui:* ${$json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id)}` }}"
+            }
+          ]
+        },
+        "contentType": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "8029C030CF0D-42CD-8D34-D021CA6755DF"
+            }
+          ]
+        },
+        "method": "POST",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "url": "https://api.emersontorres.com.br/message/sendText/Trello"
+      }
+    }
+  },
+  {
+    "type": "updateNode",
+    "nodeName": "Check Requester Eligibility",
+    "updates": {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-req-wa-pref-1",
+              "leftValue": "={{ $json.body.preferences && $json.body.preferences.requester ? $json.body.preferences.requester.whatsapp : false }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "cond-req-wa-phone-1",
+              "leftValue": "={{ $json.body.requesterPhone }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            },
+            {
+              "id": "cond-req-wa-event-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "regex",
+                "type": "string"
+              },
+              "rightValue": "/work_order_created|work_order_updated|work_order_reopened|work_order_cancelled/"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "updateNode",
+    "nodeName": "Requester WhatsApp",
+    "updates": {
+      "parameters": {
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "number",
+              "value": "={{ $json.body.requesterPhone }}"
+            },
+            {
+              "name": "text",
+              "value": "={{ `\ud83d\udd14 *Novo Horizonte CMMS*\n\ud83d\udcdd *${$json.body.subject_display} #${$json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A'}*\n\nOl\u00e1, ${$json.body.requesterName || 'Solicitante'}!\nSua ordem de servi\u00e7o ${$json.body.intro_display}. \ud83d\udc47\n\n\ud83c\udfed *M\u00e1quina:* ${$json.body.workOrder.assetName || 'N/A'}\n\ud83d\udcc2 *Falha:* ${$json.body.failure_type || 'N/A'}\n\ud83d\udee0\ufe0f *Classe:* ${$json.body.workOrder.maintenance_type || 'N/A'}\n\ud83d\udcc4 *Descri\u00e7\u00e3o:* ${$json.body.workOrder.description || 'N/A'}\n\ud83d\udea6 *Status:* ${$json.body.workOrder.status || 'N/A'}\n\ud83d\udc68\u200d\ud83d\udd27 *T\u00e9cnico:* ${$json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'N\u00e3o atribu\u00eddo'}${ $json.body.technical_report ? '\\n\ud83d\udee0\ufe0f *Relat\u00f3rio T\u00e9cnico:*\\n' + $json.body.technical_report : '' }\n\n\ud83d\udd17 *Acompanhe aqui:* ${$json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id)}` }}"
+            }
+          ]
+        },
+        "contentType": "json",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "8029C030CF0D-42CD-8D34-D021CA6755DF"
+            }
+          ]
+        },
+        "method": "POST",
+        "sendBody": true,
+        "sendHeaders": true,
+        "specifyHeaders": "keypair",
+        "url": "https://api.emersontorres.com.br/message/sendText/Trello"
+      }
+    }
+  },
+  {
+    "type": "updateNode",
+    "nodeName": "Admin Email",
+    "updates": {
+      "parameters": {
+        "fromEmail": "ti@novohorizonte.com.br",
+        "html": "={{ `<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Notifica\u00e7\u00e3o CMMS</title><style>body{margin:0;padding:0;background:#F4F6F8;font-family:Arial,Helvetica,sans-serif;}.container{max-width:640px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,0.08);}.header{background:#1C1F24;color:#ffffff;padding:30px;text-align:center;}.header h1{margin:0;font-size:20px;font-weight:600;}.header span{color:#1F7A4C;}.content{padding:30px;}.intro{font-size:15px;color:#444;margin-bottom:25px;}.card{background:#F9FBFC;border-left:5px solid #1F7A4C;padding:22px;border-radius:8px;}.field{margin-bottom:18px;}.label{font-size:12px;text-transform:uppercase;color:#8a8f98;margin-bottom:5px;font-weight:600;}.value{font-size:15px;font-weight:600;color:#1C1F24;}.badge{background:#E6F4EC;color:#1F7A4C;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;}.priority{color:#D84315;}.button-container{text-align:center;margin-top:30px;}.button{display:inline-block;padding:14px 28px;background:#1F7A4C;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;}.footer{background:#1C1F24;color:#b5bcc6;padding:18px;text-align:center;font-size:12px;}</style></head><body><div class=\"container\"><div class=\"header\"><h1>${$json.body.subject_display} <span>#${$json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A'}</span></h1></div><div class=\"content\"><p class=\"intro\">Ol\u00e1 <strong>Administrador</strong>, sua ordem de servi\u00e7o ${$json.body.intro_display}. Veja os detalhes abaixo:</p><div class=\"card\"><div class=\"field\"><div class=\"label\">T\u00edtulo / Descri\u00e7\u00e3o</div><div class=\"value\">${$json.body.workOrder.title || $json.body.workOrder.description || 'N\u00e3o informado'}</div></div><div class=\"field\"><div class=\"label\">M\u00e1quina / Ativo</div><div class=\"value\">${$json.body.workOrder.assetName ? $json.body.workOrder.assetName : 'N\u00e3o informado'}</div></div><div class=\"field\"><div class=\"label\">Tipo de Falha</div><div class=\"value\">${$json.body.failure_type || 'N\u00e3o especificado'}</div></div><div class=\"field\"><div class=\"label\">Classe de Manuten\u00e7\u00e3o</div><div class=\"value\">${$json.body.workOrder.maintenance_type || 'N\u00e3o especificada'}</div></div><div class=\"field\"><div class=\"label\">Status</div><div class=\"value\"><span class=\"badge\">${$json.body.workOrder.status || 'N/A'}</span></div></div><div class=\"field\"><div class=\"label\">Prioridade</div><div class=\"value priority\">${$json.body.workOrder.priority || 'N/A'}</div></div><div class=\"field\"><div class=\"label\">T\u00e9cnico Respons\u00e1vel</div><div class=\"value\">${$json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'N\u00e3o atribu\u00eddo'}</div></div><div class=\"field\"><div class=\"label\">Solicitante</div><div class=\"value\">${$json.body.requesterName || $json.body.requesterEmail || 'N\u00e3o informado'}</div></div>${ $json.body.technical_report ? `<div class=\"field\"><div class=\"label\">Relat\u00f3rio T\u00e9cnico</div><div class=\"value\" style=\"white-space:pre-wrap;background:#f8f9fa;padding:10px;border:1px solid #eee\">${$json.body.technical_report}</div></div>` : '' }</div><div class=\"button-container\"><a href=\"${$json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id)}\" class=\"button\">Acessar Ordem de Servi\u00e7o</a></div></div><div class=\"footer\">Novo Horizonte CMMS \u2022 Gest\u00e3o de Manuten\u00e7\u00e3o<br>\u00a9 2026 Novo Horizonte</div></div></body></html>` }}",
+        "subject": "={{ $json.body.subject_display + ' #' + ($json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A') }}",
+        "toEmail": "={{ $json.body.adminEmails }}"
+      }
+    }
+  },
+  {
+    "type": "updateNode",
+    "nodeName": "Check Requester Email",
+    "updates": {
+      "parameters": {
+        "conditions": {
+          "combinator": "and",
+          "conditions": [
+            {
+              "id": "cond-req-em-pref-1",
+              "leftValue": "={{ $json.body.preferences && $json.body.preferences.requester ? $json.body.preferences.requester.email : false }}",
+              "operator": {
+                "operation": "equals",
+                "type": "boolean"
+              },
+              "rightValue": true
+            },
+            {
+              "id": "cond-req-em-addr-1",
+              "leftValue": "={{ $json.body.requesterEmail }}",
+              "operator": {
+                "operation": "notEmpty",
+                "type": "string"
+              }
+            },
+            {
+              "id": "cond-req-em-event-1",
+              "leftValue": "={{ $json.body.event }}",
+              "operator": {
+                "operation": "regex",
+                "type": "string"
+              },
+              "rightValue": "/work_order_created|work_order_updated|work_order_reopened|work_order_cancelled/"
+            }
+          ],
+          "options": {
+            "version": 2,
+            "leftValue": "",
+            "caseSensitive": true,
+            "typeValidation": "strict"
+          }
+        },
+        "options": {}
+      }
+    }
+  },
+  {
+    "type": "updateNode",
+    "nodeName": "Send Requester Email",
+    "updates": {
+      "parameters": {
+        "fromEmail": "ti@novohorizonte.com.br",
+        "html": "={{ `<!DOCTYPE html><html><head><meta charset=\"UTF-8\"><title>Notifica\u00e7\u00e3o CMMS</title><style>body{margin:0;padding:0;background:#F4F6F8;font-family:Arial,Helvetica,sans-serif;}.container{max-width:640px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 12px 35px rgba(0,0,0,0.08);}.header{background:#1C1F24;color:#ffffff;padding:30px;text-align:center;}.header h1{margin:0;font-size:20px;font-weight:600;}.header span{color:#1F7A4C;}.content{padding:30px;}.intro{font-size:15px;color:#444;margin-bottom:25px;}.card{background:#F9FBFC;border-left:5px solid #1F7A4C;padding:22px;border-radius:8px;}.field{margin-bottom:18px;}.label{font-size:12px;text-transform:uppercase;color:#8a8f98;margin-bottom:5px;font-weight:600;}.value{font-size:15px;font-weight:600;color:#1C1F24;}.badge{background:#E6F4EC;color:#1F7A4C;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;display:inline-block;}.priority{color:#D84315;}.button-container{text-align:center;margin-top:30px;}.button{display:inline-block;padding:14px 28px;background:#1F7A4C;color:#ffffff;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600;}.footer{background:#1C1F24;color:#b5bcc6;padding:18px;text-align:center;font-size:12px;}</style></head><body><div class=\"container\"><div class=\"header\"><h1>${$json.body.subject_display} <span>#${$json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A'}</span></h1></div><div class=\"content\"><p class=\"intro\">Ol\u00e1 <strong>${$json.body.requesterName || 'Solicitante'}</strong>, sua ordem de servi\u00e7o ${$json.body.intro_display} no sistema CMMS. Veja os detalhes abaixo:</p><div class=\"card\"><div class=\"field\"><div class=\"label\">T\u00edtulo / Descri\u00e7\u00e3o</div><div class=\"value\">${$json.body.workOrder.title || $json.body.workOrder.description || 'N\u00e3o informado'}</div></div><div class=\"field\"><div class=\"label\">M\u00e1quina / Ativo</div><div class=\"value\">${$json.body.workOrder.assetName ? $json.body.workOrder.assetName : 'N\u00e3o informado'}</div></div><div class=\"field\"><div class=\"label\">Tipo de Falha</div><div class=\"value\">${$json.body.failure_type || 'N\u00e3o especificado'}</div></div><div class=\"field\"><div class=\"label\">Classe de Manuten\u00e7\u00e3o</div><div class=\"value\">${$json.body.workOrder.maintenance_type || 'N\u00e3o especificada'}</div></div><div class=\"field\"><div class=\"label\">Novo Status</div><div class=\"value\"><span class=\"badge\">${$json.body.workOrder.status || 'N/A'}</span></div></div><div class=\"field\"><div class=\"label\">Prioridade</div><div class=\"value priority\">${$json.body.workOrder.priority || 'N/A'}</div></div><div class=\"field\"><div class=\"label\">T\u00e9cnico Respons\u00e1vel</div><div class=\"value\">${$json.body.workOrder.technicianName && $json.body.workOrder.technicianName !== 'Pendente' && $json.body.workOrder.technicianName !== 'Aguardando' ? $json.body.workOrder.technicianName : 'N\u00e3o atribu\u00eddo'}</div></div>${ $json.body.technical_report ? `<div class=\"field\"><div class=\"label\">Relat\u00f3rio T\u00e9cnico</div><div class=\"value\" style=\"white-space:pre-wrap;background:#f8f9fa;padding:10px;border:1px solid #eee\">${$json.body.technical_report}</div></div>` : '' }</div><div class=\"button-container\"><a href=\"${$json.body.workOrder.url || ('https://manutencao.novohorizonte.com/#/work-orders/' + $json.body.workOrder.id)}\" class=\"button\">Ver Detalhes da OS</a></div></div><div class=\"footer\">Novo Horizonte CMMS \u2022 Fique por dentro!<br>\u00a9 2026 Novo Horizonte</div></div></body></html>` }}",
+        "subject": "={{ $json.body.subject_display + ' #' + ($json.body.workOrder.order_number || $json.body.workOrder.osNumber || 'N/A') }}",
+        "toEmail": "={{ $json.body.requesterEmail }}"
+      }
+    }
+  }
+]

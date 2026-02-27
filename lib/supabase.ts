@@ -8,7 +8,9 @@ if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error('Missing Supabase environment variables');
 }
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Client sem tipagem para tabelas não geradas (ex: work_order_activities)
-export const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey);
+const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey);
+
+export { supabase, supabaseUntyped };
