@@ -450,7 +450,7 @@
       "id": "respond-to-webhook-1",
       "name": "Respond to Webhook Webhook (POST)",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
+      "typeVersion": 1,
       "position": [
         -2160,
         648
@@ -465,7 +465,7 @@
       "id": "respond-to-webhook-2",
       "name": "Respond to Webhook Event Router",
       "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.5,
+      "typeVersion": 1,
       "position": [
         -2000,
         648
