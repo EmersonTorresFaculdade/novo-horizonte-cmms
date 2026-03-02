@@ -425,7 +425,7 @@ const ReportsContent = () => {
             const summaryKpis = [
                 { l: 'Total OS', v: stats.current.totalWO, c: [30, 58, 138] },
                 { l: 'Concluídas', v: stats.current.completedWO, c: [16, 185, 129] },
-                { l: 'Abertas', v: stats.current.openWO, c: [245, 158, 11] },
+                { l: 'Abertas', v: stats.current.openWO - (stats.current.inMaintenanceWO || 0), c: [245, 158, 11] },
                 { l: 'Manutenção', v: stats.current.inMaintenanceWO || 0, c: [139, 92, 246] },
                 { l: 'Confiabilidade', v: `${stats.current.reliability?.toFixed(1)}%`, c: [79, 70, 229] }
             ];

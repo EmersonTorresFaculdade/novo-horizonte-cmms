@@ -232,7 +232,10 @@ const ReportsContent = () => {
             // --- Basic KPIs ---
             const totalWO = woData.length;
             const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
-            const pendingWO = woData.filter(wo => wo.status?.toLowerCase() === 'pendente').length;
+            const pendingWO = woData.filter(wo => {
+                const s = wo.status?.toLowerCase() || '';
+                return s !== 'concluído' && s !== 'cancelado' && s !== 'em manutenção';
+            }).length;
             const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção').length;
 
             const totalAssets = assetData.length;
