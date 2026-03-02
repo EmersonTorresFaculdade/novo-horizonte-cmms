@@ -36,10 +36,10 @@ const getNotificationMeta = (n: Notification) => {
 
 const getPriorityColor = (priority: string) => {
     switch (priority) {
-        case 'CRÍTICA': return 'bg-red-500 text-white';
-        case 'ATRASADA': return 'bg-orange-500 text-white';
-        case 'NORMAL': return 'bg-slate-500 text-white';
-        default: return 'bg-slate-400 text-white';
+        case 'CRÍTICA': return 'bg-red-500 text-white shadow-sm';
+        case 'ATRASADA': return 'bg-orange-500 text-white shadow-sm';
+        case 'NORMAL': return 'bg-blue-50 text-blue-700 border border-blue-200';
+        default: return 'bg-slate-100 text-slate-600 border border-slate-200';
     }
 };
 
@@ -47,8 +47,8 @@ const getPriorityBorder = (priority: string) => {
     switch (priority) {
         case 'CRÍTICA': return 'border-l-4 border-l-red-500';
         case 'ATRASADA': return 'border-l-4 border-l-orange-500';
-        case 'NORMAL': return 'border-l-4 border-l-slate-500';
-        default: return 'border-l-4 border-l-slate-400';
+        case 'NORMAL': return 'border-l-4 border-l-blue-400';
+        default: return 'border-l-4 border-l-slate-300';
     }
 };
 
@@ -359,7 +359,7 @@ const Notifications = () => {
                                                         <span className="text-xs text-slate-400 font-medium">
                                                             {formatTime(n.created_at)}
                                                         </span>
-                                                        {!n.is_read && <div className="w-2 h-2 bg-primary rounded-full animate-pulse ml-1" />}
+                                                        {!n.is_read && <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse ml-1 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
                                                     </div>
                                                 </div>
 
