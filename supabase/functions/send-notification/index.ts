@@ -80,14 +80,19 @@ serve(async (req: Request) => {
         let adminPhone = null;
         let adminEmails: string[] = [];
         let adminPhones: string[] = [];
+        let customEmailForReport = body.customEmail;
 
         if (event === 'executive_report_manual') {
-            // Priority 1: Configured board emails
-            if (settings.board_emails && settings.board_emails.trim() !== '') {
+            // Priority 1: Custom email from UI
+            if (customEmailForReport && customEmailForReport.trim() !== '') {
+                adminEmails = customEmailForReport.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
+            }
+            // Priority 2: Configured board emails
+            else if (settings.board_emails && settings.board_emails.trim() !== '') {
                 adminEmails = settings.board_emails.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
             }
 
-            // Priority 2: Fallback to all administrators if board_emails is empty
+            // Priority 3: Fallback to all administrators if emails are empty
             if (adminEmails.length === 0) {
                 const { data: adminUsers } = await supabaseAdmin
                     .from('users')

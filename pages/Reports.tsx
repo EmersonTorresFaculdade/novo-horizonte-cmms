@@ -124,6 +124,9 @@ const ReportsContent = () => {
         message: ''
     });
 
+    const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+    const [emailToSend, setEmailToSend] = useState('');
+
     const [stats, setStats] = useState<any>({
         current: {},
         previous: {},
@@ -600,11 +603,17 @@ const ReportsContent = () => {
 
 
     const handleSendToBoard = async () => {
+        if (!emailToSend || !emailToSend.includes('@')) {
+            setFeedback({ isOpen: true, type: 'error', title: 'E-mail Inválido', message: 'Por favor, insira um e-mail válido.' });
+            return;
+        }
+
+        setIsEmailModalOpen(false);
         setFeedback({
             isOpen: true,
             type: 'info',
             title: 'Enviando Relatório',
-            message: 'Preparando e enviando dados para a diretoria... Aguarde.'
+            message: 'Preparando e enviando relatório... Aguarde.'
         });
 
         try {
@@ -615,6 +624,7 @@ const ReportsContent = () => {
                 body: {
                     event: 'executive_report_manual',
                     company: settings.companyName,
+                    customEmail: emailToSend,
                     pdf_attachment: pdfBase64,
                     reportData: {
                         period: periodTranslate[period] || period.toUpperCase(),
@@ -648,7 +658,7 @@ const ReportsContent = () => {
                 isOpen: true,
                 type: 'success',
                 title: 'Relatório Enviado com Sucesso',
-                message: 'O documento foi transmitido para a diretoria e deve chegar em instantes.'
+                message: 'O documento foi transmitido para o e-mail informado e deve chegar em instantes.'
             });
         } catch (error: any) {
             console.error('Send error:', error);
@@ -902,10 +912,10 @@ const ReportsContent = () => {
                         <Download size={14} /> Baixar Relatório
                     </button>
                     <button
-                        onClick={handleSendToBoard}
-                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all"
+                        onClick={() => setIsEmailModalOpen(true)}
+                        className="flex items-center gap-2 px-4 py-2 border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all font-bold"
                     >
-                        <Mail size={14} /> Enviar Diretoria
+                        <Mail size={14} /> ENVIAR RELATÓRIO
                     </button>
                 </div>
             </div>
@@ -1114,6 +1124,37 @@ const ReportsContent = () => {
                     </div>
                 </div>
             </div>
+
+            {isEmailModalOpen && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-md">
+                        <h2 className="text-xl font-bold text-slate-900 mb-2">Enviar Relatório</h2>
+                        <p className="text-sm text-slate-500 mb-4">Insira os e-mails que receberão o relatório executivo (separados por vírgula).</p>
+                        <input
+                            type="text"
+                            value={emailToSend}
+                            onChange={(e) => setEmailToSend(e.target.value)}
+                            placeholder="exemplo@email.com"
+                            className="w-full px-4 py-3 border border-slate-200 rounded-xl outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all mb-6"
+                            autoFocus
+                        />
+                        <div className="flex justify-end gap-3">
+                            <button
+                                onClick={() => setIsEmailModalOpen(false)}
+                                className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition-all"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleSendToBoard}
+                                className="px-6 py-2 bg-primary text-white font-bold rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 shadow-lg shadow-primary/30"
+                            >
+                                <Mail size={16} /> Enviar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Hidden Target for PDF Generation (Refactor later for multi-page) */}
             <div className="hidden">
