@@ -36,19 +36,21 @@ const getNotificationMeta = (n: Notification) => {
 
 const getPriorityColor = (priority: string) => {
     switch (priority) {
-        case 'CRÍTICA': return 'bg-red-500 text-white shadow-sm';
-        case 'ATRASADA': return 'bg-orange-500 text-white shadow-sm';
-        case 'NORMAL': return 'bg-blue-50 text-blue-700 border border-blue-200';
-        default: return 'bg-slate-100 text-slate-600 border border-slate-200';
+        case 'CRÍTICA': return 'bg-red-500 text-white border border-red-500';
+        case 'ALTA':
+        case 'ATRASADA': return 'bg-orange-500 text-white border border-orange-500';
+        case 'NORMAL': return 'bg-blue-500 text-white border border-blue-500';
+        default: return 'bg-slate-200 text-slate-700 border border-slate-200';
     }
 };
 
 const getPriorityBorder = (priority: string) => {
     switch (priority) {
         case 'CRÍTICA': return 'border-l-4 border-l-red-500';
+        case 'ALTA':
         case 'ATRASADA': return 'border-l-4 border-l-orange-500';
-        case 'NORMAL': return 'border-l-4 border-l-blue-400';
-        default: return 'border-l-4 border-l-slate-300';
+        case 'NORMAL': return 'border-l-4 border-l-blue-500';
+        default: return 'border-l-4 border-l-slate-400';
     }
 };
 
@@ -341,33 +343,35 @@ const Notifications = () => {
                                     <div
                                         key={n.id}
                                         onClick={() => handleNotificationClick(n)}
-                                        className={`group relative bg-white rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden flex flex-col sm:flex-row hover:shadow-lg ${getPriorityBorder(n.meta.priority)} ${!n.is_read ? 'bg-slate-50 border-r-slate-300 border-y-slate-300' : 'border-r-slate-200 border-y-slate-200 opacity-80'}`}
+                                        className={`group relative bg-white rounded-xl border transition-all duration-200 cursor-pointer overflow-hidden flex flex-col sm:flex-row hover:shadow-md hover:bg-slate-50/80 ${getPriorityBorder(n.meta.priority)} ${!n.is_read ? 'border-r-slate-300 border-y-slate-300 shadow-sm' : 'border-r-slate-200 border-y-slate-200'}`}
                                     >
-                                        <div className="flex-1 p-4 flex gap-4">
-                                            <div className={`flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center bg-white border border-slate-100 shadow-sm`}>
+                                        <div className="flex-1 p-4 py-3.5 flex gap-3">
+                                            <div className={`flex-shrink-0 w-10 h-10 mt-0.5 rounded-xl flex items-center justify-center bg-white border border-slate-100 shadow-sm`}>
                                                 {getIconForType(n.meta.type, n.meta.priority)}
                                             </div>
                                             <div className="flex-1 min-w-0">
-                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
-                                                    <h4 className={`text-sm md:text-base font-bold truncate ${!n.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
+                                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-1">
+                                                    <h4 className={`text-sm md:text-[15px] font-bold truncate ${!n.is_read ? 'text-slate-900' : 'text-slate-700'}`}>
                                                         {n.title}
                                                     </h4>
-                                                    <div className="flex items-center gap-2 shrink-0">
-                                                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-wide ${getPriorityColor(n.meta.priority)}`}>
+                                                    <div className="flex items-center gap-2.5 shrink-0">
+                                                        <span className={`px-2.5 py-0.5 rounded-lg text-[11px] font-bold tracking-wide ${getPriorityColor(n.meta.priority)}`}>
                                                             {n.meta.priority}
                                                         </span>
-                                                        <span className="text-xs text-slate-400 font-medium">
-                                                            {formatTime(n.created_at)}
-                                                        </span>
-                                                        {!n.is_read && <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse ml-1 shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[11px] text-slate-400 font-medium whitespace-nowrap">
+                                                                {formatTime(n.created_at)}
+                                                            </span>
+                                                            {!n.is_read && <div className="w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]" />}
+                                                        </div>
                                                     </div>
                                                 </div>
 
-                                                <p className="text-xs md:text-sm text-slate-500 line-clamp-2 md:line-clamp-1 mb-2">
+                                                <p className="text-xs md:text-sm text-slate-500 line-clamp-2 md:line-clamp-1 mb-1.5">
                                                     {n.message}
                                                 </p>
 
-                                                <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
+                                                <div className="flex items-center gap-2 text-[11px] font-medium text-slate-400 uppercase tracking-widest truncate">
                                                     <span>{n.meta.sector}</span>
                                                     <span className="w-1 h-1 rounded-full bg-slate-300" />
                                                     <span>Ativo: {n.meta.asset}</span>
