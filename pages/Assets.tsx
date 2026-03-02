@@ -23,6 +23,7 @@ const Assets = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('Visão Geral');
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
@@ -110,6 +111,7 @@ const Assets = () => {
       category: asset.category || 'Máquina',
       image_url: asset.image_url || ''
     });
+    setIsFormOpen(true);
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -121,6 +123,7 @@ const Assets = () => {
       category: 'Máquina',
       image_url: ''
     });
+    setIsFormOpen(false);
   };
 
   const generateAutoCode = async (category: string) => {
@@ -286,7 +289,7 @@ const Assets = () => {
   });
 
   return (
-    <div className="flex flex-col gap-6 relative">
+    <div className="flex flex-col gap-6 relative font-['Inter']">
       {/* QR Code Modal Simulation */}
       {isScanning && (
         <div className="fixed inset-0 z-50 bg-black/90 flex flex-col items-center justify-center p-4">
@@ -337,13 +340,13 @@ const Assets = () => {
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-2">
         <div>
           <h2 className="text-2xl font-bold text-slate-900">Gestão de Ativos</h2>
-          <p className="text-sm text-slate-500">Gerencie máquinas, prédios, frota e infraestrutura.</p>
+          <p className="text-sm text-slate-500 mt-1">Gerencie máquinas, prédios, frota e infraestrutura.</p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex gap-2 mt-2 md:mt-0">
           <button
             onClick={fetchAssets}
             className="bg-white hover:bg-slate-50 text-slate-600 px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 border border-slate-200 transition-all"
@@ -353,7 +356,7 @@ const Assets = () => {
           </button>
           <button
             onClick={() => setIsScanning(true)}
-            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg transition-all"
+            className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-sm hover:shadow-md transition-all h-[42px]"
           >
             <QrCode size={18} className="text-primary" />
             Escanear Máquina
@@ -361,222 +364,229 @@ const Assets = () => {
         </div>
       </div>
 
-      {/* Form */}
-      <div ref={formRef} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">{editingId ? 'Editar Ativo' : 'Novo Ativo'}</h3>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {editingId ? 'Atualize os dados do ativo abaixo.' : 'Preencha os dados abaixo para cadastrar um novo ativo no sistema.'}
-            </p>
+      {/* Form Collapsible */}
+      <div ref={formRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 ease-in-out">
+        <button
+          onClick={() => !editingId && setIsFormOpen(!isFormOpen)}
+          className="w-full px-5 py-3.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors focus:outline-none"
+        >
+          <div className="flex items-center gap-3">
+            <div className="bg-slate-100 p-1.5 rounded-lg text-slate-600">
+              {editingId ? <Edit size={18} /> : <Plus size={18} />}
+            </div>
+            <div className="text-left">
+              <h3 className="text-[15px] font-bold text-slate-800">{editingId ? 'Editar Ativo' : 'Cadastrar Novo Ativo'}</h3>
+            </div>
           </div>
-          <div className="text-primary bg-primary/10 p-2 rounded-lg">
-            {editingId ? <Edit size={20} /> : <Plus size={20} />}
-          </div>
-        </div>
-        <div className="p-6">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Nome do Ativo</label>
-              <input
-                value={formData.name}
-                onChange={(e) => handleChange('name', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="Ex: Torno CNC, Ar Condicionado, Compressor"
-                type="text"
-                required
-              />
-            </div>
+          <ChevronRight size={18} className={`text-slate-400 transition-transform duration-200 ${isFormOpen ? 'rotate-90' : ''}`} />
+        </button>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Categoria</label>
-              <select
-                value={formData.category}
-                onChange={(e) => handleChange('category', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                required
-              >
-                {user?.manage_equipment && <option value="Máquina">Máquina</option>}
-                {user?.manage_predial && <option value="Predial">Predial</option>}
-                {user?.manage_others && <option value="Outros">Outros</option>}
-                {(!user?.manage_equipment && !user?.manage_predial && !user?.manage_others) && <option value="Máquina">Máquina</option>}
-              </select>
-            </div>
+        <div className={`grid transition-all duration-200 ease-in-out ${isFormOpen ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
+          <div className="overflow-hidden">
+            <div className="p-5 pt-0 border-t border-slate-100 mt-2">
+              <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">Nome do Ativo</label>
+                  <input
+                    value={formData.name}
+                    onChange={(e) => handleChange('name', e.target.value)}
+                    className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                    placeholder="Ex: Torno CNC, Ar Condicionado, Compressor"
+                    type="text"
+                    required
+                  />
+                </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Local / Setor</label>
-              <input
-                value={formData.sector}
-                onChange={(e) => handleChange('sector', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="Ex: Sala TI, Ferramentaria, Produção"
-                type="text"
-                required
-              />
-            </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">Categoria</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => handleChange('category', e.target.value)}
+                    className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                    required
+                  >
+                    {user?.manage_equipment && <option value="Máquina">Máquina</option>}
+                    {user?.manage_predial && <option value="Predial">Predial</option>}
+                    {user?.manage_others && <option value="Outros">Outros</option>}
+                    {(!user?.manage_equipment && !user?.manage_predial && !user?.manage_others) && <option value="Máquina">Máquina</option>}
+                  </select>
+                </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-slate-700">Imagem do Ativo (URL)</label>
-              <input
-                value={formData.image_url}
-                onChange={(e) => handleChange('image_url', e.target.value)}
-                className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
-                placeholder="https://exemplo.com/imagem.jpg"
-                type="url"
-              />
-            </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">Local / Setor</label>
+                  <input
+                    value={formData.sector}
+                    onChange={(e) => handleChange('sector', e.target.value)}
+                    className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                    placeholder="Ex: Sala TI, Ferramentaria, Produção"
+                    type="text"
+                    required
+                  />
+                </div>
 
-            <div className="lg:col-span-4 flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={handleCancelEdit}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                >
-                  Cancelar Edição
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setFormData({
-                    name: '',
-                    sector: '',
-                    category: user?.manage_equipment ? 'Máquina' : user?.manage_predial ? 'Predial' : user?.manage_others ? 'Outros' : 'Máquina',
-                    image_url: ''
-                  })}
-                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
-                >
-                  Limpar
-                </button>
-              )}
-              <button type="submit" className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-dark rounded-lg flex items-center gap-2">
-                <Save size={18} />
-                {editingId ? 'Atualizar Ativo' : 'Salvar Ativo'}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
+                <div className="flex flex-col gap-2">
+                  <label className="text-sm font-medium text-slate-700">Imagem do Ativo (URL)</label>
+                  <input
+                    value={formData.image_url}
+                    onChange={(e) => handleChange('image_url', e.target.value)}
+                    className="block w-full rounded-lg border-slate-300 bg-white text-slate-900 shadow-sm focus:border-primary focus:ring-primary sm:text-sm h-10 px-3 outline-none border"
+                    placeholder="https://exemplo.com/imagem.jpg"
+                    type="url"
+                  />
+                </div>
 
-      {/* Tabs / Filter categories */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-        {[
-          { id: 'Visão Geral', label: 'Visão Geral', icon: LayoutDashboard, show: true },
-          { id: 'Máquina', label: 'Máquinas', icon: Wrench, show: !!user?.manage_equipment },
-          { id: 'Predial', label: 'Predial', icon: Building2, show: !!user?.manage_predial },
-          { id: 'Outros', label: 'Outros', icon: Box, show: !!user?.manage_others },
-        ].filter(t => t.show !== false).map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveCategory(tab.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${activeCategory === tab.id
-              ? 'bg-primary text-white shadow-md shadow-primary/20'
-              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-              }`}
-          >
-            {activeCategory === tab.id ? <tab.icon size={16} /> : <tab.icon size={16} className="text-slate-400" />}
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* List */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-          <h3 className="font-bold text-slate-900">Ativos no Sistema</h3>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Buscar..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
-              />
+                <div className="lg:col-span-4 flex justify-end gap-3 pt-4 border-t border-slate-100 mt-2">
+                  {editingId ? (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                      Cancelar Edição
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setFormData({
+                        name: '',
+                        sector: '',
+                        category: user?.manage_equipment ? 'Máquina' : user?.manage_predial ? 'Predial' : user?.manage_others ? 'Outros' : 'Máquina',
+                        image_url: ''
+                      })}
+                      className="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                  <button type="submit" className="px-5 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-dark rounded-lg flex items-center gap-2 shadow-sm transition-all h-[42px]">
+                    <Save size={18} />
+                    {editingId ? 'Atualizar Ativo' : 'Salvar Ativo'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="flex justify-center p-8">
-              <Loader2 className="animate-spin text-primary" />
+
+        {/* Tabs / Filter categories */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+          {[
+            { id: 'Visão Geral', label: 'Visão Geral', icon: LayoutDashboard, show: true },
+            { id: 'Máquina', label: 'Máquinas', icon: Wrench, show: !!user?.manage_equipment },
+            { id: 'Predial', label: 'Predial', icon: Building2, show: !!user?.manage_predial },
+            { id: 'Outros', label: 'Outros', icon: Box, show: !!user?.manage_others },
+          ].filter(t => t.show !== false).map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveCategory(tab.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${activeCategory === tab.id
+                ? 'bg-primary/90 text-white shadow-sm'
+                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+            >
+              {activeCategory === tab.id ? <tab.icon size={16} /> : <tab.icon size={16} className="text-slate-400" />}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* List */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
+          <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+            <h3 className="font-bold text-slate-900">Ativos no Sistema</h3>
+            <div className="flex gap-2">
+              <div className="relative">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
+                />
+              </div>
             </div>
-          ) : filteredAssets.length === 0 ? (
-            <div className="text-center p-8 text-slate-500">Nenhum ativo encontrado nesta categoria.</div>
-          ) : (
-            <table className="w-full text-left text-sm text-slate-600">
-              <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
-                <tr>
-                  <th className="px-6 py-3">CÓDIGO</th>
-                  <th className="px-6 py-3">NOME</th>
-                  <th className="px-6 py-3">Setor</th>
-                  <th className="px-6 py-3">Status</th>
-                  <th className="px-6 py-3 text-right">Ações</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {filteredAssets.map(asset => (
-                  <tr key={asset.id} className="hover:bg-slate-50">
-                    <td className="px-6 py-4 font-bold text-slate-900">{asset.code}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {asset.image_url ? (
-                          <img
-                            src={asset.image_url}
-                            alt={asset.name}
-                            className="w-10 h-10 rounded-lg object-cover border border-slate-200 flex-shrink-0"
-                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                          />
-                        ) : (
-                          <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 flex-shrink-0">
-                            {asset.category === 'Máquina' ? <Wrench size={18} /> :
-                              asset.category === 'Predial' ? <Building2 size={18} /> :
-                                <Box size={18} />}
-                          </div>
-                        )}
-                        <span className="font-medium text-slate-700">{asset.name}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">{asset.sector}</td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs px-2 py-0.5 rounded-full font-bold shadow-sm ${asset.status === 'Operacional' || asset.status === 'Ativo' ? 'bg-green-100 text-green-700' :
-                        asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-amber-100 text-amber-700' :
-                          asset.status === 'Crítico' ? 'bg-red-100 text-red-700' :
-                            'bg-blue-100 text-blue-700'
-                        }`}>
-                        {asset.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleEdit(asset)} className="text-slate-400 hover:text-primary mr-2" title="Editar">
-                        <Edit size={18} />
-                      </button>
-                      <button onClick={() => handleDelete(asset.id)} className="text-slate-400 hover:text-brand-alert" title="Excluir">
-                        <Trash2 size={18} />
-                      </button>
-                    </td>
+          </div>
+          <div className="overflow-x-auto">
+            {loading ? (
+              <div className="flex justify-center p-8">
+                <Loader2 className="animate-spin text-primary" />
+              </div>
+            ) : filteredAssets.length === 0 ? (
+              <div className="text-center p-8 text-slate-500">Nenhum ativo encontrado nesta categoria.</div>
+            ) : (
+              <table className="w-full text-left text-sm text-slate-600">
+                <thead className="bg-slate-50/80 text-[11px] uppercase font-medium text-slate-500/75 tracking-wider border-b border-slate-200">
+                  <tr>
+                    <th className="px-5 py-3">CÓDIGO</th>
+                    <th className="px-5 py-3">NOME DO ATIVO</th>
+                    <th className="px-5 py-3">SETOR</th>
+                    <th className="px-5 py-3">STATUS</th>
+                    <th className="px-5 py-3 text-right">AÇÕES</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {filteredAssets.map(asset => (
+                    <tr key={asset.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="px-5 py-2.5 font-semibold text-slate-700">{asset.code}</td>
+                      <td className="px-5 py-2.5">
+                        <div className="flex items-center gap-3">
+                          {asset.image_url ? (
+                            <img
+                              src={asset.image_url}
+                              alt={asset.name}
+                              className="w-9 h-9 rounded-lg object-cover border border-slate-200 flex-shrink-0 opacity-90"
+                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                            />
+                          ) : (
+                            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400/80 flex-shrink-0 border border-slate-200/60">
+                              {asset.category === 'Máquina' ? <Wrench size={16} /> :
+                                asset.category === 'Predial' ? <Building2 size={16} /> :
+                                  <Box size={16} />}
+                            </div>
+                          )}
+                          <span className="font-semibold text-slate-800">{asset.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-2.5 font-medium text-slate-600">{asset.sector}</td>
+                      <td className="px-5 py-2.5">
+                        <span className={`text-[11px] px-3 py-1 rounded-lg font-bold tracking-wide border ${asset.status === 'Operacional' || asset.status === 'Ativo' ? 'bg-[#1F7A4D]/10 text-[#1F7A4D] border-[#1F7A4D]/20' :
+                            asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-orange-50 text-orange-600 border-orange-200' :
+                              asset.status === 'Crítico' ? 'bg-red-50 text-red-600 border-red-200' :
+                                'bg-slate-100 text-slate-600 border-slate-200'
+                          }`}>
+                          {asset.status}
+                        </span>
+                      </td>
+                      <td className="px-5 py-2.5 flex justify-end gap-1">
+                        <button onClick={() => handleEdit(asset)} className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-slate-100 transition-all" title="Editar">
+                          <Edit size={16} />
+                        </button>
+                        <button onClick={() => handleDelete(asset.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Excluir">
+                          <Trash2 size={16} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
-      </div>
 
-      {/* Feedback Modal Reutilizável */}
-      {feedback && (
-        <FeedbackModal
-          isOpen={!!feedback}
-          onClose={() => setFeedback(null)}
-          type={feedback.type}
-          title={feedback.title}
-          message={feedback.message}
-          onConfirm={feedback.onConfirm}
-        />
-      )}
-    </div>
-  );
+        {/* Feedback Modal Reutilizável */}
+        {feedback && (
+          <FeedbackModal
+            isOpen={!!feedback}
+            onClose={() => setFeedback(null)}
+            type={feedback.type}
+            title={feedback.title}
+            message={feedback.message}
+            onConfirm={feedback.onConfirm}
+          />
+        )}
+      </div>
+      );
 };
 
-export default Assets;
+      export default Assets;
