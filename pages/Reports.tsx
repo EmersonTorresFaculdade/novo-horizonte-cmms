@@ -324,7 +324,7 @@ const ReportsContent = () => {
 
             const drawSmallHeader = () => {
                 const headerH = 18;
-                pdf.setFillColor(BLUE_INSTITUTIONAL[0], BLUE_INSTITUTIONAL[1], BLUE_INSTITUTIONAL[2]);
+                pdf.setFillColor(15, 23, 42); // Slate 900 (Mesma cor da capa)
                 pdf.rect(0, 0, pageWidth, headerH, 'F');
 
                 if (logoBase64) {
