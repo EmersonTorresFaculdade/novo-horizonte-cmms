@@ -191,6 +191,7 @@ const ReportsContent = () => {
     const calculatePeriodStats = (woData: any[], assetData: any[], days: number, techData: any[]) => {
         const totalWO = woData.length;
         const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
+        const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção' || wo.status?.toLowerCase() === 'manutenção');
         const openWO = woData.filter(wo => wo.status?.toLowerCase() !== 'concluído' && wo.status?.toLowerCase() !== 'cancelado');
         const preventiveWO = woData.filter(wo => wo.maintenance_category === 'PREVENTIVA').length;
 
@@ -219,6 +220,7 @@ const ReportsContent = () => {
             totalWO,
             completedWO: completedWO.length,
             openWO: openWO.length,
+            inMaintenanceWO: inMaintenanceWO.length,
             backlogDays,
             preventiveRatio: totalWO > 0 ? (preventiveWO / totalWO) * 100 : 0,
             correctiveRatio: totalWO > 0 ? ((totalWO - preventiveWO) / totalWO) * 100 : 0,
@@ -418,19 +420,20 @@ const ReportsContent = () => {
 
             currentY += scoreH + 20; // Mais respiro antes do próximo grid
 
-            // Simple 4-column KPI Grid on Page 1
-            const kpiW = (contentWidth - 9) / 4;
+            // Simple 5-column KPI Grid on Page 1
+            const kpiW = (contentWidth - 12) / 5;
             const summaryKpis = [
                 { l: 'Total OS', v: stats.current.totalWO, c: [30, 58, 138] },
                 { l: 'Concluídas', v: stats.current.completedWO, c: [16, 185, 129] },
                 { l: 'Abertas', v: stats.current.openWO, c: [245, 158, 11] },
+                { l: 'Manutenção', v: stats.current.inMaintenanceWO || 0, c: [139, 92, 246] },
                 { l: 'Confiabilidade', v: `${stats.current.reliability?.toFixed(1)}%`, c: [79, 70, 229] }
             ];
 
             summaryKpis.forEach((k, i) => {
                 const x = margin + (i * (kpiW + 3));
                 drawContentCard(x, currentY, kpiW, 25);
-                pdf.setFontSize(8);
+                pdf.setFontSize(7);
                 pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
                 pdf.text(k.l.toUpperCase(), x + kpiW / 2, currentY + 8, { align: 'center' });
                 pdf.setFontSize(14);
