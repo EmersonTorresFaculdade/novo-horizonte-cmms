@@ -232,12 +232,7 @@ const ReportsContent = () => {
         };
     };
 
-    const handleExportPDF = async () => {
-        if (!reportRef.current) return;
-        setFeedback({ isOpen: true, type: 'info', title: 'Gerando Relatório PCM Executivo', message: 'Compilando inteligência de dados e análise preditiva... Isso pode levar alguns segundos.' });
-
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
+    const generateExecutivePDF = async (forBase64 = false): Promise<jsPDF | string> => {
         try {
             const pdf = new jsPDF('p', 'mm', 'a4');
             const pageWidth = pdf.internal.pageSize.getWidth();
@@ -245,316 +240,358 @@ const ReportsContent = () => {
             const margin = 20;
             const contentWidth = pageWidth - (margin * 2);
 
-            // Layout Tokens (based on user request)
-            const ptsToMm = (pts: number) => pts * 0.3527;
-            const sizeTitle = 24;      // pt
-            const sizeSubtitle = 18;   // pt
-            const sizeSection = 15;    // pt
-            const sizeNormal = 11;     // pt
-            const sizeKPI = 32;        // pt
-            const spacingSection = 32; // mm (actually user said 32px, which is ~8.5mm, but 32mm is too big. User meant px. 32px is ~8.5mm)
+            // Helpers & Constants
             const pxToMm = (px: number) => px * 0.264583;
+            const BLUE_INSTITUTIONAL = [30, 58, 138];
+            const TEXT_DARK = [15, 23, 42];
+            const TEXT_GRAY = [100, 116, 139];
+            const BORDER_LIGHT = [226, 232, 240];
 
-            const gapS = pxToMm(32); // ~8.5mm
-            const gapM = pxToMm(16); // ~4.2mm
-            const gapInner = pxToMm(20);
-
-            // Helper for rounded cards
-            const drawCard = (x: number, y: number, w: number, h: number) => {
-                pdf.setDrawColor(226, 232, 240);
-                pdf.setFillColor(255, 255, 255);
-                pdf.roundedRect(x, y, w, h, 2, 2, 'FD');
-                // Subtle shadow effect (line)
-                pdf.setDrawColor(241, 245, 249);
-                pdf.line(x + 1, y + h + 0.5, x + w - 1, y + h + 0.5);
+            const captureChart = async (id: string) => {
+                const el = document.getElementById(id);
+                if (!el) return null;
+                const canvas = await html2canvas(el, {
+                    scale: 1.5,
+                    useCORS: true,
+                    backgroundColor: '#ffffff'
+                });
+                return canvas.toDataURL('image/jpeg', 0.8);
             };
 
-            const header = (title: string, subtitle?: string) => {
-                pdf.setFillColor(15, 23, 42); // Navy Blue
-                pdf.rect(0, 0, pageWidth, 55, 'F');
+            const loadLogo = async (url: string): Promise<string | null> => {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.crossOrigin = "Anonymous";
+                    img.onload = () => {
+                        const canvas = document.createElement("canvas");
+                        canvas.width = img.width;
+                        canvas.height = img.height;
+                        const ctx = canvas.getContext("2d");
+                        ctx?.drawImage(img, 0, 0);
+                        resolve(canvas.toDataURL("image/png"));
+                    };
+                    img.onerror = () => resolve(null);
+                    img.src = url;
+                });
+            };
 
-                // Main Title - Separated from Subtitle
-                pdf.setTextColor(255, 255, 255);
-                pdf.setFontSize(sizeTitle);
-                pdf.setFont('helvetica', 'bold');
+            const logoBase64 = settings.companyLogo ? await loadLogo(settings.companyLogo) : null;
 
-                // Auto line break for long titles
-                const splitTitle = pdf.splitTextToSize(title.toUpperCase(), contentWidth);
-                pdf.text(splitTitle, margin, 35);
+            // PAGE WRAPPERS (Header & Footer)
+            const drawInstitutionalHeader = () => {
+                const bannerH = 75; // Banner principal da capa
+                pdf.setFillColor(15, 23, 42); // Slate 900
+                pdf.rect(0, 0, pageWidth, bannerH, 'F');
 
-                if (subtitle) {
-                    const titleHeight = splitTitle.length * sizeTitle * 0.3527;
-                    pdf.setFontSize(sizeSubtitle);
-                    pdf.setFont('helvetica', 'normal');
-                    pdf.setTextColor(241, 158, 11); // Gold for emphasis
-                    pdf.text(subtitle, margin, 35 + titleHeight + 2);
+                // Lado Esquerdo: Logo e Nome da Empresa
+                if (logoBase64) {
+                    const logoW = 45; // Ampliada em 25% do original (35 -> ~44)
+                    const logoH = 18;
+                    pdf.addImage(logoBase64, 'PNG', margin, 15, logoW, logoH, undefined, 'FAST');
                 }
-            };
 
-            const footer = (pageNum: number) => {
+                pdf.setTextColor(255, 255, 255);
+                pdf.setFontSize(28);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text('INDICADORES', margin, 48);
+                pdf.text('ESTRATÉGICOS', margin, 60);
+
+                pdf.setFontSize(12);
+                pdf.setTextColor(245, 158, 11); // Amber 500
+                pdf.text(`Análise: ${periodTranslate[period] || period.toUpperCase()}`, margin, 70);
+
+                // Lado Direito: Metadados Institucionais (Vertical)
+                pdf.setTextColor(255, 255, 255);
                 pdf.setFontSize(8);
-                pdf.setTextColor(148, 163, 184);
-                pdf.text(`${settings.companyName} • Gestão de Ativos Inteligente`, margin, pageHeight - 12);
-                pdf.text(`Página ${pageNum}`, pageWidth - margin - 15, pageHeight - 12);
-                pdf.text(`Documento Gerencial Gerado em: ${new Date().toLocaleString('pt-BR')}`, margin, pageHeight - 8);
-            };
-
-            const sectionHeader = (text: string, y: number) => {
-                pdf.setFontSize(sizeSection);
-                pdf.setFont('helvetica', 'bold');
-                pdf.setTextColor(15, 23, 42);
-
-                // Allow line break for long section titles
-                const splitSecText = pdf.splitTextToSize(text.toUpperCase(), contentWidth);
-                pdf.text(splitSecText, margin, y);
-
-                const secHeight = splitSecText.length * sizeSection * 0.3527;
-                pdf.setDrawColor(241, 158, 11);
-                pdf.setLineWidth(0.8);
-                pdf.line(margin, y + secHeight + 1, margin + 25, y + secHeight + 1);
-                pdf.setLineWidth(0.2);
-                return y + secHeight + 5; // Return ending Y
-            };
-
-            // PAGE 1: COVER & EXECUTIVE SUMMARY
-            header('RESUMO EXECUTIVO DO PCM', `Período: ${periodTranslate[period]}`);
-
-            // Score Dashboard Summary Card
-            let currentY = 65;
-            drawCard(margin, currentY, contentWidth, 55);
-
-            pdf.setFontSize(sizeNormal);
-            pdf.setTextColor(100, 116, 139);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('SCORE GLOBAL DE PERFORMANCE (PCM)', pageWidth / 2, currentY + 12, { align: 'center' });
-
-            pdf.setFontSize(sizeKPI);
-            pdf.setTextColor(15, 23, 42);
-            pdf.text(stats.score.toFixed(1), pageWidth / 2, currentY + 30, { align: 'center' });
-
-            // Status Badge Centralized
-            const riskColor = stats.risk === 'Crítico' ? [239, 68, 68] : stats.risk === 'Atenção' ? [245, 158, 11] : [16, 185, 129];
-            pdf.setFillColor(riskColor[0], riskColor[1], riskColor[2]);
-            const badgeW = 40;
-            pdf.roundedRect(pageWidth / 2 - badgeW / 2, currentY + 38, badgeW, 8, 1, 1, 'F');
-            pdf.setTextColor(255, 255, 255);
-            pdf.setFontSize(10);
-            pdf.text(`STATUS: ${stats.risk.toUpperCase()}`, pageWidth / 2, currentY + 43.5, { align: 'center' });
-
-            currentY += 55 + gapS; // Spacing after card
-
-            // Dimension Scores - Grid 2x2
-            currentY = sectionHeader('SCORE POR DIMENSÃO', currentY);
-
-            const dims = [
-                { label: 'Confiabilidade de Ativos', value: stats.dimensions.reliability, desc: 'Saúde e disponibilidade física dos equipamentos.' },
-                { label: 'Eficiência Operacional', value: stats.dimensions.operational, desc: 'Cumprimento de prazos e fluxo de trabalho.' },
-                { label: 'Saúde Financeira', value: stats.dimensions.financial, desc: 'Controle de custos e ROI da manutenção.' },
-                { label: 'Alinhamento Estratégico', value: stats.dimensions.strategic, desc: 'Foco em ativos críticos e mitigação de falhas.' }
-            ];
-
-            const colW = (contentWidth - 10) / 2;
-            dims.forEach((d, i) => {
-                const row = Math.floor(i / 2);
-                const col = i % 2;
-                const x = margin + (col * (colW + 10));
-                const y = currentY + 5 + (row * 35);
-
-                drawCard(x, y, colW, 30);
-                pdf.setFontSize(10);
-                pdf.setTextColor(30, 41, 59);
-                pdf.setFont('helvetica', 'bold');
-                pdf.text(d.label, x + 5, y + 8);
-
-                // Progress Bar
-                pdf.setFillColor(241, 245, 249);
-                pdf.rect(x + 5, y + 12, colW - 10, 4, 'F');
-                pdf.setFillColor(15, 23, 42);
-                pdf.rect(x + 5, y + 12, ((colW - 10) * d.value) / 100, 4, 'F');
-
-                pdf.setFontSize(10);
-                pdf.text(`${d.value.toFixed(1)}%`, x + colW - 5, y + 8, { align: 'right' });
-
-                pdf.setFontSize(sizeNormal - 2);
-                pdf.setTextColor(100, 116, 139);
                 pdf.setFont('helvetica', 'normal');
-                const splitDesc = pdf.splitTextToSize(d.desc, colW - 10);
-                pdf.text(splitDesc, x + 5, y + 22);
-            });
+                const metaX = pageWidth - margin;
+                pdf.text(`${settings.companyName?.toUpperCase() || 'NOVO HORIZONTE'}`, metaX, 15, { align: 'right' });
+                pdf.text(`UNIDADE: MATRIZ OPERACIONAL`, metaX, 20, { align: 'right' });
+                pdf.text(`EMISSÃO: ${new Date().toLocaleDateString('pt-BR')}`, metaX, 25, { align: 'right' });
+            };
 
-            footer(1);
+            const drawInstitutionalFooter = (pagenum: number, total: number) => {
+                pdf.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+                pdf.setLineWidth(0.3);
+                pdf.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
 
-            // PAGE 2: STRATEGIC INDICATORS
-            pdf.addPage();
-            header('INDICADORES ESTRATÉGICOS', 'Análise de Tendência e Volume');
+                pdf.setFontSize(8);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(settings.companyName?.toUpperCase() || 'NOVO HORIZONTE', margin, pageHeight - 10);
+                pdf.text(`Relatório Gerencial de PCM - Página ${pagenum} de ${total}`, pageWidth - margin, pageHeight - 10, { align: 'right' });
+            };
 
-            let p2Y = 65;
-            p2Y = sectionHeader('EVOLUÇÃO TEMPORAL DE ATIVIDADES', p2Y);
-            const evolutionElement = document.getElementById('evolution-chart');
-            if (evolutionElement) {
-                const canvas = await html2canvas(evolutionElement, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, p2Y + 2, contentWidth, 70);
-            }
+            const drawSmallHeader = () => {
+                const headerH = 18;
+                pdf.setFillColor(BLUE_INSTITUTIONAL[0], BLUE_INSTITUTIONAL[1], BLUE_INSTITUTIONAL[2]);
+                pdf.rect(0, 0, pageWidth, headerH, 'F');
 
-            pdf.setFontSize(9);
-            pdf.setTextColor(100, 116, 139);
-            pdf.setFont('helvetica', 'italic');
-            pdf.text('Interpretação: Volume total de atividades no período filtrado. Flutuações indicam sazonalidade.', margin, p2Y + 76);
+                if (logoBase64) {
+                    const logoW = 32;
+                    const logoH = 12;
+                    pdf.addImage(logoBase64, 'PNG', margin, 3, logoW, logoH, undefined, 'FAST');
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(9);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(settings.companyName?.toUpperCase() || 'NOVO HORIZONTE', margin + 38, 11);
+                } else {
+                    pdf.setTextColor(255, 255, 255);
+                    pdf.setFontSize(10);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(settings.companyName?.toUpperCase() || 'NOVO HORIZONTE', margin, 11);
+                }
 
-            p2Y += 85 + gapS;
+                pdf.setFontSize(8);
+                pdf.setFont('helvetica', 'normal');
+                pdf.text(`ANÁLISE: ${periodTranslate[period] || period.toUpperCase()}`, pageWidth - margin, 11, { align: 'right' });
+            };
 
-            // Grid 2 Columns for detailed charts
-            p2Y = sectionHeader('DISTRIBUIÇÃO POR CATEGORIA E CRITICIDADE', p2Y);
-
-            const categoryElement = document.getElementById('category-chart');
-            if (categoryElement) {
-                const canvas = await html2canvas(categoryElement, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, p2Y + 2, (contentWidth / 2) - 5, 60);
-            }
-
-            // Technical Analysis Text
-            const analysisX = margin + (contentWidth / 2) + 5;
-            drawCard(analysisX, p2Y + 2, (contentWidth / 2) - 5, 60);
-            pdf.setFontSize(11);
-            pdf.setTextColor(15, 23, 42);
-            pdf.setFont('helvetica', 'bold');
-            pdf.text('ANÁLISE DE TENDÊNCIA:', analysisX + 5, p2Y + 10);
-
-            pdf.setFontSize(sizeNormal);
-            pdf.setFont('helvetica', 'normal');
-            pdf.setTextColor(51, 65, 85);
-            const ratioText = stats.current.preventiveRatio > 70
-                ? 'Equilíbrio saudável entre preventivas e corretivas.'
-                : 'Atenção: Volume de corretivas acima do ideal.';
-
-            const analysisLines = [
-                `• Ratio Preventiva: ${stats.current.preventiveRatio.toFixed(1)}%`,
-                `• Ratio Corretiva: ${stats.current.correctiveRatio.toFixed(1)}%`,
-                '',
-                pdf.splitTextToSize(ratioText, (contentWidth / 2) - 15)
-            ].flat();
-            pdf.text(analysisLines, analysisX + 5, p2Y + 18);
-
-            footer(2);
-
-            // PAGE 3: ASSETS & FINANCIAL
-            pdf.addPage();
-            header('ANÁLISE DE ATIVOS E FINANÇAS', 'Foco em Criticidade e Custos');
-
-            let p3Y = 65;
-            p3Y = sectionHeader('TOP 10 ATIVOS CRÍTICOS (INDISPONIBILIDADE)', p3Y);
-            const assetsElement = document.getElementById('assets-chart');
-            if (assetsElement) {
-                const canvas = await html2canvas(assetsElement, { scale: 3, useCORS: true, backgroundColor: '#ffffff' });
-                pdf.addImage(canvas.toDataURL('image/png'), 'PNG', margin, p3Y + 2, contentWidth, 75);
-            }
-
-            pdf.setFontSize(9);
-            pdf.setTextColor(100, 116, 139);
-            pdf.text('Legenda: Ativos organizados pelo total de horas de indisponibilidade acumulado.', margin, p3Y + 82);
-
-            p3Y += 92 + gapS;
-            p3Y = sectionHeader('CONTROLE FINANCEIRO E INVESTIMENTOS', p3Y);
-
-            const financialData = [
-                ['Total Bruto Investido', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.current.totalCost)],
-                ['Mão de Obra e Terceiros', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.current.laborCost)],
-                ['Peças, Insumos e Materiais', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.current.partsCost)],
-                ['Custo Médio por Ativo', new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(stats.current.avgCostPerAsset)]
-            ];
-
-            financialData.forEach((row, i) => {
-                const yPos = p3Y + 10 + (i * 12);
-                pdf.setFontSize(sizeNormal);
-                pdf.setTextColor(30, 41, 59);
-                pdf.setFont('helvetica', i === 0 ? 'bold' : 'normal');
-                pdf.text(row[0], margin + 5, yPos);
-
+            const drawPageTitle = (title: string, subtitle: string, yStart = 90) => {
+                pdf.setFontSize(22);
                 pdf.setFont('helvetica', 'bold');
-                pdf.text(row[1], pageWidth - margin - 5, yPos, { align: 'right' });
+                pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+                pdf.text(title.toUpperCase(), margin, yStart);
 
-                pdf.setDrawColor(241, 245, 249);
-                pdf.line(margin, yPos + 4, pageWidth - margin, yPos + 4);
-            });
+                pdf.setFontSize(11);
+                pdf.setFont('helvetica', 'normal');
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text(subtitle, margin, yStart + 8); // Aumentado distanciamento do subtítulo
+                return yStart + 22; // Aumentado distanciamento para o próximo elemento
+            };
 
-            footer(3);
+            const drawSectionHeader = (text: string, y: number) => {
+                pdf.setFontSize(10);
+                pdf.setFont('helvetica', 'bold');
+                pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+                pdf.text(text.toUpperCase(), margin, y);
+                pdf.setDrawColor(BLUE_INSTITUTIONAL[0], BLUE_INSTITUTIONAL[1], BLUE_INSTITUTIONAL[2]);
+                pdf.setLineWidth(0.5);
+                pdf.line(margin, y + 2, margin + 20, y + 2);
+                return y + 10;
+            };
 
-            // PAGE 4: PROJECTION & ACTION PLAN
-            pdf.addPage();
-            header('RISCO, PROJEÇÃO E PLANO DE AÇÃO', 'Diretrizes para o Próximo Ciclo');
+            const drawContentCard = (x: number, y: number, w: number, h: number, fill = [255, 255, 255]) => {
+                pdf.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+                pdf.setFillColor(fill[0], fill[1], fill[2]);
+                pdf.roundedRect(x, y, w, h, 2, 2, 'FD');
+            };
 
-            let p4Y = 65;
-            p4Y = sectionHeader('PROJEÇÃO E TENDÊNCIA FUTURA', p4Y);
+            // --- PAGE 1: COVER & SUMMARY ---
+            drawInstitutionalHeader();
+            let currentY = 95;
 
-            drawCard(margin, p4Y + 5, contentWidth, 45);
+            // Score Global Central Card
+            const scoreH = 50;
+            const riskColors: any = {
+                'Crítico': { bg: [254, 242, 242], text: [185, 28, 28], label: 'RISCO CRÍTICO' },
+                'Atenção': { bg: [255, 251, 235], text: [180, 83, 9], label: 'ALERTA / ATENÇÃO' },
+                'Estável': { bg: [240, 253, 244], text: [21, 128, 61], label: 'OPERAÇÃO ESTÁVEL' }
+            };
+            const theme = riskColors[stats.risk] || riskColors['Estável'];
 
-            pdf.setFontSize(11);
-            pdf.setTextColor(100, 116, 139);
+            drawContentCard(margin, currentY, contentWidth, scoreH, theme.bg);
+
+            pdf.setFontSize(36);
             pdf.setFont('helvetica', 'bold');
-            pdf.text('CONFIABILIDADE ESTIMADA (PRÓXIMO CICLO)', margin + 10, p4Y + 16);
+            pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+            pdf.text(stats.score.toFixed(1), margin + 15, currentY + 25);
 
-            pdf.setFontSize(sizeKPI);
-            pdf.setTextColor(15, 23, 42);
-            pdf.text(`${stats.projection.reliability.toFixed(1)}%`, margin + 10, p4Y + 36);
-
-            // Risk Highlight Box
-            pdf.setFillColor(241, 245, 249);
-            pdf.roundedRect(pageWidth - margin - 75, p4Y + 15, 65, 25, 1, 1, 'F');
-            pdf.setTextColor(100, 116, 139);
-            pdf.setFontSize(9);
-            pdf.text('RISCO ESTIMADO:', pageWidth - margin - 42.5, p4Y + 23, { align: 'center' });
+            pdf.setFontSize(10);
+            pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+            pdf.text('SCORE DE PERFORMANCE GLOBAL', margin + 15, currentY + 32);
 
             pdf.setFontSize(14);
-            pdf.setFont('helvetica', 'bold');
-            const pRiskColor = stats.projection.risk === 'Crítico' ? [239, 68, 68] : [15, 23, 42];
-            pdf.setTextColor(pRiskColor[0], pRiskColor[1], pRiskColor[2]);
-            pdf.text(stats.projection.risk.toUpperCase(), pageWidth - margin - 42.5, p4Y + 33, { align: 'center' });
-
-            p4Y += 55 + gapS;
-            p4Y = sectionHeader('PLANO DE AÇÃO AUTOMÁTICO ( PCM )', p4Y);
-
-            let actionItemY = p4Y + 5;
-            stats.actionPlan.forEach((action: string, i: number) => {
-                const splitAction = pdf.splitTextToSize(`${i + 1}. ${action}`, contentWidth - 20);
-
-                pdf.setFillColor(248, 250, 252);
-                const blockH = (splitAction.length * 5) + 8;
-
-                // Keep-together logic simple check
-                if (actionItemY + blockH > pageHeight - 70) {
-                    pdf.addPage();
-                    header('PLANO DE AÇÃO (CONT.)', 'Continuação das recomendações');
-                    actionItemY = 65;
-                }
-
-                pdf.roundedRect(margin, actionItemY, contentWidth, blockH, 1, 1, 'F');
-
-                pdf.setFontSize(sizeNormal);
-                pdf.setTextColor(51, 65, 85);
-                pdf.setFont('helvetica', 'normal');
-                pdf.text(splitAction, margin + 5, actionItemY + 7);
-
-                actionItemY += blockH + gapM;
-            });
-
-            // Signing area - Well spaced
-            const signY = pageHeight - 60;
-            pdf.setDrawColor(203, 213, 225);
-            pdf.line(margin + 20, signY, margin + 80, signY);
-            pdf.line(pageWidth - margin - 80, signY, pageWidth - margin - 20, signY);
+            pdf.setTextColor(theme.text[0], theme.text[1], theme.text[2]);
+            pdf.text(theme.label, pageWidth - margin - 15, currentY + 22, { align: 'right' });
 
             pdf.setFontSize(9);
-            pdf.setTextColor(100, 116, 139);
-            pdf.text('Responsável PCM', margin + 50, signY + 5, { align: 'center' });
-            pdf.text('Diretoria Industrial', pageWidth - margin - 50, signY + 5, { align: 'center' });
+            pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
 
-            footer(4);
+            const cleanText = stats.insights[0]?.text || 'Análise baseada em indicadores técnicos, financeiros e cumprimento de metas.';
+            const splitDesc = pdf.splitTextToSize(cleanText, (contentWidth / 2) - 30);
 
+            splitDesc.forEach((line: string, i: number) => {
+                // Aumentado Y start de 30 para 34, e line height de 4 para 5
+                pdf.text(line, pageWidth - margin - 15, currentY + 34 + (i * 5), { align: 'right' });
+            });
+
+            currentY += scoreH + 20; // Mais respiro antes do próximo grid
+
+            // Simple 4-column KPI Grid on Page 1
+            const kpiW = (contentWidth - 9) / 4;
+            const summaryKpis = [
+                { l: 'Total OS', v: stats.current.totalWO, c: [30, 58, 138] },
+                { l: 'Concluídas', v: stats.current.completedWO, c: [16, 185, 129] },
+                { l: 'Abertas', v: stats.current.openWO, c: [245, 158, 11] },
+                { l: 'Confiabilidade', v: `${stats.current.reliability?.toFixed(1)}%`, c: [79, 70, 229] }
+            ];
+
+            summaryKpis.forEach((k, i) => {
+                const x = margin + (i * (kpiW + 3));
+                drawContentCard(x, currentY, kpiW, 25);
+                pdf.setFontSize(8);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text(k.l.toUpperCase(), x + kpiW / 2, currentY + 8, { align: 'center' });
+                pdf.setFontSize(14);
+                pdf.setTextColor(k.c[0], k.c[1], k.c[2]);
+                pdf.setFont('helvetica', 'bold');
+                pdf.text(String(k.v), x + kpiW / 2, currentY + 18, { align: 'center' });
+            });
+
+            currentY += 40;
+            currentY = drawSectionHeader('Análise de Dimensões Estratégicas', currentY);
+            const dimW = (contentWidth - 10) / 2;
+            const dims = [
+                { label: 'Confiabilidade Técnica', val: stats.dimensions.reliability },
+                { label: 'Eficiência Operacional', val: stats.dimensions.operational },
+                { label: 'Saúde Financeira', val: stats.dimensions.financial },
+                { label: 'Alinhamento PCM', val: stats.dimensions.strategic }
+            ];
+
+            dims.forEach((d, i) => {
+                const ix = i % 2;
+                const iy = Math.floor(i / 2);
+                const x = margin + (ix * (dimW + 10));
+                const y = currentY + (iy * 25);
+                drawContentCard(x, y, dimW, 20);
+                pdf.setFontSize(9);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text(d.label, x + 5, y + 8);
+                pdf.setFontSize(12);
+                pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+                pdf.text(`${d.val.toFixed(1)}%`, x + dimW - 5, y + 13, { align: 'right' });
+                pdf.setFillColor(241, 245, 249);
+                pdf.rect(x + 5, y + 15, dimW - 10, 1.5, 'F');
+                pdf.setFillColor(BLUE_INSTITUTIONAL[0], BLUE_INSTITUTIONAL[1], BLUE_INSTITUTIONAL[2]);
+                pdf.rect(x + 5, y + 15, ((dimW - 10) * d.val) / 100, 1.5, 'F');
+            });
+
+            drawInstitutionalFooter(1, 4);
+
+            // --- PAGE 2: CHARTS & ANALYTICS ---
+            pdf.addPage();
+            drawSmallHeader();
+            let p2Y = 32;
+            p2Y = drawPageTitle('Análise de Tendências', 'Visão Detalhada de Evolução e Desempenho', p2Y);
+
+            p2Y = drawSectionHeader('Evolução das Ordens de Serviço', p2Y);
+            const evolutionImg = await captureChart('evolution-chart');
+            if (evolutionImg) {
+                pdf.addImage(evolutionImg, 'JPEG', margin, p2Y, contentWidth, 60);
+                p2Y += 70;
+            }
+
+            const chartCols = (contentWidth - 10) / 2;
+            p2Y = drawSectionHeader('Distribuição de Categorias e Ativos', p2Y);
+            const categoryImg = await captureChart('category-chart');
+            const assetsImg = await captureChart('assets-chart');
+            if (categoryImg) pdf.addImage(categoryImg, 'JPEG', margin, p2Y, chartCols, 50);
+            if (assetsImg) pdf.addImage(assetsImg, 'JPEG', margin + chartCols + 10, p2Y, chartCols, 50);
+
+            p2Y += 65;
+            p2Y = drawSectionHeader('Ativos Críticos (Downtime)', p2Y);
+            const barImg = await captureChart('bar-chart-assets');
+            if (barImg) pdf.addImage(barImg, 'JPEG', margin, p2Y, contentWidth, 50);
+
+            drawInstitutionalFooter(2, 4);
+
+            // --- PAGE 3: FINANCIAL & TECH KPIs ---
+            pdf.addPage();
+            drawSmallHeader();
+            let p3Y = 32;
+            p3Y = drawPageTitle('Gestão Técnica e Financeira', 'Eficiência de Custos e Prazos', p3Y);
+
+            p3Y = drawSectionHeader('Resumo de Custos do Período', p3Y);
+            const costs = [
+                { l: 'Investimento Total Bruto', v: stats.current.totalCost },
+                { l: 'Mão de Obra e Terceirizados', v: stats.current.laborCost },
+                { l: 'Peças e Insumos', v: stats.current.partsCost },
+                { l: 'Média de Custo por Ativo', v: stats.current.avgCostPerAsset }
+            ];
+
+            costs.forEach((c, i) => {
+                const y = p3Y + (i * 12);
+                pdf.setFontSize(10);
+                pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+                pdf.text(c.l, margin + 5, y + 7);
+                pdf.text(c.v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), pageWidth - margin - 5, y + 7, { align: 'right' });
+                pdf.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+                pdf.line(margin, y + 12, pageWidth - margin, y + 12);
+            });
+            p3Y += 60;
+
+            p3Y = drawSectionHeader('KPIs Técnicos de Manutenção', p3Y);
+            const techKpis = [
+                { l: 'MTTR (Tempo Reparo)', v: `${stats.current.mttr?.toFixed(1)}h`, d: 'Meta < 2.0h' },
+                { l: 'MTBF (Entre Falhas)', v: `${stats.current.mtbf?.toFixed(1)}h`, d: 'Intervalo Médio' },
+                { l: 'Backlog Atual', v: `${stats.current.backlogDays?.toFixed(1)}d`, d: 'Carga de Trabalho' },
+                { l: 'Taxa Preventiva', v: `${stats.current.preventiveRatio?.toFixed(1)}%`, d: 'Meta > 80%' }
+            ];
+
+            techKpis.forEach((k, i) => {
+                const ix = i % 2;
+                const iy = Math.floor(i / 2);
+                const x = margin + (ix * (dimW + 10));
+                const y = p3Y + (iy * 30);
+                drawContentCard(x, y, dimW, 25);
+                pdf.setFontSize(9);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text(k.l, x + 5, y + 8);
+                pdf.setFontSize(16);
+                pdf.setTextColor(BLUE_INSTITUTIONAL[0], BLUE_INSTITUTIONAL[1], BLUE_INSTITUTIONAL[2]);
+                pdf.text(k.v, x + 5, y + 18);
+                pdf.setFontSize(8);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text(k.d, x + dimW - 5, y + 18, { align: 'right' });
+            });
+
+            drawInstitutionalFooter(3, 4);
+
+            // --- PAGE 4: PLANO DE AÇÃO ---
+            pdf.addPage();
+            drawSmallHeader();
+            let p4Y = 32;
+            p4Y = drawPageTitle('Estratégia e Plano de Ação', 'Direcionamento Operacional Próximo Ciclo', p4Y);
+
+            p4Y = drawSectionHeader('Diagnóstico de Inteligência (PCM)', p4Y);
+            const insightText = stats.insights.map((i: any) => i.text).join('\n\n');
+            pdf.setFontSize(10);
+            pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+            const splitInsight = pdf.splitTextToSize(insightText, contentWidth - 10);
+            drawContentCard(margin, p4Y, contentWidth, (splitInsight.length * 6) + 10, [248, 250, 252]);
+            pdf.text(splitInsight, margin + 5, p4Y + 10);
+
+            p4Y += (splitInsight.length * 6) + 25;
+            p4Y = drawSectionHeader('Ações Recomendadas', p4Y);
+
+            stats.actionPlan.forEach((action: string, i: number) => {
+                const text = `${i + 1}. ${action}`;
+                const splitAction = pdf.splitTextToSize(text, contentWidth - 15);
+                const h = (splitAction.length * 6) + 5;
+                drawContentCard(margin, p4Y, contentWidth, h);
+                pdf.text(splitAction, margin + 5, p4Y + 8);
+                p4Y += h + 5;
+            });
+
+            drawInstitutionalFooter(4, 4);
+
+            if (forBase64) return pdf.output('datauristring').split(',')[1];
+            return pdf;
+        } catch (error) {
+            console.error('PDF Generation Error:', error);
+            throw error;
+        }
+    };
+
+    const handleExportPDF = async () => {
+        setFeedback({ isOpen: true, type: 'info', title: 'Gerando Relatório PCM Executivo', message: 'Compilando inteligência de dados... Aguarde.' });
+        try {
+            const pdf = await generateExecutivePDF() as jsPDF;
             pdf.save(`NH_CMMS_Relatorio_Executivo_${periodTranslate[period]}_${new Date().toISOString().split('T')[0]}.pdf`);
             setFeedback({ isOpen: true, type: 'success', title: 'Relatório Gerado!', message: 'O arquivo PDF foi baixado com sucesso.' });
         } catch (error) {
-            console.error('PDF Error:', error);
-            setFeedback({ isOpen: true, type: 'error', title: 'Falha na Geração', message: 'Ocorreu um erro ao gerar o PDF. Verifique o console para mais detalhes.' });
+            setFeedback({ isOpen: true, type: 'error', title: 'Falha na Geração', message: 'Houve um problema ao gerar o PDF.' });
         }
     };
 
@@ -563,15 +600,19 @@ const ReportsContent = () => {
         setFeedback({
             isOpen: true,
             type: 'info',
-            title: 'Enviando ao Board',
-            message: 'Iniciando canal de comunicação estratégica... Aguarde.'
+            title: 'Enviando Relatório',
+            message: 'Preparando e enviando dados para a diretoria... Aguarde.'
         });
 
         try {
+            // Generate PDF as base64 for attachment
+            const pdfBase64 = await generateExecutivePDF(true) as string;
+
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
                     event: 'executive_report_manual',
                     company: settings.companyName,
+                    pdf_attachment: pdfBase64,
                     reportData: {
                         period: periodTranslate[period] || period.toUpperCase(),
                         company_name: settings.companyName,
@@ -590,6 +631,8 @@ const ReportsContent = () => {
                         projection: stats.projection,
                         insights: stats.insights,
                         actionPlan: stats.actionPlan,
+                        category: categoryFilter === 'ALL' ? 'Todas' : categoryFilter,
+                        company_logo: settings.companyLogo,
                         timestamp: new Date().toISOString()
                     }
                 }
@@ -601,15 +644,15 @@ const ReportsContent = () => {
             setFeedback({
                 isOpen: true,
                 type: 'success',
-                title: 'Canal Executivo Ativado',
-                message: 'O relatório foi transmitido com sucesso para a diretoria.'
+                title: 'Relatório Enviado com Sucesso',
+                message: 'O documento foi transmitido para a diretoria e deve chegar em instantes.'
             });
         } catch (error: any) {
             console.error('Send error:', error);
             setFeedback({
                 isOpen: true,
                 type: 'error',
-                title: 'Falha na Transmissão',
+                title: 'Falha no Envio',
                 message: `Não foi possível enviar o relatório: ${error.message || 'Verifique sua conexão e configurações de e-mail.'}`
             });
         }
@@ -958,8 +1001,8 @@ const ReportsContent = () => {
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={chartData.temporalEvolution}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <XAxis dataKey="name" hide />
-                                    <YAxis hide />
+                                    <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#64748b' }} />
+                                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} />
                                     <Tooltip />
                                     <Line type="monotone" dataKey="total" stroke="#137fec" strokeWidth={3} dot={{ r: 4, fill: '#137fec' }} activeDot={{ r: 6 }} isAnimationActive={false} />
                                 </LineChart>
@@ -996,9 +1039,9 @@ const ReportsContent = () => {
                             <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-widest mb-6 px-1">Ativos Críticos (Downtime)</h4>
                             <div className="h-[200px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={chartData.topProblematicAssets} layout="vertical">
+                                    <BarChart data={chartData.topProblematicAssets} layout="vertical" margin={{ left: 30, right: 30 }}>
                                         <XAxis type="number" hide />
-                                        <YAxis dataKey="name" type="category" hide />
+                                        <YAxis dataKey="name" type="category" width={100} tick={{ fontSize: 9, fontWeight: 700, fill: '#334155' }} />
                                         <Tooltip />
                                         <Bar dataKey="hours" fill="#f43f5e" radius={[0, 4, 4, 0]} barSize={12} label={{ position: 'right', fontSize: 10, fontWeight: 900 }} isAnimationActive={false} />
                                     </BarChart>

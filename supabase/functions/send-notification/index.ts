@@ -82,9 +82,38 @@ serve(async (req: Request) => {
         let adminPhones: string[] = [];
 
         if (event === 'executive_report_manual') {
-            // Use configured board emails for the strategic report
-            if (settings.board_emails) {
+            // Priority 1: Configured board emails
+            if (settings.board_emails && settings.board_emails.trim() !== '') {
                 adminEmails = settings.board_emails.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
+            }
+
+            // Priority 2: Fallback to all administrators if board_emails is empty
+            if (adminEmails.length === 0) {
+                const { data: adminUsers } = await supabaseAdmin
+                    .from('users')
+                    .select('id, email, email_notifications')
+                    .in('role', ['admin_root', 'admin'])
+
+                if (adminUsers && adminUsers.length > 0) {
+                    const adminIds = adminUsers.map((u: any) => u.id);
+                    const { data: profiles } = await supabaseAdmin
+                        .from('user_profiles')
+                        .select('id, email')
+                        .in('id', adminIds);
+
+                    const profileMap = new Map(profiles?.map((p: any) => [p.id, p]));
+                    const uniqueEmails = new Set<string>();
+
+                    adminUsers.forEach((user: any) => {
+                        const emailEnabled = user.email_notifications ?? true;
+                        if (emailEnabled) {
+                            const profile = profileMap.get(user.id) as any;
+                            const email = (profile && typeof profile === 'object' && 'email' in profile && profile.email && profile.email.trim() !== '') ? profile.email : user.email;
+                            if (email && email.trim() !== '') uniqueEmails.add(email);
+                        }
+                    });
+                    adminEmails = Array.from(uniqueEmails);
+                }
             }
         } else {
             // Fetch Admin(s) for standard work order notifications
@@ -114,17 +143,17 @@ serve(async (req: Request) => {
 
                     if (!hasCategoryPermission) return;
 
-                    const profile = profileMap.get(user.id);
+                    const profile = profileMap.get(user.id) as any;
 
                     const emailEnabled = user.email_notifications ?? true;
                     if (emailEnabled) {
-                        const email = (profile?.email && profile.email.trim() !== '') ? profile.email : user.email;
+                        const email = (profile && typeof profile === 'object' && 'email' in profile && profile.email && profile.email.trim() !== '') ? profile.email : user.email;
                         if (email && email.trim() !== '') uniqueEmails.add(email);
                     }
 
                     const whatsappEnabled = user.whatsapp_notifications ?? false;
                     if (whatsappEnabled) {
-                        const rawPhone = (profile?.phone && profile.phone.trim() !== '') ? profile.phone : user.phone;
+                        const rawPhone = (profile && typeof profile === 'object' && 'phone' in profile && profile.phone && profile.phone.trim() !== '') ? profile.phone : user.phone;
                         const formattedPhone = formatPhone(rawPhone);
                         if (formattedPhone) uniquePhones.add(formattedPhone);
                     }
@@ -323,6 +352,7 @@ serve(async (req: Request) => {
                 company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,
                 reportData: reportData, // Inclusion of report data
+                pdf_attachment: body.pdf_attachment,
                 preferences: {
                     requester: requesterPreferences
                 },
