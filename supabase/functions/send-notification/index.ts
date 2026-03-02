@@ -301,7 +301,17 @@ serve(async (req: Request) => {
             }
         }
 
-        const response = await fetch(settings.webhook_url, {
+        let finalWebhookUrl = settings.webhook_url;
+        if (event === 'executive_report_manual') {
+            // Derive the reports webhook URL from the base URL. 
+            // Standard is .../webhook/cmms-webhook, reports is .../webhook/executive-report-manual
+            const lastSlashIndex = settings.webhook_url.lastIndexOf('/');
+            const baseUrl = settings.webhook_url.substring(0, lastSlashIndex + 1);
+            finalWebhookUrl = baseUrl + 'executive-report-manual';
+            console.log(`Routing executive report to: ${finalWebhookUrl}`);
+        }
+
+        const response = await fetch(finalWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
