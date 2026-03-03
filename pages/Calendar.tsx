@@ -79,6 +79,8 @@ interface CalendarEvent {
 
 export const STATUS_COLORS: Record<string, { color: string; bgColor: string; borderColor: string }> = {
   'Pendente': { color: 'text-amber-600', bgColor: 'bg-amber-100', borderColor: 'border-amber-200' },
+  'Recebido': { color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200' },
+  'Agendado': { color: 'text-teal-600', bgColor: 'bg-teal-100', borderColor: 'border-teal-200' },
   'Em Manutenção': { color: 'text-primary', bgColor: 'bg-blue-100', borderColor: 'border-primary-light/20' },
   'Concluído': { color: 'text-emerald-600', bgColor: 'bg-emerald-100', borderColor: 'border-emerald-200' },
   'Cancelado': { color: 'text-slate-600', bgColor: 'bg-slate-100', borderColor: 'border-slate-200' },

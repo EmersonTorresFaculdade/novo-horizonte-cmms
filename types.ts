@@ -12,9 +12,9 @@ export interface WorkOrder {
   technicianAvatar?: string;
   date: string;
   sector: string;
-  failure_type: string;
+  failure_type: 'Mecânica' | 'Elétrica' | 'Hidráulica' | 'Pneumática' | 'Estrutural' | 'Automação' | 'Geral';
   technical_report?: string;
-  maintenance_type?: 'Preventiva' | 'Corretiva' | 'Preditiva';
+  maintenance_type?: 'Corretiva' | 'Preventiva' | 'Preditiva' | 'Inspeção';
   response_hours?: number;
   estimated_hours?: number;
   parts_cost?: number;

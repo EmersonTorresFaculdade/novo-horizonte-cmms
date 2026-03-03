@@ -546,8 +546,9 @@ const Assets = () => {
                         asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-purple-50 text-purple-600 border-purple-200' :
                           asset.status === 'Crítico' ? 'bg-red-50 text-red-600 border-red-200' :
                             asset.status === 'Recebido' ? 'bg-blue-50 text-blue-600 border-blue-200' :
-                              asset.status === 'Pendente' ? 'bg-amber-50 text-amber-600 border-amber-200' :
-                                'bg-slate-100 text-slate-600 border-slate-200'
+                              asset.status === 'Agendado' ? 'bg-teal-50 text-teal-600 border-teal-200' :
+                                asset.status === 'Pendente' ? 'bg-amber-50 text-amber-600 border-amber-200' :
+                                  'bg-slate-100 text-slate-600 border-slate-200'
                         }`}>
                         {asset.status}
                       </span>

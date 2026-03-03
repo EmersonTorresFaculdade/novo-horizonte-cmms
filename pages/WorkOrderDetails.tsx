@@ -82,6 +82,7 @@ interface WorkOrder {
    parts_cost?: number;
    responded_at?: string;
    resolved_at?: string;
+   scheduled_at?: string;
 }
 
 interface Technician {
@@ -137,6 +138,16 @@ const WorkOrderDetails = () => {
    const [selectedTechId, setSelectedTechId] = useState('');
    const [report, setReport] = useState('');
    const [hourlyRate, setHourlyRate] = useState<number>(0);
+   const [scheduledAt, setScheduledAt] = useState<string>('');
+
+   // Funções Auxiliares
+   const formatToLocalISO = (dateStr: string) => {
+      if (!dateStr) return '';
+      const date = new Date(dateStr);
+      // Ajusta para o fuso horário local subtraindo o offset em minutos convertido para ms
+      const localDate = new Date(date.getTime() - (date.getTimezoneOffset() * 60000));
+      return localDate.toISOString().slice(0, 16);
+   };
 
    // Helpers para tempos individuais da OS
    const formatDuration = (ms: number) => {
@@ -247,12 +258,13 @@ const WorkOrderDetails = () => {
             }
          );
 
-         const data = await res.json();
          if (res.ok) {
-            console.log('DEBUG: Activity logged successfully:', data);
+            console.log('DEBUG: Activity logged successfully');
             fetchActivities();
          } else {
-            console.error('SUPABASE LOG ACTIVITY ERROR:', data);
+            const errorText = await res.text();
+            console.warn('SUPABASE LOG ACTIVITY WARN:', errorText);
+            // Non-critical failure, don't throw
          }
       } catch (error) {
          console.error('Error logging activity:', error);
@@ -336,6 +348,7 @@ const WorkOrderDetails = () => {
          setHourlyRate(workOrderData.hourly_rate || 0);
 
          setPartsCost(Number((workOrderData as any).parts_cost) || 0);
+         setScheduledAt((workOrderData as any).scheduled_at || '');
 
          if (workOrderData.technician_id) setSelectedTechId(workOrderData.technician_id);
          else if ((workOrderData as any).third_party_company_id) setSelectedTechId((workOrderData as any).third_party_company_id);
@@ -494,11 +507,27 @@ const WorkOrderDetails = () => {
 
          // SLA Updates
          let slaUpdates: any = {};
+         let finalScheduledAt = scheduledAt || null;
+
          if (!workOrder?.responded_at && status === 'Em Manutenção') {
             slaUpdates.responded_at = now.toISOString();
+            // Auto-fill scheduled_at when going directly to Em Manutenção without scheduling
+            if (!finalScheduledAt) {
+               finalScheduledAt = now.toISOString();
+            }
          }
          if (!workOrder?.resolved_at && status === 'Concluído') {
             slaUpdates.resolved_at = now.toISOString();
+            // Also auto-fill scheduled_at if it was never set
+            if (!finalScheduledAt) {
+               finalScheduledAt = now.toISOString();
+            }
+         }
+
+         // Auto-set status to Agendado when a date is picked but status is still Pendente/Recebido
+         let finalStatus = status;
+         if (finalScheduledAt && (status === 'Pendente' || status === 'Recebido')) {
+            finalStatus = 'Agendado';
          }
 
          const selectedEntity = technicians.find(t => t.id === selectedTechId);
@@ -509,7 +538,7 @@ const WorkOrderDetails = () => {
             .update({
                technician_id: isThirdParty === false ? selectedTechId : null,
                third_party_company_id: isThirdParty === true ? selectedTechId : null,
-               status: status,
+               status: finalStatus,
                issue: editIssue,
                priority: editPriority,
                failure_type: editFailureType,
@@ -522,6 +551,7 @@ const WorkOrderDetails = () => {
                repair_hours: finalRepairHours,
                downtime_hours: finalDowntimeHours,
                parts_cost: calculatedPartsCost,
+               scheduled_at: finalScheduledAt,
                updated_at: now.toISOString(),
                ...slaUpdates
             } as any)
@@ -530,38 +560,47 @@ const WorkOrderDetails = () => {
          if (error) throw error;
 
          // Registrar logs de mudança
-         if (workOrder?.status !== status) {
-            await logActivity('status_change', `alterou o status para ${status}`);
+         const isStatusChanged = workOrder?.status !== finalStatus;
+         const isScheduleChanged = workOrder?.scheduled_at !== finalScheduledAt;
+
+         if (isStatusChanged) {
+            await logActivity('status_change', `alterou o status para ${finalStatus}`);
+            setStatus(finalStatus);
+         }
+
+         if (isScheduleChanged && finalStatus === 'Agendado') {
+            const formattedDate = finalScheduledAt ? new Date(finalScheduledAt).toLocaleString('pt-BR') : 'remover data';
+            await logActivity('system', `atualizou o agendamento para ${formattedDate}`);
          }
 
          const currentTechName = technicians.find(t => t.id === selectedTechId)?.name;
+
          if (workOrder?.technician_id !== selectedTechId) {
             await logActivity('assignment', `designou ${currentTechName || 'Nenhum'}`);
          }
 
-         // Notificar sobre atualização
-         if (workOrder) {
+         // Notificar sobre atualização - Agora dispara se status mudou OU se o agendamento mudou (para Agendado)
+         if (workOrder && (isStatusChanged || (isScheduleChanged && finalStatus === 'Agendado'))) {
             await NotificationService.notifyWorkOrderUpdated({
                id: workOrder.id,
                title: `Atualização OS: ${workOrder.order_number}`,
                description: editIssue,
                priority: editPriority,
-               status: status,
+               status: finalStatus,
                assetId: workOrder.asset_id,
                locationId: '',
                assignedTo: selectedTechId || undefined,
                technicianName: currentTechName || 'Aguardando',
                requesterId: workOrder.requester_id || undefined,
-               // Garantir compatibilidade com o que a Edge Function espera
                asset_id: workOrder.asset_id,
                requester_id: workOrder.requester_id,
                technical_report: report,
                maintenance_type: editMaintenanceType,
-               estimated_hours: 0
+               estimated_hours: 0,
+               scheduled_at: finalScheduledAt
             } as any);
          }
 
-         // Mostra o modal de sucesso com visual premium
          setFeedback({
             type: 'success',
             title: 'Salvo com Sucesso!',
@@ -569,7 +608,6 @@ const WorkOrderDetails = () => {
             showLoading: true
          });
 
-         // Redireciona após 2.5 segundos
          setTimeout(() => {
             navigate('/work-orders');
          }, 2500);
@@ -641,11 +679,21 @@ const WorkOrderDetails = () => {
    const statusSteps = [
       { id: 'Pendente', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
       { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-teal-600', bg: 'bg-teal-50' },
       { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-purple-600', bg: 'bg-purple-50' },
       { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' }
    ];
 
-   const currentStepIndex = statusSteps.findIndex(s => s.id === status);
+   // Custom timeline logic: Agendado is determined by scheduled_at, not by status directly
+   const getTimelineIndex = () => {
+      const statusIdx = statusSteps.findIndex(s => s.id === status);
+      // If status is not Agendado but scheduled_at exists, ensure Agendado step shows as done
+      if (status === 'Em Manutenção' || status === 'Concluído') return statusIdx;
+      if (status === 'Agendado') return 2;
+      if (scheduledAt && (status === 'Pendente' || status === 'Recebido')) return 2; // Show as Agendado
+      return statusIdx;
+   };
+   const currentStepIndex = getTimelineIndex();
 
    if (loading) return <div className="p-8 text-center flex flex-col items-center gap-4">
       <Loader2 className="animate-spin text-primary" size={32} />
@@ -716,7 +764,7 @@ const WorkOrderDetails = () => {
                   {/* Background Line */}
                   <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-100 -translate-y-1/2 hidden md:block"></div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-2 relative z-10">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-2 relative z-10">
                      {statusSteps.map((step, idx) => {
                         const isLast = idx === statusSteps.length - 1;
                         // Mais simples:
@@ -767,33 +815,104 @@ const WorkOrderDetails = () => {
                      </div>
 
                      <div className="p-8">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 mb-10">
-                           <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ID do Ativo</p>
-                              <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
+                        {isEditing ? (
+                           <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                 <div className="space-y-2">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição do Problema</label>
+                                    <textarea
+                                       value={editIssue}
+                                       onChange={(e) => setEditIssue(e.target.value)}
+                                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all min-h-[100px]"
+                                       placeholder="Descreva o problema..."
+                                    />
+                                 </div>
+                                 <div className="space-y-4">
+                                    <div className="space-y-2">
+                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prioridade</label>
+                                       <div className="flex flex-wrap gap-2">
+                                          {['Baixa', 'Média', 'Alta', 'Crítica'].map((p) => (
+                                             <button
+                                                key={p}
+                                                type="button"
+                                                onClick={() => setEditPriority(p)}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${editPriority === p
+                                                      ? 'bg-primary text-white border-primary shadow-md'
+                                                      : 'bg-white text-slate-500 border-slate-200 hover:border-primary/30'
+                                                   }`}
+                                             >
+                                                {p}
+                                             </button>
+                                          ))}
+                                       </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                       <div className="space-y-2">
+                                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo de Serviço</label>
+                                          <select
+                                             value={editMaintenanceType}
+                                             onChange={(e) => setEditMaintenanceType(e.target.value)}
+                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary appearance-none cursor-pointer"
+                                          >
+                                             <option value="Corretiva">Corretiva</option>
+                                             <option value="Preventiva">Preventiva</option>
+                                             <option value="Preditiva">Preditiva</option>
+                                             <option value="Inspeção">Inspeção</option>
+                                          </select>
+                                       </div>
+                                       <div className="space-y-2">
+                                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Classificação</label>
+                                          <select
+                                             value={editFailureType}
+                                             onChange={(e) => setEditFailureType(e.target.value)}
+                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary appearance-none cursor-pointer"
+                                          >
+                                             <option value="Mecânica">Mecânica</option>
+                                             <option value="Elétrica">Elétrica</option>
+                                             <option value="Hidráulica">Hidráulica</option>
+                                             <option value="Pneumática">Pneumática</option>
+                                             <option value="Estrutural">Estrutural</option>
+                                             <option value="Automação">Automação</option>
+                                             <option value="Geral">Geral</option>
+                                          </select>
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
                            </div>
-                           <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Localização</p>
-                              <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
-                           </div>
-                           <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Categoria</p>
-                              <p className="text-sm font-bold text-slate-700 capitalize">
-                                 {workOrder.maintenance_category || 'Geral'}
-                              </p>
-                           </div>
-                           <div>
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Problema</p>
-                              <p className="text-sm font-bold text-slate-700 capitalize">{workOrder.failure_type || 'Geral'}</p>
-                           </div>
-                        </div>
+                        ) : (
+                           <>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 mb-10">
+                                 <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ID do Ativo</p>
+                                    <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
+                                 </div>
+                                 <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Localização</p>
+                                    <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
+                                 </div>
+                                 <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Categoria</p>
+                                    <p className="text-sm font-bold text-slate-700 capitalize">
+                                       {workOrder.maintenance_category || 'Geral'}
+                                    </p>
+                                 </div>
+                                 <div>
+                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço / Classificação</p>
+                                    <p className="text-sm font-bold text-slate-700">
+                                       {workOrder.maintenance_type || 'Corretiva'} / {workOrder.failure_type || 'Geral'}
+                                    </p>
+                                 </div>
+                              </div>
 
-                        <div className="space-y-4">
-                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Descrição</p>
-                           <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed min-h-[100px]">
-                              {workOrder.issue}
-                           </div>
-                        </div>
+                              <div className="space-y-4">
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Descrição</p>
+                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed min-h-[100px]">
+                                    {workOrder.issue}
+                                 </div>
+                              </div>
+                           </>
+                        )}
                      </div>
                   </div>
 
@@ -812,12 +931,14 @@ const WorkOrderDetails = () => {
                            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase border
                                ${status === 'Pendente' ? 'bg-slate-50 text-slate-600 border-slate-200' :
                                  status === 'Recebido' ? 'bg-blue-50 text-blue-700 border-primary-light/20' :
-                                    status === 'Em Manutenção' ? 'bg-amber-50 text-amber-700 border-amber-200' :
-                                       status === 'Cancelado' ? 'bg-slate-900 text-white border-slate-900' :
-                                          'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
+                                    status === 'Agendado' ? 'bg-teal-50 text-teal-700 border-teal-200' :
+                                       status === 'Em Manutenção' ? 'bg-purple-50 text-purple-700 border-purple-200' :
+                                          status === 'Cancelado' ? 'bg-slate-900 text-white border-slate-900' :
+                                             'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
                         >
                            <option value="Pendente">Pendente</option>
                            <option value="Recebido">Recebido</option>
+                           {status === 'Agendado' && <option value="Agendado">Agendado</option>}
                            <option value="Em Manutenção">Em Manutenção</option>
                            <option value="Concluído">Concluído</option>
                         </select>
@@ -880,6 +1001,50 @@ const WorkOrderDetails = () => {
                                     ]}
                                  />
                               </div>
+                           </div>
+
+                           {/* Agendamento de Manutenção */}
+                           <div className="space-y-4">
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                 <Calendar size={12} className="text-teal-500" />
+                                 Agendar Manutenção
+                              </p>
+                              <div className="relative">
+                                 <input
+                                    type="datetime-local"
+                                    value={formatToLocalISO(scheduledAt)}
+                                    onChange={(e) => {
+                                       const val = e.target.value;
+                                       if (val) {
+                                          setScheduledAt(new Date(val).toISOString());
+                                          if (status === 'Recebido' || status === 'Pendente') {
+                                             setStatus('Agendado');
+                                          }
+                                       } else {
+                                          setScheduledAt('');
+                                       }
+                                    }}
+                                    disabled={isConcluded || !isAdmin}
+                                    className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-teal-400 transition-all shadow-sm focus:ring-4 focus:ring-teal-500/5"
+                                 />
+                              </div>
+                              {scheduledAt && (
+                                 <div className="flex items-center gap-2 p-2.5 bg-teal-50 border border-teal-100 rounded-xl">
+                                    <Calendar size={14} className="text-teal-600 shrink-0" />
+                                    <p className="text-[11px] font-bold text-teal-700">
+                                       Agendada para {new Date(scheduledAt).toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })} às {new Date(scheduledAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                    </p>
+                                    {!isConcluded && isAdmin && (
+                                       <button
+                                          onClick={() => { setScheduledAt(''); if (status === 'Agendado') setStatus('Recebido'); }}
+                                          className="ml-auto text-teal-400 hover:text-red-500 transition-colors shrink-0"
+                                          title="Remover agendamento"
+                                       >
+                                          <X size={14} />
+                                       </button>
+                                    )}
+                                 </div>
+                              )}
                            </div>
 
                            <div className="grid grid-cols-2 gap-4">

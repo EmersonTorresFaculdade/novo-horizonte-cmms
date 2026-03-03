@@ -108,8 +108,9 @@ const WorkOrderTable = ({ orders }: { orders: any[] }) => {
             <td className="px-6 py-4">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${order.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
                 order.status === 'Recebido' ? 'bg-blue-100 text-blue-700' :
-                  order.status === 'Em Manutenção' ? 'bg-purple-100 text-purple-700' :
-                    'bg-orange-100 text-orange-700'
+                  order.status === 'Agendado' ? 'bg-teal-100 text-teal-700' :
+                    order.status === 'Em Manutenção' ? 'bg-purple-100 text-purple-700' :
+                      'bg-orange-100 text-orange-700'
                 }`}>
                 {order.status}
               </span>
@@ -308,11 +309,12 @@ const Dashboard = () => {
         const cat = assetMap[o.asset_id]?.categoria || o.maintenance_category || '';
         const rawType = (o.failure_type || o.type || o.maintenance_type || 'N/A').trim().toLowerCase();
 
-        // 2. Map Maintenance Types (Mecanica -> Máquinas, Outro -> Outros)
+        // 2. Map Maintenance Types (Standardize display names if needed)
         let displayType = 'Outros';
-        if (rawType.includes('mecanica') || rawType === 'maquinas' || isInd(cat)) {
+        const type = rawType.toLowerCase();
+        if (type.includes('mecanica') || type === 'máquina' || type === 'maquina' || isInd(cat)) {
           displayType = 'Máquinas';
-        } else if (rawType.includes('predial') || rawType.includes('preditivo') || rawType.includes('preditiva') || isPre(cat)) {
+        } else if (type.includes('predial') || type.includes('preditivo') || type.includes('preditiva') || isPre(cat)) {
           displayType = 'Predial';
         }
 

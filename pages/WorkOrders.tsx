@@ -205,6 +205,8 @@ const WorkOrders = () => {
       colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
     } else if (s === 'em manutenção' || s === 'manutenção') {
       colorClass = 'bg-purple-50 text-purple-700 border-purple-200';
+    } else if (s === 'agendado') {
+      colorClass = 'bg-teal-50 text-teal-700 border-teal-200';
     } else if (s === 'recebido') {
       colorClass = 'bg-blue-50 text-blue-600 border-blue-200';
     } else if (s === 'aguardando peça' || s === 'aguardando') {

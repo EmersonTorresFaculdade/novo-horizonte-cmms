@@ -54,7 +54,7 @@ const NewWorkOrder = () => {
   const [issueDescription, setIssueDescription] = useState('');
   const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta' | 'Crítica'>('Média');
   const [failureType, setFailureType] = useState('mecanica');
-  const [maintenanceType, setMaintenanceType] = useState<'Preventiva' | 'Corretiva' | 'Preditiva'>('Corretiva');
+  const [maintenanceType, setMaintenanceType] = useState<'Corretiva' | 'Preventiva' | 'Preditiva' | 'Inspeção'>('Corretiva');
   const [maintenanceCategory, setMaintenanceCategory] = useState<'Equipamento' | 'Predial' | 'Outros'>('Equipamento');
 
   // Quick Asset Registration State
@@ -505,7 +505,7 @@ const NewWorkOrder = () => {
             </h3>
 
             <div className="flex flex-wrap gap-3">
-              {['Corretiva', 'Preventiva', 'Preditiva'].map(type => (
+              {['Corretiva', 'Preventiva', 'Preditiva', 'Inspeção'].map(type => (
                 <button
                   key={type}
                   type="button"
@@ -515,7 +515,7 @@ const NewWorkOrder = () => {
                     : 'bg-white text-slate-600 border border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                     }`}
                 >
-                  {type === 'Preditiva' ? 'Inspeção' : type}
+                  {type}
                 </button>
               ))}
             </div>
@@ -527,10 +527,13 @@ const NewWorkOrder = () => {
                 onChange={(e) => setFailureType(e.target.value)}
                 className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:bg-white transition-all font-medium"
               >
-                <option value="mecanica">Máquinas</option>
-                <option value="eletrica">Elétrica</option>
-                <option value="hidraulica">Hidráulica</option>
-                <option value="outro">Geral</option>
+                <option value="Mecânica">Mecânica</option>
+                <option value="Elétrica">Elétrica</option>
+                <option value="Hidráulica">Hidráulica</option>
+                <option value="Pneumática">Pneumática</option>
+                <option value="Estrutural">Estrutural</option>
+                <option value="Automação">Automação</option>
+                <option value="Geral">Geral</option>
               </select>
             </div>
           </div>

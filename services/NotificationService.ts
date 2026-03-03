@@ -33,14 +33,16 @@ export const NotificationService = {
 
     async sendWebhook(event: string, workOrder: WorkOrderPayload, adminName?: string) {
         try {
-            // Get current user session for Authorization
+            // Get session if available, but don't strictly block (Edge Function might have its own auth check or be public)
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                console.warn('No active session, cannot invoke Edge Function');
-                return;
-            }
 
-            console.log(`Invoking Edge Function for event ${event}...`);
+            console.log(`DEBUG: Invoking Edge Function for event: ${event}`);
+            console.log('DEBUG: Payload:', {
+                event,
+                status: workOrder.status,
+                id: workOrder.id,
+                scheduled_at: (workOrder as any).scheduled_at
+            });
 
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
@@ -48,22 +50,26 @@ export const NotificationService = {
                     adminName,
                     workOrder: {
                         ...workOrder,
-                        // Include hash router for production compatibility
                         url: `${window.location.origin}/#/work-orders/${workOrder.id}`
                     },
-                    // Company name will be fetched by Edge Function from DB
-                }
+                },
+                headers: session ? {
+                    Authorization: `Bearer ${session.access_token}`
+                } : {}
             });
 
             if (error) {
                 console.error('Edge Function returned error:', error);
-                throw error;
+                // Return success false to handle in UI if needed
+                return { success: false, error };
             }
 
             console.log('Notification sent successfully:', data);
+            return { success: true, data };
 
         } catch (error) {
             console.error('Error sending notification webhook:', error);
+            return { success: false, error };
         }
     }
 };

@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -213,17 +213,24 @@ serve(async (req: Request) => {
                         enrichedWorkOrder = { ...enrichedWorkOrder, ...basicOrder };
                     }
                 } else if (dbWorkOrder) {
+                    console.log('DB Work Order fetched:', { status: dbWorkOrder.status, scheduled_at: dbWorkOrder.scheduled_at });
+
                     enrichedWorkOrder = {
                         ...workOrder,
                         ...dbWorkOrder,
+                        // PRIORIDADE: Manter o que veio do frontend se for mais recente ou específico
+                        status: workOrder.status || dbWorkOrder.status,
+                        scheduled_at: workOrder.scheduled_at || dbWorkOrder.scheduled_at,
                         url: originalUrl || workOrder.url || enrichedWorkOrder.url,
-                        assetName: dbWorkOrder.asset?.name || 'N/A',
-                        assetCode: dbWorkOrder.asset?.code,
-                        technicianName: dbWorkOrder.technician?.name || 'Pendente',
+                        assetName: dbWorkOrder.asset?.name || workOrder.assetName || 'N/A',
+                        assetCode: dbWorkOrder.asset?.code || workOrder.assetCode,
+                        technicianName: dbWorkOrder.technician?.name || workOrder.technicianName || 'Pendente',
                         osNumber: dbWorkOrder.order_number || workOrder.osNumber || workOrder.order_number,
                         description: dbWorkOrder.issue || workOrder.description || workOrder.issue,
                         title: dbWorkOrder.issue || workOrder.title
                     };
+
+                    console.log('Enriched Work Order final status:', enrichedWorkOrder.status);
 
                     if (dbWorkOrder.requester) {
                         const userData = dbWorkOrder.requester;
@@ -297,9 +304,7 @@ serve(async (req: Request) => {
             if (adminPhones.length > 0) requesterPhone = adminPhones[0];
             requesterName = 'Administrador (Teste)';
             requesterPreferences = { email: true, whatsapp: true, push: true };
-        }
-
-        if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled') {
+        } else if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled') {
             adminEmails = [];
             adminPhones = [];
         }
@@ -330,6 +335,29 @@ serve(async (req: Request) => {
                 intro_display = "entrou em manutenção";
             } else if (currentStatus === 'Concluído') {
                 intro_display = "foi concluída com sucesso";
+            } else if (currentStatus === 'Agendado') {
+                subject_display = "📅 Agendamento de Manutenção";
+                if (enrichedWorkOrder.scheduled_at) {
+                    try {
+                        const date = new Date(enrichedWorkOrder.scheduled_at);
+                        const formattedDate = date.toLocaleDateString('pt-BR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            timeZone: 'America/Sao_Paulo'
+                        });
+                        const formattedTime = date.toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'America/Sao_Paulo'
+                        });
+                        intro_display = `foi agendada para *${formattedDate}* às *${formattedTime}*`;
+                    } catch (e) {
+                        intro_display = `foi atualizada para o status: ${currentStatus}`;
+                    }
+                } else {
+                    intro_display = "foi marcada como agendada";
+                }
             } else {
                 intro_display = `foi atualizada para o status: ${currentStatus}`;
             }
@@ -345,6 +373,22 @@ serve(async (req: Request) => {
             console.log(`Routing executive report to: ${finalWebhookUrl}`);
         }
 
+        // Extract dates and prepare HTML intro for easy access in n8n
+        let formatted_date = '';
+        let formatted_time = '';
+        if (currentStatus === 'Agendado' && enrichedWorkOrder.scheduled_at) {
+            try {
+                const date = new Date(enrichedWorkOrder.scheduled_at);
+                formatted_date = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+                formatted_time = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+            } catch (e) { /* ignore */ }
+        }
+
+        // Convert WhatsApp bold (*) to HTML strong tags
+        const intro_html = intro_display.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
+
+        console.log('Sending to n8n:', { event, status: enrichedWorkOrder.status, intro: intro_display });
+
         const response = await fetch(finalWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -352,6 +396,9 @@ serve(async (req: Request) => {
                 event: event,
                 subject_display,
                 intro_display,
+                intro_html,
+                formatted_date,
+                formatted_time,
                 admin_name,
                 timestamp: new Date().toISOString(),
                 company: company || 'Novo Horizonte Alumínios',
@@ -373,7 +420,7 @@ serve(async (req: Request) => {
                 formatted_blocks: {
                     failure_type_block: enrichedWorkOrder.failure_type ? `⚠ Tipo de Falha:\n${enrichedWorkOrder.failure_type}` : '',
                     technical_report_block: enrichedWorkOrder.technical_report ? `📝 Relatório Técnico:\n${enrichedWorkOrder.technical_report}` : '',
-                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Falha\n${enrichedWorkOrder.failure_type || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
+                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Falha\n${enrichedWorkOrder.failure_type || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}${formatted_date ? `\n\n📅 Data do Agendamento\n*${formatted_date} às ${formatted_time}*` : ''}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
                 }
             }),
         })
@@ -390,7 +437,8 @@ serve(async (req: Request) => {
 
     } catch (error) {
         console.error('Edge Function Error:', error)
-        return new Response(JSON.stringify({ success: false, error: error.message }), {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return new Response(JSON.stringify({ success: false, error: errorMessage }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
         })
     }
