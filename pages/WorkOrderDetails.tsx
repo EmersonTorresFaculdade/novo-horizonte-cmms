@@ -640,8 +640,8 @@ const WorkOrderDetails = () => {
 
    const statusSteps = [
       { id: 'Pendente', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
-      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-primary', bg: 'bg-emerald-50/50' },
-      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-amber-500', bg: 'bg-amber-50' },
+      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-purple-600', bg: 'bg-purple-50' },
       { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' }
    ];
 

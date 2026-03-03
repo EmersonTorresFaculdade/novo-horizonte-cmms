@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw, Wrench, Building2, Zap, Car, Monitor, LayoutDashboard, Box } from 'lucide-react';
+import {
+  QrCode, Search, Filter, Edit, Save, Plus, ScanLine, X, Camera, Trash2, Loader2, RefreshCw, Wrench, Building2, Zap, Car, Monitor, LayoutDashboard, Box, ChevronRight
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import FeedbackModal from '../components/FeedbackModal';
 import { useAuth } from '../contexts/AuthContext';
@@ -59,8 +61,6 @@ const Assets = () => {
     onConfirm?: () => void;
   } | null>(null);
 
-
-
   const formRef = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -70,7 +70,6 @@ const Assets = () => {
   const fetchAssets = async () => {
     try {
       setLoading(true);
-      // Busca ativos e ordens de serviço ativas em paralelo
       const [assetsRes, woRes] = await Promise.all([
         supabase.from('assets').select('*').order('name'),
         supabase.from('work_orders')
@@ -85,7 +84,6 @@ const Assets = () => {
         const activeWO = activeWOs.find(wo => wo.asset_id === asset.id);
         return {
           ...asset,
-          // Se tiver OS ativa, o status vem da OS, senão é Operacional
           status: activeWO ? activeWO.status : 'Operacional',
           active_priority: activeWO?.priority
         };
@@ -129,7 +127,6 @@ const Assets = () => {
   const generateAutoCode = async (category: string) => {
     const prefix = category === 'Máquina' ? 'MAQ-' : category === 'Predial' ? 'PRE-' : 'OUT-';
 
-    // Buscar todos os ativos da categoria para encontrar o maior número sequencial
     const { data: existingAssets, error } = await supabase
       .from('assets')
       .select('code')
@@ -144,7 +141,6 @@ const Assets = () => {
       return `${prefix}001`;
     }
 
-    // Extrair números, filtrar válidos e encontrar o máximo
     const numbers = existingAssets
       .map(a => {
         const parts = a.code.split('-');
@@ -162,10 +158,7 @@ const Assets = () => {
     e.preventDefault();
     try {
       if (editingId) {
-        // Update existing asset
         const currentAsset = assets.find(a => a.id === editingId);
-
-        // Comparação robusta (ignora espaços extras e diferença de maiúsculas/minúsculas)
         const normalize = (cat: string) => (cat || '').trim().toLowerCase();
         const categoryChanged = currentAsset && normalize(currentAsset.category) !== normalize(formData.category);
 
@@ -173,8 +166,8 @@ const Assets = () => {
           name: formData.name,
           sector: formData.sector,
           category: formData.category,
-          model: '', // Campo não visível mas obrigatório no DB
-          manufacturer: '', // Campo não visível no DB
+          model: '',
+          manufacturer: '',
           image_url: formData.image_url || null
         };
 
@@ -195,7 +188,6 @@ const Assets = () => {
           message: 'Os dados do ativo foram atualizados com sucesso.'
         });
       } else {
-        // Create new asset with automatic code
         const autoCode = await generateAutoCode(formData.category);
 
         const { error } = await supabase
@@ -206,8 +198,8 @@ const Assets = () => {
             sector: formData.sector,
             category: formData.category,
             status: 'Operacional',
-            model: '', // Campo não visível mas obrigatório no DB
-            manufacturer: '', // Campo não visível no DB
+            model: '',
+            manufacturer: '',
             image_url: formData.image_url || null
           }]);
 
@@ -219,7 +211,7 @@ const Assets = () => {
         });
       }
 
-      handleCancelEdit(); // Reset form
+      handleCancelEdit();
       fetchAssets();
     } catch (error) {
       console.error('Error saving asset:', error);
@@ -277,7 +269,6 @@ const Assets = () => {
       if (user?.manage_predial) allowedCategories.push('Predial');
       if (user?.manage_others) allowedCategories.push('Outros');
 
-      // Se não tiver nenhuma role específica, mostra Máquina como fallback (comportamento legado)
       if (allowedCategories.length === 0) allowedCategories.push('Máquina');
 
       matchesCategory = allowedCategories.includes(asset.category) || (allowedCategories.length === 0 && asset.category === 'Máquina');
@@ -303,7 +294,6 @@ const Assets = () => {
           <h2 className="text-white text-xl font-bold mb-8">Escanear QR Code da Máquina</h2>
 
           <div className="relative size-72 sm:size-96 rounded-3xl overflow-hidden border-4 border-primary shadow-[0_0_50px_rgba(17,212,115,0.5)] bg-slate-900 flex items-center justify-center">
-            {/* Camera Overlay UI */}
             <div className="absolute inset-0 z-10 opacity-50">
               <div className="w-full h-1 bg-primary/50 absolute top-10 animate-bounce"></div>
             </div>
@@ -367,6 +357,7 @@ const Assets = () => {
       {/* Form Collapsible */}
       <div ref={formRef} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden transition-all duration-200 ease-in-out">
         <button
+          type="button"
           onClick={() => !editingId && setIsFormOpen(!isFormOpen)}
           className="w-full px-5 py-3.5 flex items-center justify-between bg-white hover:bg-slate-50 transition-colors focus:outline-none"
         >
@@ -467,126 +458,131 @@ const Assets = () => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Tabs / Filter categories */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-          {[
-            { id: 'Visão Geral', label: 'Visão Geral', icon: LayoutDashboard, show: true },
-            { id: 'Máquina', label: 'Máquinas', icon: Wrench, show: !!user?.manage_equipment },
-            { id: 'Predial', label: 'Predial', icon: Building2, show: !!user?.manage_predial },
-            { id: 'Outros', label: 'Outros', icon: Box, show: !!user?.manage_others },
-          ].filter(t => t.show !== false).map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveCategory(tab.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${activeCategory === tab.id
-                ? 'bg-primary/90 text-white shadow-sm'
-                : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                }`}
-            >
-              {activeCategory === tab.id ? <tab.icon size={16} /> : <tab.icon size={16} className="text-slate-400" />}
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      {/* Tabs / Filter categories */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+        {[
+          { id: 'Visão Geral', label: 'Visão Geral', icon: LayoutDashboard, show: true },
+          { id: 'Máquina', label: 'Máquinas', icon: Wrench, show: !!user?.manage_equipment },
+          { id: 'Predial', label: 'Predial', icon: Building2, show: !!user?.manage_predial },
+          { id: 'Outros', label: 'Outros', icon: Box, show: !!user?.manage_others },
+        ].filter(t => t.show !== false).map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveCategory(tab.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap transition-all flex items-center gap-2 ${activeCategory === tab.id
+              ? 'bg-[#1F7A4D] text-white shadow-sm'
+              : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+              }`}
+          >
+            {activeCategory === tab.id ? <tab.icon size={16} /> : <tab.icon size={16} className="text-slate-400" />}
+            {tab.label}
+          </button>
+        ))}
+      </div>
 
-        {/* List */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-100">
-          <div className="p-4 border-b border-slate-100 flex justify-between items-center">
-            <h3 className="font-bold text-slate-900">Ativos no Sistema</h3>
-            <div className="flex gap-2">
-              <div className="relative">
-                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Buscar..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
-                />
-              </div>
+      {/* List */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+          <h3 className="font-bold text-slate-900">Ativos no Sistema</h3>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-9 pr-4 py-1.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-primary"
+              />
             </div>
           </div>
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="flex justify-center p-8">
-                <Loader2 className="animate-spin text-primary" />
-              </div>
-            ) : filteredAssets.length === 0 ? (
-              <div className="text-center p-8 text-slate-500">Nenhum ativo encontrado nesta categoria.</div>
-            ) : (
-              <table className="w-full text-left text-sm text-slate-600">
-                <thead className="bg-slate-50/80 text-[11px] uppercase font-medium text-slate-500/75 tracking-wider border-b border-slate-200">
-                  <tr>
-                    <th className="px-5 py-3">CÓDIGO</th>
-                    <th className="px-5 py-3">NOME DO ATIVO</th>
-                    <th className="px-5 py-3">SETOR</th>
-                    <th className="px-5 py-3">STATUS</th>
-                    <th className="px-5 py-3 text-right">AÇÕES</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredAssets.map(asset => (
-                    <tr key={asset.id} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="px-5 py-2.5 font-semibold text-slate-700">{asset.code}</td>
-                      <td className="px-5 py-2.5">
-                        <div className="flex items-center gap-3">
-                          {asset.image_url ? (
-                            <img
-                              src={asset.image_url}
-                              alt={asset.name}
-                              className="w-9 h-9 rounded-lg object-cover border border-slate-200 flex-shrink-0 opacity-90"
-                              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                            />
-                          ) : (
-                            <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400/80 flex-shrink-0 border border-slate-200/60">
-                              {asset.category === 'Máquina' ? <Wrench size={16} /> :
-                                asset.category === 'Predial' ? <Building2 size={16} /> :
-                                  <Box size={16} />}
-                            </div>
-                          )}
-                          <span className="font-semibold text-slate-800">{asset.name}</span>
-                        </div>
-                      </td>
-                      <td className="px-5 py-2.5 font-medium text-slate-600">{asset.sector}</td>
-                      <td className="px-5 py-2.5">
-                        <span className={`text-[11px] px-3 py-1 rounded-lg font-bold tracking-wide border ${asset.status === 'Operacional' || asset.status === 'Ativo' ? 'bg-[#1F7A4D]/10 text-[#1F7A4D] border-[#1F7A4D]/20' :
-                            asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-orange-50 text-orange-600 border-orange-200' :
-                              asset.status === 'Crítico' ? 'bg-red-50 text-red-600 border-red-200' :
+        </div>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="animate-spin text-primary" />
+            </div>
+          ) : filteredAssets.length === 0 ? (
+            <div className="text-center p-8 text-slate-500">Nenhum ativo encontrado nesta categoria.</div>
+          ) : (
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="bg-slate-50/80 text-[11px] uppercase font-medium text-slate-500/75 tracking-wider border-b border-slate-200">
+                <tr>
+                  <th className="px-5 py-3">CÓDIGO</th>
+                  <th className="px-5 py-3">NOME DO ATIVO</th>
+                  <th className="px-5 py-3">SETOR</th>
+                  <th className="px-5 py-3">STATUS</th>
+                  <th className="px-5 py-3 text-right">AÇÕES</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {filteredAssets.map(asset => (
+                  <tr key={asset.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-5 py-3 font-semibold text-slate-700">{asset.code}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex items-center gap-3">
+                        {asset.image_url ? (
+                          <img
+                            src={asset.image_url}
+                            alt={asset.name}
+                            className="w-9 h-9 rounded-lg object-cover border border-slate-200 flex-shrink-0 opacity-90"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                          />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400/80 flex-shrink-0 border border-slate-200/60">
+                            {asset.category === 'Máquina' ? <Wrench size={16} /> :
+                              asset.category === 'Predial' ? <Building2 size={16} /> :
+                                <Box size={16} />}
+                          </div>
+                        )}
+                        <span className="font-semibold text-slate-800">{asset.name}</span>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3 font-medium text-slate-600">{asset.sector}</td>
+                    <td className="px-5 py-3">
+                      <span className={`text-[11px] px-3 py-1 rounded-lg font-bold tracking-wide border ${asset.status === 'Operacional' || asset.status === 'Ativo' ? 'bg-[#1F7A4D]/10 text-[#1F7A4D] border-[#1F7A4D]/20' :
+                        asset.status === 'Em Manutenção' || asset.status === 'Parada' ? 'bg-purple-50 text-purple-600 border-purple-200' :
+                          asset.status === 'Crítico' ? 'bg-red-50 text-red-600 border-red-200' :
+                            asset.status === 'Recebido' ? 'bg-blue-50 text-blue-600 border-blue-200' :
+                              asset.status === 'Pendente' ? 'bg-amber-50 text-amber-600 border-amber-200' :
                                 'bg-slate-100 text-slate-600 border-slate-200'
-                          }`}>
-                          {asset.status}
-                        </span>
-                      </td>
-                      <td className="px-5 py-2.5 flex justify-end gap-1">
+                        }`}>
+                        {asset.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      <div className="flex justify-end gap-1">
                         <button onClick={() => handleEdit(asset)} className="p-1.5 rounded-md text-slate-400 hover:text-primary hover:bg-slate-100 transition-all" title="Editar">
                           <Edit size={16} />
                         </button>
                         <button onClick={() => handleDelete(asset.id)} className="p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all" title="Excluir">
                           <Trash2 size={16} />
                         </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
-
-        {/* Feedback Modal Reutilizável */}
-        {feedback && (
-          <FeedbackModal
-            isOpen={!!feedback}
-            onClose={() => setFeedback(null)}
-            type={feedback.type}
-            title={feedback.title}
-            message={feedback.message}
-            onConfirm={feedback.onConfirm}
-          />
-        )}
       </div>
-      );
+
+      {/* Feedback Modal Reutilizável */}
+      {feedback && (
+        <FeedbackModal
+          isOpen={!!feedback}
+          onClose={() => setFeedback(null)}
+          type={feedback.type}
+          title={feedback.title}
+          message={feedback.message}
+          onConfirm={feedback.onConfirm}
+        />
+      )}
+    </div>
+  );
 };
 
-      export default Assets;
+export default Assets;

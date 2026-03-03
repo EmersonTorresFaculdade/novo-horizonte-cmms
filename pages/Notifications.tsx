@@ -36,29 +36,29 @@ const getNotificationMeta = (n: Notification) => {
 
 const getPriorityColor = (priority: string) => {
     switch (priority) {
-        case 'CRÍTICA': return 'bg-red-500 text-white border border-red-500';
+        case 'CRÍTICA': return 'bg-red-600 text-white border border-red-600';
         case 'ALTA':
         case 'ATRASADA': return 'bg-orange-500 text-white border border-orange-500';
-        case 'NORMAL': return 'bg-blue-500 text-white border border-blue-500';
-        default: return 'bg-slate-200 text-slate-700 border border-slate-200';
+        case 'NORMAL': return 'bg-blue-600 text-white border border-blue-600';
+        default: return 'bg-slate-500 text-white border border-slate-500';
     }
 };
 
 const getPriorityBorder = (priority: string) => {
     switch (priority) {
-        case 'CRÍTICA': return 'border-l-4 border-l-red-500';
+        case 'CRÍTICA': return 'border-l-4 border-l-red-600';
         case 'ALTA':
         case 'ATRASADA': return 'border-l-4 border-l-orange-500';
-        case 'NORMAL': return 'border-l-4 border-l-blue-500';
+        case 'NORMAL': return 'border-l-4 border-l-blue-600';
         default: return 'border-l-4 border-l-slate-400';
     }
 };
 
 const getIconForType = (type: string, priority: string) => {
-    if (priority === 'CRÍTICA') return <AlertTriangle size={24} className="text-red-500" />;
+    if (priority === 'CRÍTICA') return <AlertTriangle size={24} className="text-red-600" />;
     if (priority === 'ATRASADA') return <CalendarClock size={24} className="text-orange-500" />;
-    if (type === 'Corretiva') return <Wrench size={24} className="text-blue-500" />;
-    if (type === 'Preventiva') return <CheckCircle2 size={24} className="text-emerald-500" />;
+    if (type === 'Corretiva') return <Wrench size={24} className="text-blue-600" />;
+    if (type === 'Preventiva') return <CheckCircle2 size={24} className="text-emerald-600" />;
     if (type === 'Financeiro') return <FileText size={24} className="text-slate-600" />;
     return <Info size={24} className="text-slate-400" />;
 };
@@ -101,7 +101,6 @@ const groupByDate = (notifications: any[]) => {
     return groups;
 };
 
-
 const Notifications = () => {
     const navigate = useNavigate();
     const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
@@ -128,31 +127,26 @@ const Notifications = () => {
         const delayed = decoratedNotifications.filter(n => n.meta.priority === 'ATRASADA').length;
         const newNotifs = unreadCount;
 
-        // Mocking "Resolvidas Hoje" based on type
         const resolvedToday = decoratedNotifications.filter(n => {
             const isToday = new Date(n.created_at).toDateString() === new Date().toDateString();
             return isToday && n.type === 'work_order_completed';
         }).length;
 
-        // Auto Intelligence Alert
         const correctiveCount = decoratedNotifications.filter(n => n.meta.type === 'Corretiva').length;
         const total = decoratedNotifications.length;
-        const showCorrectiveAlert = total > 0 && (correctiveCount / total > 0.6);
+        const showCorrectiveAlert = total > 0 && (total > 5 && (correctiveCount / total > 0.6));
 
         return { critical, delayed, newNotifs, resolvedToday, showCorrectiveAlert };
     }, [decoratedNotifications, unreadCount]);
 
     const filtered = useMemo(() => {
         let result = decoratedNotifications.filter(n => {
-            // Base filters
             if (filterStatus === 'unread' && n.is_read) return false;
             if (filterStatus === 'read' && !n.is_read) return false;
 
-            // Search
             const searchLower = searchTerm.toLowerCase();
             if (searchTerm && !n.title.toLowerCase().includes(searchLower) && !(n.message?.toLowerCase().includes(searchLower))) return false;
 
-            // Advanced Filters
             if (filterType !== 'ALL' && n.meta.type !== filterType) return false;
             if (filterPriority !== 'ALL' && n.meta.priority !== filterPriority) return false;
             if (filterSector !== 'ALL' && n.meta.sector !== filterSector) return false;
@@ -160,16 +154,13 @@ const Notifications = () => {
             return true;
         });
 
-        // Sorting
         if (sortBy === 'priority') {
-            const pLevel = { 'CRÍTICA': 1, 'ATRASADA': 2, 'NORMAL': 3, 'INFORMATIVA': 4 };
+            const pLevel: Record<string, number> = { 'CRÍTICA': 1, 'ATRASADA': 2, 'NORMAL': 3, 'INFORMATIVA': 4 };
             result.sort((a, b) => pLevel[a.meta.priority] - pLevel[b.meta.priority]);
         } else if (sortBy === 'impact') {
-            // Mock impact based on sector "Produção" > others
             const getImpact = (n: any) => (n.meta.sector === 'Produção' || n.meta.priority === 'CRÍTICA') ? 1 : 2;
             result.sort((a, b) => getImpact(a) - getImpact(b));
         } else {
-            // Default Date
             result.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
         }
 
@@ -221,10 +212,10 @@ const Notifications = () => {
             {/* Top Summary Panel */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                 {[
-                    { title: 'Notificações Críticas', count: stats.critical, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', trend: '↑ 2' },
-                    { title: 'Atrasadas', count: stats.delayed, icon: CalendarClock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', trend: '↓ 1' },
-                    { title: 'Novas', count: stats.newNotifs, icon: Bell, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', trend: '+' + stats.newNotifs },
-                    { title: 'Resolvidas Hoje', count: stats.resolvedToday, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: '↑ 14%' },
+                    { title: 'Notificações Críticas', count: stats.critical, icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100', trend: '↑' },
+                    { title: 'Atrasadas', count: stats.delayed, icon: CalendarClock, color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100', trend: '!' },
+                    { title: 'Novas', count: stats.newNotifs, icon: Bell, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100', trend: stats.newNotifs > 0 ? `+${stats.newNotifs}` : '0' },
+                    { title: 'Resolvidas Hoje', count: stats.resolvedToday, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100', trend: '✓' },
                 ].map((card, idx) => (
                     <div key={idx} className={`bg-white p-5 rounded-2xl border ${card.border} shadow-sm flex flex-col justify-between hover:shadow-md transition-all`}>
                         <div className="flex justify-between items-start mb-2">
@@ -276,7 +267,6 @@ const Notifications = () => {
                     </div>
                 </div>
 
-                {/* Advanced Filters Expandable */}
                 {showAdvancedFilters && (
                     <div className="pt-4 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2">
                         <div>
@@ -331,7 +321,8 @@ const Notifications = () => {
                         </p>
                     </div>
                 ) : (
-                    Object.entries(groupedNotifications).map(([groupName, items]) => {
+                    Object.entries(groupedNotifications).map(([groupName, groupItems]) => {
+                        const items = groupItems as any[];
                         if (items.length === 0) return null;
                         return (
                             <div key={groupName} className="space-y-3">
@@ -381,7 +372,6 @@ const Notifications = () => {
                                             </div>
                                         </div>
 
-                                        {/* Hover Quick Actions (Desktop) */}
                                         <div className="hidden sm:flex items-center gap-2 px-4 bg-slate-50/50 border-l border-slate-100 opacity-0 group-hover:opacity-100 transition-opacity">
                                             {n.link && (
                                                 <button onClick={(e) => { e.stopPropagation(); navigate(n.link!); }} className="p-2 text-slate-400 hover:text-primary hover:bg-white rounded-lg border border-transparent hover:border-slate-200 shadow-sm transition-all" title="Abrir OS">
@@ -393,7 +383,6 @@ const Notifications = () => {
                                             </button>
                                         </div>
 
-                                        {/* Mobile Expansion Indicator */}
                                         <div className="sm:hidden absolute bottom-3 right-4 text-slate-300">
                                             <ChevronRight size={16} />
                                         </div>

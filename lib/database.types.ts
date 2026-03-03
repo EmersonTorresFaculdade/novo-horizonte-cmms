@@ -110,6 +110,10 @@ export type Database = {
           manufacturer: string | null
           category: string | null
           image_url: string | null
+          model: string
+          name: string
+          sector: string
+          status: string
         }
         Insert: {
           code: string
@@ -459,6 +463,12 @@ export type Database = {
           status: string
           technician_id: string | null
           updated_at: string | null
+          maintenance_category: string | null
+          maintenance_type: string | null
+          failure_type: string | null
+          estimated_hours: number | null
+          parts_cost: number | null
+          response_hours: number | null
         }
         Insert: {
           asset_id?: string | null
@@ -476,6 +486,12 @@ export type Database = {
           status: string
           technician_id?: string | null
           updated_at?: string | null
+          maintenance_category?: string | null
+          maintenance_type?: string | null
+          failure_type?: string | null
+          estimated_hours?: number | null
+          parts_cost?: number | null
+          response_hours?: number | null
         }
         Update: {
           asset_id?: string | null
@@ -493,6 +509,12 @@ export type Database = {
           status?: string
           technician_id?: string | null
           updated_at?: string | null
+          maintenance_category?: string | null
+          maintenance_type?: string | null
+          failure_type?: string | null
+          estimated_hours?: number | null
+          parts_cost?: number | null
+          response_hours?: number | null
         }
         Relationships: [
           {

@@ -131,7 +131,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
           <NavLink
             to="/dashboard"
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`
             }
           >
@@ -146,7 +146,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
           <NavLink
             to="/work-orders"
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`
             }
           >
@@ -162,7 +162,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
           <NavLink
             to="/calendar"
             className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
               }`
             }
           >
@@ -177,7 +177,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/assets"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -188,7 +188,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/technicians"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -199,7 +199,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/inventory"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -210,7 +210,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/notifications"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -230,7 +230,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/reports"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -241,7 +241,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/settings"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -252,7 +252,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/users"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -263,7 +263,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
               <NavLink
                 to="/users/pending"
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
