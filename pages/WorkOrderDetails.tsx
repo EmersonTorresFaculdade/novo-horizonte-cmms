@@ -423,7 +423,7 @@ const WorkOrderDetails = () => {
                const { error } = await supabase
                   .from('work_orders')
                   .update({
-                     status: 'Pendente',
+                     status: 'Aberto',
                      created_at: now,
                      responded_at: null,
                      resolved_at: null,
@@ -444,7 +444,7 @@ const WorkOrderDetails = () => {
                      id: workOrder.id,
                      title: `OS REABERTA: ${workOrder.order_number}`,
                      description: editIssue || workOrder.issue,
-                     status: 'Pendente',
+                     status: 'Aberto',
                      assetId: workOrder.asset_id,
                      requesterId: workOrder.requester_id,
                   } as any);
@@ -526,7 +526,7 @@ const WorkOrderDetails = () => {
 
          // Auto-set status to Agendado when a date is picked but status is still Pendente/Recebido
          let finalStatus = status;
-         if (finalScheduledAt && (status === 'Pendente' || status === 'Recebido')) {
+         if (finalScheduledAt && (status === 'Aberto' || status === 'Recebido')) {
             finalStatus = 'Agendado';
          }
 
@@ -677,7 +677,7 @@ const WorkOrderDetails = () => {
    };
 
    const statusSteps = [
-      { id: 'Pendente', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
+      { id: 'Aberto', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
       { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
       { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-teal-600', bg: 'bg-teal-50' },
       { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-purple-600', bg: 'bg-purple-50' },
@@ -690,7 +690,7 @@ const WorkOrderDetails = () => {
       // If status is not Agendado but scheduled_at exists, ensure Agendado step shows as done
       if (status === 'Em Manutenção' || status === 'Concluído') return statusIdx;
       if (status === 'Agendado') return 2;
-      if (scheduledAt && (status === 'Pendente' || status === 'Recebido')) return 2; // Show as Agendado
+      if (scheduledAt && (status === 'Aberto' || status === 'Recebido')) return 2; // Show as Agendado
       return statusIdx;
    };
    const currentStepIndex = getTimelineIndex();
@@ -780,7 +780,7 @@ const WorkOrderDetails = () => {
                               <div className="space-y-1">
                                  <p className={`text-sm font-bold ${done ? 'text-slate-900' : 'text-slate-400'}`}>{step.label}</p>
                                  <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                                    {active ? 'Em andamento' : done ? 'Concluído' : 'Pendente'}
+                                    {active ? 'Em andamento' : done ? 'Concluído' : 'Aberto'}
                                  </p>
                               </div>
                               {!isLast && (
@@ -852,14 +852,14 @@ const WorkOrderDetails = () => {
                            disabled={isConcluded || !isAdmin}
 
                            className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase border
-                               ${status === 'Pendente' ? 'bg-slate-50 text-slate-600 border-slate-200' :
+                               ${status === 'Aberto' ? 'bg-slate-50 text-slate-600 border-slate-200' :
                                  status === 'Recebido' ? 'bg-blue-50 text-blue-700 border-primary-light/20' :
                                     status === 'Agendado' ? 'bg-teal-50 text-teal-700 border-teal-200' :
                                        status === 'Em Manutenção' ? 'bg-purple-50 text-purple-700 border-purple-200' :
                                           status === 'Cancelado' ? 'bg-slate-900 text-white border-slate-900' :
                                              'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
                         >
-                           <option value="Pendente">Pendente</option>
+                           <option value="Aberto">Aberto</option>
                            <option value="Recebido">Recebido</option>
                            {status === 'Agendado' && <option value="Agendado">Agendado</option>}
                            <option value="Em Manutenção">Em Manutenção</option>
@@ -940,7 +940,7 @@ const WorkOrderDetails = () => {
                                        const val = e.target.value;
                                        if (val) {
                                           setScheduledAt(new Date(val).toISOString());
-                                          if (status === 'Recebido' || status === 'Pendente') {
+                                          if (status === 'Recebido' || status === 'Aberto') {
                                              setStatus('Agendado');
                                           }
                                        } else {

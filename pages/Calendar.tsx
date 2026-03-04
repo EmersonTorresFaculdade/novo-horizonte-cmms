@@ -78,7 +78,7 @@ interface CalendarEvent {
 }
 
 export const STATUS_COLORS: Record<string, { color: string; bgColor: string; borderColor: string }> = {
-  'Pendente': { color: 'text-amber-600', bgColor: 'bg-amber-100', borderColor: 'border-amber-200' },
+  'Aberto': { color: 'text-amber-600', bgColor: 'bg-amber-100', borderColor: 'border-amber-200' },
   'Recebido': { color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-200' },
   'Agendado': { color: 'text-teal-600', bgColor: 'bg-teal-100', borderColor: 'border-teal-200' },
   'Em Manutenção': { color: 'text-primary', bgColor: 'bg-blue-100', borderColor: 'border-primary-light/20' },
@@ -403,7 +403,7 @@ const Calendar = () => {
 
                           <div className="flex-1 flex flex-col gap-1 overflow-hidden">
                             {dayEvents.slice(0, 2).map(e => {
-                              const s = STATUS_COLORS[e.status] || STATUS_COLORS['Pendente'];
+                              const s = STATUS_COLORS[e.status] || STATUS_COLORS['Aberto'];
                               return (
                                 <div
                                   key={e.id}
@@ -488,7 +488,7 @@ const Calendar = () => {
                                 <div className="relative">
                                   {d.day}
                                   {dayEvents.length > 0 && d.currentMonth && (
-                                    <div className={`absolute -top-1 -right-1 size-1 rounded-full ${(STATUS_COLORS[dayEvents[0].status] || STATUS_COLORS['Pendente']).bgColor.replace('100', '500')}`}></div>
+                                    <div className={`absolute -top-1 -right-1 size-1 rounded-full ${(STATUS_COLORS[dayEvents[0].status] || STATUS_COLORS['Aberto']).bgColor.replace('100', '500')}`}></div>
                                   )}
                                   {isHoliday && d.currentMonth && (
                                     <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 size-0.5 rounded-full bg-brand-alert"></div>
@@ -543,7 +543,7 @@ const Calendar = () => {
               ) : filteredEvents.length > 0 ? (
                 filteredEvents.map(event => {
                   const cat = CATEGORIES[event.category] || CATEGORIES['Civil'];
-                  const stat = STATUS_COLORS[event.status] || STATUS_COLORS['Pendente'];
+                  const stat = STATUS_COLORS[event.status] || STATUS_COLORS['Aberto'];
                   const date = new Date(event.date);
                   return (
                     <div
@@ -642,7 +642,7 @@ const Calendar = () => {
               {hoveredCell.events.length > 0 && (
                 <div className="space-y-3">
                   {hoveredCell.events.map(event => {
-                    const stat = STATUS_COLORS[event.status] || STATUS_COLORS['Pendente'];
+                    const stat = STATUS_COLORS[event.status] || STATUS_COLORS['Aberto'];
                     return (
                       <div key={event.id} className={`p-3 rounded-xl border-2 ${stat.borderColor} ${stat.bgColor.replace('100', '50/50')} space-y-2`}>
                         <div className="flex items-center justify-between gap-4">

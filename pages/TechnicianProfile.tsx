@@ -379,7 +379,7 @@ const TechnicianProfile = () => {
                                                 </span>
                                                 <div className="mt-2 space-y-1">
                                                     {dayOrders.map(order => {
-                                                        const colors = STATUS_COLORS[order.status] || STATUS_COLORS['Pendente'];
+                                                        const colors = STATUS_COLORS[order.status] || STATUS_COLORS['Aberto'];
                                                         const priorityColors: Record<string, string> = {
                                                             'Crítica': 'bg-red-100 text-red-700',
                                                             'Alta': 'bg-orange-100 text-orange-700',
@@ -449,7 +449,7 @@ const TechnicianProfile = () => {
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900">Tarefas de Hoje</h3>
                             </div>
-                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest italic">{todayTasks.length} Pendentes</span>
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest italic">{todayTasks.length} Abertas</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -469,7 +469,7 @@ const TechnicianProfile = () => {
                                             <div className="flex items-center gap-2 mb-1">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{order.order_number}</span>
                                                 {(() => {
-                                                    const statusColors = STATUS_COLORS[order.status] || STATUS_COLORS['Pendente'];
+                                                    const statusColors = STATUS_COLORS[order.status] || STATUS_COLORS['Aberto'];
                                                     return (
                                                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${statusColors.bgColor} ${statusColors.color}`}>
                                                             {order.status}

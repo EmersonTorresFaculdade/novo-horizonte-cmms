@@ -58,7 +58,7 @@ const WorkOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'pending' | 'maintenance' | 'waiting' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'maintenance' | 'waiting' | 'completed'>('all');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
     title: string;
@@ -110,7 +110,7 @@ const WorkOrders = () => {
     // Status filter
     const matchesStatus =
       filterStatus === 'all' ||
-      (filterStatus === 'pending' && order.status === 'Pendente') ||
+      (filterStatus === 'open' && order.status === 'Aberto') ||
       (filterStatus === 'maintenance' && order.status === 'Em Manutenção') ||
       (filterStatus === 'waiting' && order.status === 'Aguardando Peça') ||
       (filterStatus === 'completed' && order.status === 'Concluído');
@@ -211,7 +211,7 @@ const WorkOrders = () => {
       colorClass = 'bg-blue-50 text-blue-600 border-blue-200';
     } else if (s === 'aguardando peça' || s === 'aguardando') {
       colorClass = 'bg-amber-50 text-amber-700 border-amber-200';
-    } else if (s === 'pendente') {
+    } else if (s === 'aberto' || s === 'aberta') {
       colorClass = 'bg-orange-50 text-orange-700 border-orange-200';
     } else if (s === 'crítico' || s === 'crítica') {
       colorClass = 'bg-red-50 text-red-700 border-red-200';
@@ -253,10 +253,10 @@ const WorkOrders = () => {
               Todas ({orders.length})
             </button>
             <button
-              onClick={() => setFilterStatus('pending')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'pending' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+              onClick={() => setFilterStatus('open')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'open' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
             >
-              Pendentes ({orders.filter(o => o.status === 'Pendente').length})
+              Abertas ({orders.filter(o => o.status === 'Aberto').length})
             </button>
             <button
               onClick={() => setFilterStatus('maintenance')}
@@ -431,7 +431,7 @@ const WorkOrders = () => {
           ) : (
             /* KANBAN VIEW (Simplified for Real Data) */
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
-              {['Pendente', 'Em Manutenção', 'Aguardando Peça', 'Concluído'].map(status => (
+              {['Aberto', 'Em Manutenção', 'Aguardando Peça', 'Concluído'].map(status => (
                 <div key={status} className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200">
                   <div className="p-3 border-b border-slate-200 bg-white rounded-t-xl flex items-center justify-between">
                     <h3 className="font-bold text-slate-700 text-sm">{status}</h3>

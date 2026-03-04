@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import { Menu } from 'lucide-react';
 import Sidebar from './Sidebar';
+import NotificationToast from './NotificationToast';
 
 const Layout = () => {
   const [isSidebarOpen, setSidebarOpen] = React.useState(false);
@@ -26,6 +27,8 @@ const Layout = () => {
           <Outlet />
         </main>
       </div>
+
+      <NotificationToast />
     </div>
   );
 };

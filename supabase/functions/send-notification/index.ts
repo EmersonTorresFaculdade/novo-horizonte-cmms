@@ -224,7 +224,7 @@ serve(async (req: Request) => {
                         url: originalUrl || workOrder.url || enrichedWorkOrder.url,
                         assetName: dbWorkOrder.asset?.name || workOrder.assetName || 'N/A',
                         assetCode: dbWorkOrder.asset?.code || workOrder.assetCode,
-                        technicianName: dbWorkOrder.technician?.name || workOrder.technicianName || 'Pendente',
+                        technicianName: dbWorkOrder.technician?.name || workOrder.technicianName || 'Não atribuído',
                         osNumber: dbWorkOrder.order_number || workOrder.osNumber || workOrder.order_number,
                         description: dbWorkOrder.issue || workOrder.description || workOrder.issue,
                         title: dbWorkOrder.issue || workOrder.title

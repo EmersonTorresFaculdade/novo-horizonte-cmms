@@ -23,6 +23,8 @@ interface NotificationsContextType {
     markAsRead: (id: string) => Promise<void>;
     markAllAsRead: () => Promise<void>;
     deleteNotification: (id: string) => Promise<void>;
+    activeToast: Notification | null;
+    clearToast: () => void;
 }
 
 const NotificationsContext = createContext<NotificationsContextType | undefined>(undefined);
@@ -42,6 +44,7 @@ interface NotificationsProviderProps {
 export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ children }) => {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(false);
+    const [activeToast, setActiveToast] = useState<Notification | null>(null);
     const { user, isAdmin } = useAuth();
 
     // Carregar notificações
@@ -53,10 +56,16 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
 
         setLoading(true);
         try {
+            // Se for admin, carrega também as genéricas para 'admin' ou 'admin_root'
+            let filterString = `user_id.eq.${user.id},recipient_role.eq.${user.role}`;
+            if (user.role === 'admin' || user.role === 'admin_root') {
+                filterString = `user_id.eq.${user.id},recipient_role.eq.admin,recipient_role.eq.admin_root`;
+            }
+
             const { data, error } = await supabase
                 .from('notifications')
                 .select('*')
-                .or(`user_id.eq.${user.id},recipient_role.eq.${user.role}`)
+                .or(filterString)
                 .order('created_at', { ascending: false });
 
             if (error) {
@@ -122,6 +131,82 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
             console.error('Error loading notifications:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Worker para verificar agendamentos próximos
+    const checkScheduledTasks = async () => {
+        if (!user || (user.role !== 'admin' && user.role !== 'admin_root')) return;
+
+        try {
+            const now = new Date();
+            // Verifica agendamentos para as próximas 2 horas
+            const windowEnd = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+
+            const { data: upcomingOrders, error } = await supabase
+                .from('work_orders')
+                .select('id, order_number, scheduled_at, maintenance_category, status')
+                .eq('status', 'Agendado')
+                .gte('scheduled_at', now.toISOString())
+                .lte('scheduled_at', windowEnd.toISOString());
+
+            if (error) throw error;
+
+            if (upcomingOrders && upcomingOrders.length > 0) {
+                for (const order of upcomingOrders) {
+                    // Verifica permissão por categoria
+                    const category = order.maintenance_category || 'Equipamento';
+                    let hasPermission = false;
+
+                    if (category === 'Equipamento' && user.manage_equipment) hasPermission = true;
+                    else if (category === 'Predial' && user.manage_predial) hasPermission = true;
+                    else if (category === 'Outros' && user.manage_others) hasPermission = true;
+
+                    if (!hasPermission) continue;
+
+                    // Verifica se já existe notificação deste tipo para esta OS
+                    // Se existiu uma há menos de 12 horas, não repete
+                    const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000).toISOString();
+
+                    const { data: existingNotif } = await supabase
+                        .from('notifications')
+                        .select('id')
+                        .eq('type', 'schedule_warning')
+                        .eq('link', `/work-orders/${order.id}`)
+                        .gte('created_at', twelveHoursAgo)
+                        .maybeSingle();
+
+                    if (!existingNotif) {
+                        const scheduledTime = new Date(order.scheduled_at).toLocaleTimeString('pt-BR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            timeZone: 'America/Sao_Paulo'
+                        });
+
+                        const newNotif = {
+                            recipient_role: 'admin' as const,
+                            type: 'schedule_warning',
+                            title: '⏳ Agendamento Próximo',
+                            message: `A O.S. #${order.order_number} está agendada para hoje às ${scheduledTime}.`,
+                            link: `/work-orders/${order.id}`,
+                            is_read: false
+                        };
+
+                        const { data: inserted, error: insertError } = await supabase
+                            .from('notifications')
+                            .insert(newNotif)
+                            .select()
+                            .single();
+
+                        if (!insertError && inserted) {
+                            setActiveToast(inserted as Notification);
+                            loadNotifications();
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error in scheduled tasks worker:', error);
         }
     };
 
@@ -206,11 +291,21 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
     useEffect(() => {
         loadNotifications();
 
+        // Primeira verificação de agendamentos
+        if (user && (user.role === 'admin' || user.role === 'admin_root')) {
+            checkScheduledTasks();
+        }
+
         // Auto-refresh a cada 30 segundos
-        const interval = setInterval(loadNotifications, 30000);
+        const interval = setInterval(() => {
+            loadNotifications();
+            if (user && (user.role === 'admin' || user.role === 'admin_root')) {
+                checkScheduledTasks();
+            }
+        }, 30000);
 
         return () => clearInterval(interval);
-    }, [user?.id, user?.role]); // Adicionado role como dependência se mudar
+    }, [user?.id, user?.role]);
 
     const value: NotificationsContextType = {
         notifications,
@@ -219,7 +314,9 @@ export const NotificationsProvider: React.FC<NotificationsProviderProps> = ({ ch
         loadNotifications,
         markAsRead,
         markAllAsRead,
-        deleteNotification
+        deleteNotification,
+        activeToast,
+        clearToast: () => setActiveToast(null)
     };
 
     return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

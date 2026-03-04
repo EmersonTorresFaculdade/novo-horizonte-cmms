@@ -41,9 +41,9 @@ export const workOrdersData: WorkOrder[] = [
         issue: 'Falha no Motor - Linha Parada',
         priority: 'Crítica',
         sector: 'Montagem',
-        status: 'Pendente',
+        status: 'Aberto',
         date: '30m atrás',
-        technician: 'Pendente'
+        technician: 'Não atribuído'
     } as any,
     // Completed
     {

@@ -205,7 +205,7 @@ const Dashboard = () => {
 
       // Use active orders to estimate 'Machines under stress' instead of fetching all assets
       const urgentOrders = orders.filter(o =>
-        (o.status?.toLowerCase() === 'pendente' || o.status?.toLowerCase() === 'em manutenção') &&
+        (o.status?.toLowerCase() === 'aberto' || o.status?.toLowerCase() === 'em manutenção') &&
         (o.priority === 'Urgente' || o.priority === 'Alta')
       );
 
@@ -340,7 +340,7 @@ const Dashboard = () => {
 
       // Constants for other parts of the function
       const closedOrders = recentOrdersRaw.filter(o => o.status === 'Concluído');
-      const openOrders = recentOrdersRaw.filter(o => o.status === 'Pendente');
+      const openOrders = recentOrdersRaw.filter(o => o.status === 'Aberto');
       const totalDowntimeVal = indStats.downtime + preStats.downtime;
 
       // 2. Fetch Technicians & Third Party Companies
@@ -469,7 +469,7 @@ const Dashboard = () => {
         asset_name: order.assets?.name || 'Geral',
         maintenance_category: order.maintenance_category || 'Equipamento',
         issue: order.issue || 'Sem descrição',
-        status: order.status || 'Pendente',
+        status: order.status || 'Aberto',
         technician_name: order.technicians?.name || 'Não atribuído',
         requester_name: (order as any).requester?.name || 'Administrador',
         date: new Date(order.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
@@ -488,7 +488,7 @@ const Dashboard = () => {
       case 'concluído': return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
       case 'em manutenção': return 'bg-purple-50 text-purple-700 border border-purple-200';
       case 'aguardando peça': return 'bg-amber-50 text-amber-700 border border-amber-200';
-      case 'pendente': return 'bg-orange-50 text-orange-700 border border-orange-200';
+      case 'aberto': return 'bg-orange-50 text-orange-700 border border-orange-200';
       case 'crítico': return 'bg-red-50 text-red-700 border border-red-200';
       default: return 'bg-slate-50 text-slate-700 border border-slate-200';
     }

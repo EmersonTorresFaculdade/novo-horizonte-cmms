@@ -4,7 +4,7 @@ export interface WorkOrder {
   asset_id?: string;
   maintenance_category: string; // Ex: 'Equipamento', 'Predial', 'Elétrica', 'Frota'
   issue: string;
-  status: 'Aberto' | 'Em Progresso' | 'Concluído' | 'Crítico' | 'Pendente';
+  status: 'Aberto' | 'Em Progresso' | 'Concluído' | 'Crítico';
   priority: 'Baixa' | 'Média' | 'Alta' | 'Crítica';
   technician: string;
   technician_id?: string;

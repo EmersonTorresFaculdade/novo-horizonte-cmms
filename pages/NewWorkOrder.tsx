@@ -138,7 +138,7 @@ const NewWorkOrder = () => {
         maintenance_category: maintenanceCategory,
         technician_id: null,
         priority: priority,
-        status: 'Pendente',
+        status: 'Aberto',
         issue: issueDescription,
         failure_type: failureType,
         sector: asset?.sector || 'Geral',
@@ -175,7 +175,7 @@ const NewWorkOrder = () => {
           title: `Nova OS: ${newOrder.order_number}`,
           description: issueDescription,
           priority: priority,
-          status: 'Pendente',
+          status: 'Aberto',
           assetId: selectedAssetId || undefined,
           locationId: '',
           assignedTo: null,
@@ -310,7 +310,7 @@ const NewWorkOrder = () => {
         </div>
         <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50/50 text-blue-700 rounded-full border border-primary-light/10/50">
           <Info size={14} />
-          <span className="text-xs font-bold uppercase tracking-wide">Status: Será Pendente</span>
+          <span className="text-xs font-bold uppercase tracking-wide">Status: Será Aberto</span>
         </div>
       </div>
 

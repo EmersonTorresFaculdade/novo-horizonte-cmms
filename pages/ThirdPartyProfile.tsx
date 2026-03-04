@@ -360,7 +360,7 @@ const ThirdPartyProfile = () => {
                                                 </span>
                                                 <div className="mt-2 space-y-1 text-left">
                                                     {dayOrders.map(order => {
-                                                        const colors = STATUS_COLORS[order.status] || STATUS_COLORS['Pendente'];
+                                                        const colors = STATUS_COLORS[order.status] || STATUS_COLORS['Aberto'];
                                                         return (
                                                             <div
                                                                 key={order.id}
@@ -417,7 +417,7 @@ const ThirdPartyProfile = () => {
                                 </div>
                                 <h3 className="text-xl font-black text-slate-900">Ordens de Serviço Ativas</h3>
                             </div>
-                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest italic">{todayTasks.length} Pendentes</span>
+                            <span className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest italic">{todayTasks.length} Abertas</span>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4">
@@ -437,7 +437,7 @@ const ThirdPartyProfile = () => {
                                             <div className="flex items-center gap-2 mb-1 text-left">
                                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">#{order.order_number}</span>
                                                 {(() => {
-                                                    const statusColors = STATUS_COLORS[order.status] || STATUS_COLORS['Pendente'];
+                                                    const statusColors = STATUS_COLORS[order.status] || STATUS_COLORS['Aberto'];
                                                     return (
                                                         <span className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-tighter ${statusColors.bgColor} ${statusColors.color}`}>
                                                             {order.status}
@@ -461,7 +461,7 @@ const ThirdPartyProfile = () => {
                             {todayTasks.length === 0 && (
                                 <div className="bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 p-12 text-center">
                                     <CheckCircle size={40} className="mx-auto text-slate-300 mb-3" />
-                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nenhuma tarefa pendente</p>
+                                    <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Nenhuma tarefa em aberto</p>
                                 </div>
                             )}
                         </div>

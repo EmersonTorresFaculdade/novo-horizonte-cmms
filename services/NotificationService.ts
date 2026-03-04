@@ -50,7 +50,7 @@ export const NotificationService = {
                     adminName,
                     workOrder: {
                         ...workOrder,
-                        url: `${window.location.origin}/#/work-orders/${workOrder.id}`
+                        url: `https://manutencao.novohorizonte.com/#/work-orders/${workOrder.id}`
                     },
                 },
                 headers: session ? {
