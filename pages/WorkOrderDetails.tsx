@@ -804,115 +804,38 @@ const WorkOrderDetails = () => {
                            <FileText size={16} className="text-primary" />
                            Detalhes do Chamado
                         </h3>
-                        {isAdmin && (
-                           <button
-                              onClick={() => navigate(`/work-orders/${id}/edit`)}
-                              className="text-xs font-bold text-primary hover:underline"
-                           >
-                              Editar
-                           </button>
-                        )}
                      </div>
 
                      <div className="p-8">
-                        {isEditing ? (
-                           <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Descrição do Problema</label>
-                                    <textarea
-                                       value={editIssue}
-                                       onChange={(e) => setEditIssue(e.target.value)}
-                                       className="w-full p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all min-h-[100px]"
-                                       placeholder="Descreva o problema..."
-                                    />
-                                 </div>
-                                 <div className="space-y-4">
-                                    <div className="space-y-2">
-                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prioridade</label>
-                                       <div className="flex flex-wrap gap-2">
-                                          {['Baixa', 'Média', 'Alta', 'Crítica'].map((p) => (
-                                             <button
-                                                key={p}
-                                                type="button"
-                                                onClick={() => setEditPriority(p)}
-                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${editPriority === p
-                                                      ? 'bg-primary text-white border-primary shadow-md'
-                                                      : 'bg-white text-slate-500 border-slate-200 hover:border-primary/30'
-                                                   }`}
-                                             >
-                                                {p}
-                                             </button>
-                                          ))}
-                                       </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                       <div className="space-y-2">
-                                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tipo de Serviço</label>
-                                          <select
-                                             value={editMaintenanceType}
-                                             onChange={(e) => setEditMaintenanceType(e.target.value)}
-                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary appearance-none cursor-pointer"
-                                          >
-                                             <option value="Corretiva">Corretiva</option>
-                                             <option value="Preventiva">Preventiva</option>
-                                             <option value="Preditiva">Preditiva</option>
-                                             <option value="Inspeção">Inspeção</option>
-                                          </select>
-                                       </div>
-                                       <div className="space-y-2">
-                                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Classificação</label>
-                                          <select
-                                             value={editFailureType}
-                                             onChange={(e) => setEditFailureType(e.target.value)}
-                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary appearance-none cursor-pointer"
-                                          >
-                                             <option value="Mecânica">Mecânica</option>
-                                             <option value="Elétrica">Elétrica</option>
-                                             <option value="Hidráulica">Hidráulica</option>
-                                             <option value="Pneumática">Pneumática</option>
-                                             <option value="Estrutural">Estrutural</option>
-                                             <option value="Automação">Automação</option>
-                                             <option value="Geral">Geral</option>
-                                          </select>
-                                       </div>
-                                    </div>
-                                 </div>
-                              </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 mb-10">
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ID do Ativo</p>
+                              <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
                            </div>
-                        ) : (
-                           <>
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 mb-10">
-                                 <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ID do Ativo</p>
-                                    <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
-                                 </div>
-                                 <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Localização</p>
-                                    <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
-                                 </div>
-                                 <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Categoria</p>
-                                    <p className="text-sm font-bold text-slate-700 capitalize">
-                                       {workOrder.maintenance_category || 'Geral'}
-                                    </p>
-                                 </div>
-                                 <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço / Classificação</p>
-                                    <p className="text-sm font-bold text-slate-700">
-                                       {workOrder.maintenance_type || 'Corretiva'} / {workOrder.failure_type || 'Geral'}
-                                    </p>
-                                 </div>
-                              </div>
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Localização</p>
+                              <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
+                           </div>
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Categoria</p>
+                              <p className="text-sm font-bold text-slate-700 capitalize">
+                                 {workOrder.maintenance_category || 'Geral'}
+                              </p>
+                           </div>
+                           <div>
+                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço / Classificação</p>
+                              <p className="text-sm font-bold text-slate-700">
+                                 {workOrder.maintenance_type || 'Corretiva'} / {workOrder.failure_type || 'Geral'}
+                              </p>
+                           </div>
+                        </div>
 
-                              <div className="space-y-4">
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Descrição</p>
-                                 <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed min-h-[100px]">
-                                    {workOrder.issue}
-                                 </div>
-                              </div>
-                           </>
-                        )}
+                        <div className="space-y-4">
+                           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Descrição</p>
+                           <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed min-h-[100px]">
+                              {workOrder.issue}
+                           </div>
+                        </div>
                      </div>
                   </div>
 
