@@ -39,6 +39,9 @@ interface AuthContextType {
     approveUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
     rejectUser: (userId: string) => Promise<{ success: boolean; error?: string }>;
     resetUserPassword: (userId: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
+    requestPasswordReset: (email: string) => Promise<{ success: boolean; error?: string }>;
+    verifyResetToken: (email: string, token: string) => Promise<{ success: boolean; error?: string }>;
+    completePasswordReset: (email: string, token: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -318,6 +321,130 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
+    const requestPasswordReset = async (email: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            // 1. Verificar se o usuário existe
+            const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('id, name')
+                .eq('email', email)
+                .maybeSingle();
+
+            if (userError) throw userError;
+
+            if (!userData) {
+                // Por segurança, não confirmamos explicitamente que o email não existe
+                return { success: true };
+            }
+
+            // 2. Gerar Token de Reset
+            const resetToken = generateToken();
+            const expiresAt = new Date();
+            expiresAt.setHours(expiresAt.getHours() + 1); // 1 hora de validade
+
+            const { error: updateError } = await supabase
+                .from('users')
+                .update({
+                    reset_token: resetToken,
+                    reset_token_expires_at: expiresAt.toISOString()
+                })
+                .eq('id', userData.id);
+
+            if (updateError) throw updateError;
+
+            // 3. Notificar via n8n (Integração que o usuário pediu)
+            // Vamos buscar a URL do webhook nas configurações
+            const { data: settings } = await supabase.from('app_settings').select('webhook_url').single();
+
+            if (settings?.webhook_url) {
+                try {
+                    await fetch(settings.webhook_url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            event: 'password_reset_request',
+                            name: userData.name,
+                            email: email,
+                            token: resetToken,
+                            url: `${window.location.origin}/#/reset-password?token=${resetToken}&email=${email}`
+                        })
+                    });
+                } catch (e) {
+                    console.error('Error calling n8n webhook:', e);
+                }
+            }
+
+            // 4. Também cria uma notificação interna para registro
+            await supabase
+                .from('notifications')
+                .insert({
+                    user_id: userData.id,
+                    title: 'Token de Recuperação Gerado',
+                    message: `Um link de recuperação de senha foi solicitado e enviado para ${email}.`,
+                    type: 'info',
+                    recipient_role: 'admin',
+                    is_read: false
+                });
+
+            return { success: true };
+        } catch (error: any) {
+            console.error('Error requesting password reset:', error);
+            return { success: false, error: 'Erro ao processar solicitação' };
+        }
+    };
+
+    const verifyResetToken = async (email: string, token: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            const { data, error } = await supabase
+                .from('users')
+                .select('id, reset_token_expires_at')
+                .eq('email', email)
+                .eq('reset_token', token)
+                .maybeSingle();
+
+            if (error || !data) {
+                return { success: false, error: 'Token inválido ou expirado' };
+            }
+
+            const expiresAt = new Date(data.reset_token_expires_at);
+            if (expiresAt < new Date()) {
+                return { success: false, error: 'Link de recuperação expirou' };
+            }
+
+            return { success: true };
+        } catch (error) {
+            return { success: false, error: 'Erro ao verificar token' };
+        }
+    };
+
+    const completePasswordReset = async (email: string, token: string, newPassword: string): Promise<{ success: boolean; error?: string }> => {
+        try {
+            // Verificar token novamente por segurança
+            const verify = await verifyResetToken(email, token);
+            if (!verify.success) return verify;
+
+            // Hash da nova senha
+            const salt = await bcrypt.genSalt(10);
+            const passwordHash = await bcrypt.hash(newPassword, salt);
+
+            // Atualizar senha e remover o token
+            const { error } = await supabase
+                .from('users')
+                .update({
+                    password_hash: passwordHash,
+                    reset_token: null,
+                    reset_token_expires_at: null
+                })
+                .eq('email', email);
+
+            if (error) throw error;
+            return { success: true };
+        } catch (error) {
+            console.error('Error completing password reset:', error);
+            return { success: false, error: 'Erro ao redefinir senha' };
+        }
+    };
+
     const value: AuthContextType = {
         user,
         loading,
@@ -330,7 +457,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         getPendingUsers,
         approveUser,
         rejectUser,
-        resetUserPassword
+        resetUserPassword,
+        requestPasswordReset,
+        verifyResetToken,
+        completePasswordReset
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

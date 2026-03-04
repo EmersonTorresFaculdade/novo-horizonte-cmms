@@ -16,6 +16,8 @@ export type Database = {
     Tables: {
       app_settings: {
         Row: {
+          board_emails: string | null
+          company_email: string | null
           company_logo: string | null
           company_name: string
           created_at: string | null
@@ -23,6 +25,7 @@ export type Database = {
           daily_report: boolean | null
           email_notifications: boolean | null
           id: string
+          report_frequency: string | null
           theme: string | null
           updated_at: string | null
           webhook_enabled: boolean | null
@@ -31,6 +34,8 @@ export type Database = {
           work_order_alerts: boolean | null
         }
         Insert: {
+          board_emails?: string | null
+          company_email?: string | null
           company_logo?: string | null
           company_name?: string
           created_at?: string | null
@@ -38,6 +43,7 @@ export type Database = {
           daily_report?: boolean | null
           email_notifications?: boolean | null
           id?: string
+          report_frequency?: string | null
           theme?: string | null
           updated_at?: string | null
           webhook_enabled?: boolean | null
@@ -46,6 +52,8 @@ export type Database = {
           work_order_alerts?: boolean | null
         }
         Update: {
+          board_emails?: string | null
+          company_email?: string | null
           company_logo?: string | null
           company_name?: string
           created_at?: string | null
@@ -53,93 +61,58 @@ export type Database = {
           daily_report?: boolean | null
           email_notifications?: boolean | null
           id?: string
+          report_frequency?: string | null
           theme?: string | null
           updated_at?: string | null
           webhook_enabled?: boolean | null
           webhook_url?: string | null
           whatsapp_notifications?: boolean | null
           work_order_alerts?: boolean | null
-        }
-        Relationships: []
-      }
-      third_party_companies: {
-        Row: {
-          id: string
-          name: string
-          cnpj: string | null
-          contact_name: string
-          phone: string
-          email: string | null
-          specialty: string
-          status: string
-          created_at: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          id?: string
-          name: string
-          cnpj?: string | null
-          contact_name: string
-          phone: string
-          email?: string | null
-          specialty: string
-          status: string
-          created_at?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          id?: string
-          name?: string
-          cnpj?: string | null
-          contact_name?: string
-          phone?: string
-          email?: string | null
-          specialty?: string
-          status?: string
-          created_at?: string | null
-          updated_at?: string | null
         }
         Relationships: []
       }
       assets: {
         Row: {
+          category: string | null
           code: string
           created_at: string | null
           id: string
-          updated_at: string | null
-          manufacturer: string | null
-          category: string | null
           image_url: string | null
+          manufacturer: string | null
           model: string
           name: string
           sector: string
           status: string
+          updated_at: string | null
+          warranty_expires_at: string | null
         }
         Insert: {
+          category?: string | null
           code: string
           created_at?: string | null
           id?: string
+          image_url?: string | null
           manufacturer?: string | null
-          model?: string
+          model: string
           name: string
           sector: string
           status: string
           updated_at?: string | null
-          category?: string | null
-          image_url?: string | null
+          warranty_expires_at?: string | null
         }
         Update: {
+          category?: string | null
           code?: string
           created_at?: string | null
           id?: string
+          image_url?: string | null
           manufacturer?: string | null
           model?: string
           name?: string
           sector?: string
           status?: string
           updated_at?: string | null
-          category?: string | null
-          image_url?: string | null
+          warranty_expires_at?: string | null
         }
         Relationships: []
       }
@@ -223,14 +196,71 @@ export type Database = {
           },
         ]
       }
+      technician_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string | null
+          id: string
+          rating: number
+          technician_id: string
+          third_party_company_id: string | null
+          user_id: string
+          work_order_id: string | null
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating: number
+          technician_id: string
+          third_party_company_id?: string | null
+          user_id: string
+          work_order_id?: string | null
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string | null
+          id?: string
+          rating?: number
+          technician_id?: string
+          third_party_company_id?: string | null
+          user_id?: string
+          work_order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "technician_ratings_technician_id_fkey"
+            columns: ["technician_id"]
+            isOneToOne: false
+            referencedRelation: "technicians"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_ratings_third_party_company_id_fkey"
+            columns: ["third_party_company_id"]
+            isOneToOne: false
+            referencedRelation: "third_party_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "technician_ratings_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       technicians: {
         Row: {
           avatar: string | null
           contact: string
           created_at: string | null
+          employee_id: string | null
           hourly_rate: number | null
           id: string
           name: string
+          on_night_shift: boolean | null
           performance_closed: number | null
           performance_open: number | null
           specialty: string
@@ -241,9 +271,11 @@ export type Database = {
           avatar?: string | null
           contact: string
           created_at?: string | null
+          employee_id?: string | null
           hourly_rate?: number | null
           id?: string
           name: string
+          on_night_shift?: boolean | null
           performance_closed?: number | null
           performance_open?: number | null
           specialty: string
@@ -254,14 +286,58 @@ export type Database = {
           avatar?: string | null
           contact?: string
           created_at?: string | null
+          employee_id?: string | null
           hourly_rate?: number | null
           id?: string
           name?: string
+          on_night_shift?: boolean | null
           performance_closed?: number | null
           performance_open?: number | null
           specialty?: string
           status?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      third_party_companies: {
+        Row: {
+          cnpj: string | null
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          logo_url: string | null
+          name: string
+          phone: string | null
+          specialty: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          cnpj?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          specialty?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cnpj?: string | null
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          specialty?: string | null
+          status?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -348,14 +424,22 @@ export type Database = {
           approved_by: string | null
           avatar_url: string | null
           created_at: string | null
+          daily_report: boolean | null
           email: string
           email_notifications: boolean | null
           id: string
           last_login: string | null
+          manage_equipment: boolean | null
+          manage_others: boolean | null
+          manage_predial: boolean | null
           name: string
           password_hash: string
           phone: string | null
+          push_notifications: boolean | null
+          report_frequency: string | null
           requested_role: Database["public"]["Enums"]["user_role"] | null
+          reset_token: string | null
+          reset_token_expires_at: string | null
           role: Database["public"]["Enums"]["user_role"]
           status: Database["public"]["Enums"]["user_status"]
           username: string | null
@@ -366,14 +450,22 @@ export type Database = {
           approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
+          daily_report?: boolean | null
           email: string
           email_notifications?: boolean | null
           id?: string
           last_login?: string | null
+          manage_equipment?: boolean | null
+          manage_others?: boolean | null
+          manage_predial?: boolean | null
           name: string
           password_hash: string
           phone?: string | null
+          push_notifications?: boolean | null
+          report_frequency?: string | null
           requested_role?: Database["public"]["Enums"]["user_role"] | null
+          reset_token?: string | null
+          reset_token_expires_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           username?: string | null
@@ -384,14 +476,22 @@ export type Database = {
           approved_by?: string | null
           avatar_url?: string | null
           created_at?: string | null
+          daily_report?: boolean | null
           email?: string
           email_notifications?: boolean | null
           id?: string
           last_login?: string | null
+          manage_equipment?: boolean | null
+          manage_others?: boolean | null
+          manage_predial?: boolean | null
           name?: string
           password_hash?: string
           phone?: string | null
+          push_notifications?: boolean | null
+          report_frequency?: string | null
           requested_role?: Database["public"]["Enums"]["user_role"] | null
+          reset_token?: string | null
+          reset_token_expires_at?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           status?: Database["public"]["Enums"]["user_status"]
           username?: string | null
@@ -403,6 +503,44 @@ export type Database = {
             columns: ["approved_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      work_order_activities: {
+        Row: {
+          activity_type: string
+          created_at: string
+          description: string
+          id: string
+          user_id: string | null
+          user_name: string
+          work_order_id: string
+        }
+        Insert: {
+          activity_type: string
+          created_at?: string
+          description: string
+          id?: string
+          user_id?: string | null
+          user_name: string
+          work_order_id: string
+        }
+        Update: {
+          activity_type?: string
+          created_at?: string
+          description?: string
+          id?: string
+          user_id?: string | null
+          user_name?: string
+          work_order_id: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_order_activities_work_order_id_fkey"
+            columns: ["work_order_id"]
+            isOneToOne: false
+            referencedRelation: "work_orders"
             referencedColumns: ["id"]
           },
         ]
@@ -427,7 +565,7 @@ export type Database = {
           id?: string
           item_id?: string
           quantity?: number
-          work_order_id?: string
+          work_order_id: string
         }
         Relationships: [
           {
@@ -446,78 +584,105 @@ export type Database = {
           },
         ]
       }
+      work_order_sequences: {
+        Row: {
+          last_value: number
+          year: number
+        }
+        Insert: {
+          last_value?: number
+          year: number
+        }
+        Update: {
+          last_value?: number
+          year?: number
+        }
+        Relationships: []
+      }
       work_orders: {
         Row: {
           asset_id: string | null
           created_at: string | null
           date: string | null
           downtime_hours: number | null
+          estimated_hours: number | null
+          failure_type: string | null
           hourly_rate: number | null
           id: string
           issue: string
+          maintenance_category: string
+          maintenance_type: string | null
           order_number: string
+          parts_cost: number | null
           priority: string
           repair_hours: number | null
           requester_id: string | null
-          sector: string
-          status: string
-          technician_id: string | null
-          updated_at: string | null
-          maintenance_category: string | null
-          maintenance_type: string | null
-          failure_type: string | null
-          estimated_hours: number | null
-          parts_cost: number | null
+          resolved_at: string | null
+          responded_at: string | null
           response_hours: number | null
           scheduled_at: string | null
+          sector: string
+          status: string
+          technical_report: string | null
+          technician_id: string | null
+          third_party_company_id: string | null
+          updated_at: string | null
         }
         Insert: {
           asset_id?: string | null
           created_at?: string | null
           date?: string | null
           downtime_hours?: number | null
+          estimated_hours?: number | null
+          failure_type?: string | null
           hourly_rate?: number | null
           id?: string
           issue: string
+          maintenance_category?: string
+          maintenance_type?: string | null
           order_number: string
+          parts_cost?: number | null
           priority: string
           repair_hours?: number | null
           requester_id?: string | null
-          sector: string
-          status: string
-          technician_id?: string | null
-          updated_at?: string | null
-          maintenance_category?: string | null
-          maintenance_type?: string | null
-          failure_type?: string | null
-          estimated_hours?: number | null
-          parts_cost?: number | null
+          resolved_at?: string | null
+          responded_at?: string | null
           response_hours?: number | null
           scheduled_at?: string | null
+          sector: string
+          status: string
+          technical_report?: string | null
+          technician_id?: string | null
+          third_party_company_id?: string | null
+          updated_at?: string | null
         }
         Update: {
           asset_id?: string | null
           created_at?: string | null
           date?: string | null
           downtime_hours?: number | null
+          estimated_hours?: number | null
+          failure_type?: string | null
           hourly_rate?: number | null
           id?: string
           issue?: string
+          maintenance_category?: string
+          maintenance_type?: string | null
           order_number?: string
+          parts_cost?: number | null
           priority?: string
           repair_hours?: number | null
           requester_id?: string | null
-          sector?: string
-          status?: string
-          technician_id?: string | null
-          updated_at?: string | null
-          maintenance_category?: string | null
-          maintenance_type?: string | null
-          failure_type?: string | null
-          estimated_hours?: number | null
-          parts_cost?: number | null
+          resolved_at?: string | null
+          responded_at?: string | null
           response_hours?: number | null
           scheduled_at?: string | null
+          sector?: string
+          status?: string
+          technical_report?: string | null
+          technician_id?: string | null
+          third_party_company_id?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -541,6 +706,13 @@ export type Database = {
             referencedRelation: "technicians"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "work_orders_third_party_company_id_fkey"
+            columns: ["third_party_company_id"]
+            isOneToOne: false
+            referencedRelation: "third_party_companies"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -548,6 +720,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      cancel_work_order: {
+        Args: { p_admin_name: string; p_work_order_id: string }
+        Returns: undefined
+      }
       cleanup_expired_sessions: { Args: never; Returns: undefined }
       ensure_admin_root_exists: { Args: never; Returns: undefined }
       update_app_settings:
@@ -591,6 +767,57 @@ export type Database = {
           p_email_notifications: boolean
           p_theme: string
           p_webhook_enabled?: boolean
+          p_webhook_url: string
+          p_whatsapp_notifications: boolean
+          p_work_order_alerts: boolean
+        }
+        Returns: undefined
+      }
+      | {
+        Args: {
+          p_company_logo: string
+          p_company_name: string
+          p_critical_alerts: boolean
+          p_daily_report: boolean
+          p_email_notifications: boolean
+          p_report_frequency?: string
+          p_theme: string
+          p_webhook_enabled: boolean
+          p_webhook_url: string
+          p_whatsapp_notifications: boolean
+          p_work_order_alerts: boolean
+        }
+        Returns: undefined
+      }
+      | {
+        Args: {
+          p_company_email?: string
+          p_company_logo: string
+          p_company_name: string
+          p_critical_alerts: boolean
+          p_daily_report: boolean
+          p_email_notifications: boolean
+          p_report_frequency?: string
+          p_theme: string
+          p_webhook_enabled: boolean
+          p_webhook_url: string
+          p_whatsapp_notifications: boolean
+          p_work_order_alerts: boolean
+        }
+        Returns: undefined
+      }
+      | {
+        Args: {
+          p_board_emails?: string
+          p_company_email: string
+          p_company_logo: string
+          p_company_name: string
+          p_critical_alerts: boolean
+          p_daily_report: boolean
+          p_email_notifications: boolean
+          p_report_frequency: string
+          p_theme: string
+          p_webhook_enabled: boolean
           p_webhook_url: string
           p_whatsapp_notifications: boolean
           p_work_order_alerts: boolean

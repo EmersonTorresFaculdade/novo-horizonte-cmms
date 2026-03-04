@@ -25,6 +25,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
+import ResetPassword from './pages/ResetPassword';
 
 const App = () => {
   return (
@@ -37,6 +38,7 @@ const App = () => {
                 {/* Public Routes */}
                 <Route path="/login" element={<Login />} />
                 <Route path="/public-reports" element={<PublicReports />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
                 <Route path="/" element={<Navigate to="/login" replace />} />
 
                 {/* Protected Routes */}
