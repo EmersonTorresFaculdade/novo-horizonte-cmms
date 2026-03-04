@@ -206,6 +206,7 @@ const WorkOrderDetails = () => {
    const [existingRating, setExistingRating] = useState<any>(null);
    const [ratingHover, setRatingHover] = useState(0);
    const [ratingSaving, setRatingSaving] = useState(false);
+   const [showRatingPopup, setShowRatingPopup] = useState(false);
 
    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
    const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -811,9 +812,9 @@ const WorkOrderDetails = () => {
                                  </p>
                               </div>
                               <div>
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço / Classificação</p>
+                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço</p>
                                  <p className="text-sm font-bold text-slate-700">
-                                    {workOrder.maintenance_type || 'Corretiva'} / {workOrder.failure_type || 'Geral'}
+                                    {workOrder.maintenance_type || 'Corretiva'}
                                  </p>
                               </div>
                            </div>
@@ -1182,6 +1183,41 @@ const WorkOrderDetails = () => {
                            <p className="text-[10px] text-slate-400">Início Manutenção → Conclusão</p>
                         </div>
                      </div>
+
+                     {/* Widget: Avaliação do Serviço */}
+                     {isConcluded && existingRating && (
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
+                           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                              <Star size={14} className="text-amber-400 fill-amber-400" />
+                              Avaliação do Serviço
+                           </h4>
+                           <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-0.5">
+                                 {[1, 2, 3, 4, 5].map((star) => (
+                                    <Star
+                                       key={star}
+                                       size={20}
+                                       className={star <= existingRating.rating
+                                          ? 'text-amber-400 fill-amber-400'
+                                          : 'text-slate-200'
+                                       }
+                                    />
+                                 ))}
+                              </div>
+                              <span className="text-lg font-bold text-slate-800">{existingRating.rating}/5</span>
+                           </div>
+                           {existingRating.comment && (
+                              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                                 <p className="text-sm text-slate-600 italic">"{existingRating.comment}"</p>
+                              </div>
+                           )}
+                           <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Avaliação enviada em {new Date(existingRating.created_at).toLocaleDateString('pt-BR')}
+                           </p>
+                        </div>
+                     )}
+
                      {/* Widget: Asset Card */}
                      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                         <div className="h-32 bg-slate-900 flex items-center justify-center overflow-hidden relative group">
@@ -1472,7 +1508,13 @@ const WorkOrderDetails = () => {
                            </button>
                         ) : (
                            <button
-                              onClick={handleSave}
+                              onClick={() => {
+                                 if (status === 'Concluído' && workOrder?.status !== 'Concluído') {
+                                    setShowRatingPopup(true);
+                                 } else {
+                                    handleSave();
+                                 }
+                              }}
                               disabled={saving || (status === 'Cancelado' && workOrder?.status === 'Cancelado')}
                               className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-primary text-white rounded-lg text-xs md:text-sm font-bold hover:bg-primary-dark transition-all shadow-md shadow-primary/20 disabled:opacity-50"
                            >
@@ -1490,6 +1532,115 @@ const WorkOrderDetails = () => {
                   </div>
                </div>
             </div>
+
+            {/* Rating Popup Modal */}
+            {showRatingPopup && (
+               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRatingPopup(false)}>
+                  <div
+                     className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200"
+                     onClick={(e) => e.stopPropagation()}
+                  >
+                     {/* Header */}
+                     <div className="bg-gradient-to-r from-[#0a2540] to-[#1a3a5c] p-6 text-center">
+                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm mb-3">
+                           <Star size={32} className="text-amber-400 fill-amber-400" />
+                        </div>
+                        <h3 className="text-xl font-bold text-white">Avalie o Serviço</h3>
+                        <p className="text-sm text-slate-300 mt-1">
+                           Como foi o trabalho do técnico?
+                        </p>
+                     </div>
+
+                     {/* Body */}
+                     <div className="p-6">
+                        {/* Stars */}
+                        <div className="flex items-center justify-center gap-2 mb-2">
+                           {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                 key={star}
+                                 type="button"
+                                 onClick={() => setTechRating(star)}
+                                 onMouseEnter={() => setRatingHover(star)}
+                                 onMouseLeave={() => setRatingHover(0)}
+                                 className="p-1 transition-transform hover:scale-110 active:scale-95"
+                              >
+                                 <Star
+                                    size={36}
+                                    className={`transition-colors ${star <= (ratingHover || techRating)
+                                       ? 'text-amber-400 fill-amber-400 drop-shadow-sm'
+                                       : 'text-slate-200'
+                                       }`}
+                                 />
+                              </button>
+                           ))}
+                        </div>
+                        <p className="text-center text-sm font-bold text-slate-500 mb-4">
+                           {techRating === 0 && 'Clique nas estrelas para avaliar'}
+                           {techRating === 1 && 'Ruim'}
+                           {techRating === 2 && 'Regular'}
+                           {techRating === 3 && 'Bom'}
+                           {techRating === 4 && 'Muito Bom'}
+                           {techRating === 5 && 'Excelente!'}
+                        </p>
+
+                        {/* Comment */}
+                        <textarea
+                           value={techRatingComment}
+                           onChange={(e) => setTechRatingComment(e.target.value)}
+                           placeholder="Comentário opcional..."
+                           rows={3}
+                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:bg-white transition-all resize-none placeholder:text-slate-400"
+                        />
+                     </div>
+
+                     {/* Footer */}
+                     <div className="px-6 pb-6 flex gap-3">
+                        <button
+                           onClick={() => {
+                              setShowRatingPopup(false);
+                              setTechRating(0);
+                              setTechRatingComment('');
+                              handleSave();
+                           }}
+                           className="flex-1 py-3 px-4 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                        >
+                           Pular
+                        </button>
+                        <button
+                           disabled={techRating === 0 || ratingSaving}
+                           onClick={async () => {
+                              if (techRating === 0) return;
+                              setRatingSaving(true);
+                              try {
+                                 const techId = selectedTechId || workOrder?.technician_id;
+                                 if (techId) {
+                                    await supabaseUntyped
+                                       .from('technician_ratings')
+                                       .insert({
+                                          work_order_id: id,
+                                          technician_id: techId,
+                                          rated_by: user?.id,
+                                          rating: techRating,
+                                          comment: techRatingComment || null
+                                       });
+                                 }
+                              } catch (err) {
+                                 console.error('Error saving rating:', err);
+                              } finally {
+                                 setRatingSaving(false);
+                                 setShowRatingPopup(false);
+                                 handleSave();
+                              }
+                           }}
+                           className="flex-1 py-3 px-4 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                           {ratingSaving ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
+                           Avaliar e Finalizar
+                        </button>
+                     </div>
+                  </div>
+               </div>
+            )}
 
             {/* Feedback Modal Reutilizável */}
             {feedback && (

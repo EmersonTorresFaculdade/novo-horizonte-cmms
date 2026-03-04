@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -20,7 +20,9 @@ import {
   Settings,
   Wrench,
   Building2,
-  Box
+  Box,
+  Image,
+  Trash2
 } from 'lucide-react';
 import { supabase, supabaseUntyped } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -53,9 +55,13 @@ const NewWorkOrder = () => {
   const [selectedAssetId, setSelectedAssetId] = useState('');
   const [issueDescription, setIssueDescription] = useState('');
   const [priority, setPriority] = useState<'Baixa' | 'Média' | 'Alta' | 'Crítica'>('Média');
-  const [failureType, setFailureType] = useState('mecanica');
-  const [maintenanceType, setMaintenanceType] = useState<'Corretiva' | 'Preventiva' | 'Preditiva' | 'Inspeção'>('Corretiva');
+  const [maintenanceType, setMaintenanceType] = useState<'Corretiva' | 'Preventiva'>('Corretiva');
   const [maintenanceCategory, setMaintenanceCategory] = useState<'Equipamento' | 'Predial' | 'Outros'>('Equipamento');
+
+  // Upload state
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url: string }[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   // Quick Asset Registration State
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -140,7 +146,7 @@ const NewWorkOrder = () => {
         priority: priority,
         status: 'Aberto',
         issue: issueDescription,
-        failure_type: failureType,
+        failure_type: 'Geral',
         sector: asset?.sector || 'Geral',
         date: new Date().toISOString(),
         requester_id: user?.id,
@@ -148,7 +154,8 @@ const NewWorkOrder = () => {
         estimated_hours: 0,
         downtime_hours: 0,
         parts_cost: 0,
-        response_hours: 0
+        response_hours: 0,
+        photos: uploadedFiles.map(f => f.url)
       };
 
       const { data: newOrder, error } = await supabaseUntyped
@@ -487,12 +494,79 @@ const NewWorkOrder = () => {
 
             <div className="space-y-1.5">
               <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Evidências / Fotos</label>
-              <div className="border border-dashed border-slate-300 rounded-lg p-6 flex items-center justify-center gap-4 hover:bg-slate-50/50 transition-colors cursor-pointer group">
-                <div className="p-2.5 bg-slate-100 rounded-md text-slate-500 group-hover:bg-slate-200 transition-colors">
-                  <UploadCloud size={20} />
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={async (e) => {
+                  const files = e.target.files;
+                  if (!files || files.length === 0) return;
+                  setUploading(true);
+                  try {
+                    for (let i = 0; i < files.length; i++) {
+                      const file = files[i];
+                      const ext = file.name.split('.').pop();
+                      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                      const filePath = `work-orders/${fileName}`;
+                      const { error: uploadError } = await supabase.storage
+                        .from('evidencias')
+                        .upload(filePath, file);
+                      if (uploadError) throw uploadError;
+                      const { data: urlData } = supabase.storage
+                        .from('evidencias')
+                        .getPublicUrl(filePath);
+                      setUploadedFiles(prev => [...prev, { name: file.name, url: urlData.publicUrl }]);
+                    }
+                  } catch (err: any) {
+                    console.error('Upload error:', err);
+                    setFeedback({
+                      type: 'error',
+                      title: 'Erro no Upload',
+                      message: err.message || 'Não foi possível enviar o arquivo.'
+                    });
+                  } finally {
+                    setUploading(false);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }
+                }}
+              />
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="border border-dashed border-slate-300 rounded-lg p-6 flex items-center justify-center gap-4 hover:bg-slate-50/50 transition-colors cursor-pointer group"
+              >
+                {uploading ? (
+                  <Loader2 size={20} className="animate-spin text-primary" />
+                ) : (
+                  <div className="p-2.5 bg-slate-100 rounded-md text-slate-500 group-hover:bg-slate-200 transition-colors">
+                    <UploadCloud size={20} />
+                  </div>
+                )}
+                <div className="text-sm font-medium text-slate-700">
+                  {uploading ? 'Enviando...' : 'Clique para enviar fotos'}
                 </div>
-                <div className="text-sm font-medium text-slate-700">Fazer upload de arquivo</div>
               </div>
+              {uploadedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {uploadedFiles.map((file, idx) => (
+                    <div key={idx} className="relative group/thumb">
+                      <img
+                        src={file.url}
+                        alt={file.name}
+                        className="w-20 h-20 object-cover rounded-lg border border-slate-200 shadow-sm"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute -top-2 -right-2 size-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/thumb:opacity-100 transition-opacity shadow-md"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -505,7 +579,7 @@ const NewWorkOrder = () => {
             </h3>
 
             <div className="flex flex-wrap gap-3">
-              {['Corretiva', 'Preventiva', 'Preditiva', 'Inspeção'].map(type => (
+              {['Corretiva', 'Preventiva'].map(type => (
                 <button
                   key={type}
                   type="button"
@@ -518,23 +592,6 @@ const NewWorkOrder = () => {
                   {type}
                 </button>
               ))}
-            </div>
-
-            <div className="mt-6 space-y-1.5 max-w-sm">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-tight">Classificação da Falha</label>
-              <select
-                value={failureType}
-                onChange={(e) => setFailureType(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:bg-white transition-all font-medium"
-              >
-                <option value="Mecânica">Mecânica</option>
-                <option value="Elétrica">Elétrica</option>
-                <option value="Hidráulica">Hidráulica</option>
-                <option value="Pneumática">Pneumática</option>
-                <option value="Estrutural">Estrutural</option>
-                <option value="Automação">Automação</option>
-                <option value="Geral">Geral</option>
-              </select>
             </div>
           </div>
         </div>

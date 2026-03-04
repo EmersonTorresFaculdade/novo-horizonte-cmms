@@ -414,13 +414,12 @@ serve(async (req: Request) => {
                 requesterPhone,
                 requesterEmail,
                 requesterName,
-                failure_type: enrichedWorkOrder.failure_type,
+                maintenance_type: enrichedWorkOrder.maintenance_type || 'Corretiva',
                 technical_report: enrichedWorkOrder.technical_report,
-                description: enrichedWorkOrder.description || '',
+                description: enrichedWorkOrder.description || enrichedWorkOrder.issue || '',
                 formatted_blocks: {
-                    failure_type_block: enrichedWorkOrder.failure_type ? `⚠ Tipo de Falha:\n${enrichedWorkOrder.failure_type}` : '',
                     technical_report_block: enrichedWorkOrder.technical_report ? `📝 Relatório Técnico:\n${enrichedWorkOrder.technical_report}` : '',
-                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Falha\n${enrichedWorkOrder.failure_type || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}${formatted_date ? `\n\n📅 Data do Agendamento\n*${formatted_date} às ${formatted_time}*` : ''}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
+                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Serviço\n${enrichedWorkOrder.maintenance_type || 'Corretiva'}\n\nDescrição\n${enrichedWorkOrder.description || enrichedWorkOrder.issue || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}${formatted_date ? `\n\n📅 Data do Agendamento\n*${formatted_date} às ${formatted_time}*` : ''}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
                 }
             }),
         })
