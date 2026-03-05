@@ -62,6 +62,22 @@ const Login = () => {
     }
   };
 
+  const applyPhoneMask = (value: string) => {
+    // Remove tudo que não é dígito
+    const digits = value.replace(/\D/g, '');
+
+    // Força o prefixo 55 se o usuário começar a apagar tudo ou digitar errado
+    let formatted = digits;
+    if (digits.length > 0 && !digits.startsWith('55')) {
+      formatted = '55' + digits;
+    } else if (digits.length === 0) {
+      // Opcional: deixar vazio ou forçar o 55 ao focar
+    }
+
+    // Limita a 13 dígitos (55 + 2 DDD + 9 Número)
+    return formatted.slice(0, 13);
+  };
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError('');
@@ -120,9 +136,9 @@ const Login = () => {
 
   const getApprovalMessage = () => {
     if (registerRole === 'user') {
-      return '👥 Qualquer Admin Industrial pode aprovar usuários comuns e técnicos';
+      return '👥 Qualquer Administrador de OS pode aprovar usuários comuns e técnicos';
     } else {
-      return '⚡ Apenas o Admin Root (Super Administrador) pode aprovar novos Admins Industriais';
+      return '⚡ Apenas o Admin Root (Super Administrador) pode aprovar novos Administradores de OS';
     }
   };
 
@@ -429,12 +445,42 @@ const Login = () => {
                         <input
                           id="registerPhone"
                           type="tel"
+                          required
                           value={registerPhone}
-                          onChange={(e) => setRegisterPhone(e.target.value)}
-                          placeholder="(11) 99999-9999"
+                          onChange={(e) => setRegisterPhone(applyPhoneMask(e.target.value))}
+                          onFocus={(e) => {
+                            if (!e.target.value) setRegisterPhone('55');
+                          }}
+                          placeholder="5543999999999"
                           className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
                         />
                       </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="registerRole" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                        Tipo de Acesso Desejado
+                      </label>
+                      <div className="relative group">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                          <Shield size={18} />
+                        </div>
+                        <select
+                          id="registerRole"
+                          required
+                          value={registerRole}
+                          onChange={(e) => setRegisterRole(e.target.value as any)}
+                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold focus:border-primary focus:bg-white transition-all outline-none appearance-none"
+                        >
+                          <option value="user">Técnico / Requerente</option>
+                          <option value="admin">Administrador de OS</option>
+                        </select>
+                      </div>
+                      <p className="mt-1.5 text-[10px] text-slate-500 font-medium px-1">
+                        {registerRole === 'admin'
+                          ? '⚡ Requer aprovação do Gerente de Manutenção'
+                          : '👥 Requer aprovação de qualquer administrador'}
+                      </p>
                     </div>
 
                     <div>

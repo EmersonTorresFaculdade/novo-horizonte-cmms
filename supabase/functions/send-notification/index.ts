@@ -31,6 +31,7 @@ serve(async (req: Request) => {
         let workOrder: any = body.workOrder || body.data;
         let company = body.company;
         let reportData = body.reportData;
+        let userData = body.user; // Added for user events
 
         if (!event && body.type) {
             if (body.type === 'INSERT') event = 'work_order_created';
@@ -38,10 +39,11 @@ serve(async (req: Request) => {
             workOrder = body.record;
         }
 
-        // Allow report events to proceed without a workOrder if reportData is present
+        // Allow report events and user events to proceed without a workOrder
         const isReportEvent = event === 'executive_report_manual';
+        const isUserEvent = ['user_registered', 'user_approved', 'user_rejected'].includes(event);
 
-        if (!event || (!workOrder && !isReportEvent)) {
+        if (!event || (!workOrder && !isReportEvent && !isUserEvent)) {
             return new Response(JSON.stringify({
                 message: 'Missing event or workOrder',
                 received: { event, hasWorkOrder: !!workOrder, hasReportData: !!reportData }
@@ -168,6 +170,13 @@ serve(async (req: Request) => {
                 adminPhones = Array.from(uniquePhones);
                 if (adminPhones.length > 0) adminPhone = adminPhones[0];
             }
+        }
+
+        // 2b. Handle User Event recipients
+        if (isUserEvent && userData) {
+            requesterEmail = userData.email;
+            requesterPhone = formatPhone(userData.phone);
+            requesterName = userData.name;
         }
 
         // 3. Enrich Work Order Data
@@ -326,6 +335,19 @@ serve(async (req: Request) => {
         } else if (event === 'executive_report_manual') {
             subject_display = "📊 Relatório Executivo Estratégico";
             intro_display = "foi gerado manualmente pela diretoria";
+        } else if (event === 'user_registered') {
+            subject_display = "👤 Novo Registro de Usuário";
+            if (userData?.role === 'admin') {
+                intro_display = "solicitou acesso como Administrador e aguarda aprovação do Root.";
+            } else {
+                intro_display = "foi realizado e aguarda aprovação de um administrador.";
+            }
+        } else if (event === 'user_approved') {
+            subject_display = "✅ Cadastro Aprovado";
+            intro_display = "foi aprovado! Agora você já pode acessar o sistema com suas credenciais.";
+        } else if (event === 'user_rejected') {
+            subject_display = "❌ Cadastro Não Aprovado";
+            intro_display = "foi revisado e, infelizmente, o acesso não foi concedido no momento.";
         } else {
             subject_display = "🔄 Atualização da Ordem de Serviço";
             // Custom messages based on status

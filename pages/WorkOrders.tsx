@@ -26,6 +26,7 @@ interface WorkOrder {
   order_number: string;
   issue: string; // desc
   maintenance_category?: string;
+  maintenance_type?: string;
   failure_type: string;
   status: string;
   priority: string;
@@ -85,14 +86,38 @@ const WorkOrders = () => {
         .select(`
                 *,
                 failure_type,
+                maintenance_type,
                 assets (id, name, model, code, sector),
                 technicians (name),
                 requester:users!requester_id (name)
             `)
         .order('created_at', { ascending: false });
 
-      if (!isAdmin && user?.id) {
-        query = query.eq('requester_id', user.id);
+      const isAdminRoot = user?.role === 'admin_root';
+      const isCommonAdmin = user?.role === 'admin';
+
+      const managedCats: string[] = [];
+      if (user?.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA');
+      if (user?.manage_predial) managedCats.push('Predial', 'PREDIAL');
+      if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
+
+      if (!isAdminRoot) {
+        if (isCommonAdmin) {
+          // Admin sees all in their managed categories
+          if (managedCats.length > 0) {
+            query = query.in('maintenance_category', managedCats);
+          } else {
+            query = query.eq('maintenance_category', 'NONE');
+          }
+        } else {
+          // Common user sees only their OWN in their managed categories
+          query = query.eq('requester_id', user?.id || '');
+          if (managedCats.length > 0) {
+            query = query.in('maintenance_category', managedCats);
+          } else {
+            query = query.eq('maintenance_category', 'NONE');
+          }
+        }
       }
 
       const { data, error } = await query;
@@ -125,16 +150,7 @@ const WorkOrders = () => {
       (order.assets?.name || '').toLowerCase().includes(searchLower) ||
       (assetsData?.code || '').toLowerCase().includes(searchLower);
 
-    // Filter by Permission (Maintenance Category)
-    const allowedCategories: string[] = [];
-    if (user?.manage_equipment) allowedCategories.push('Equipamento');
-    if (user?.manage_predial) allowedCategories.push('Predial');
-    if (user?.manage_others) allowedCategories.push('Outros');
-
-    // If order has no category, treat it as Equipamento (legacy or default)
-    const matchesPermission = allowedCategories.includes(order.maintenance_category || 'Equipamento');
-
-    return matchesStatus && matchesSearch && matchesPermission;
+    return matchesStatus && matchesSearch;
   });
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
@@ -169,10 +185,16 @@ const WorkOrders = () => {
 
   const getPriorityColor = (p: string) => {
     switch (p) {
-      case 'Alta': return 'bg-red-100 text-red-800 border-red-200';
-      case 'Média': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'Baixa': return 'bg-emerald-50/50 text-green-800 border-green-200';
-      default: return 'bg-slate-100 text-slate-700 border-slate-200';
+      case 'Crítica':
+      case 'Emergência':
+      case 'Alta':
+        return 'bg-red-50 text-red-700 border-red-200/50 shadow-sm shadow-red-500/5';
+      case 'Média':
+        return 'bg-amber-50 text-amber-700 border-amber-200/50 shadow-sm shadow-amber-500/5';
+      case 'Baixa':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200/50 shadow-sm shadow-emerald-500/5';
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-200/50';
     }
   };
 
@@ -202,23 +224,23 @@ const WorkOrders = () => {
     let colorClass = 'bg-slate-50 text-slate-600 border-slate-200';
 
     if (s === 'concluído' || s === 'concluido' || s === 'concluída' || s === 'concluida') {
-      colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      colorClass = 'bg-emerald-50 text-emerald-700 border-emerald-200/60';
     } else if (s === 'em manutenção' || s === 'manutenção') {
-      colorClass = 'bg-purple-50 text-purple-700 border-purple-200';
+      colorClass = 'bg-blue-50 text-blue-700 border-blue-200/60';
     } else if (s === 'agendado') {
-      colorClass = 'bg-teal-50 text-teal-700 border-teal-200';
+      colorClass = 'bg-indigo-50 text-indigo-700 border-indigo-200/60';
     } else if (s === 'recebido') {
-      colorClass = 'bg-blue-50 text-blue-600 border-blue-200';
+      colorClass = 'bg-sky-50 text-sky-700 border-sky-200/60';
     } else if (s === 'aguardando peça' || s === 'aguardando') {
-      colorClass = 'bg-amber-50 text-amber-700 border-amber-200';
+      colorClass = 'bg-amber-50 text-amber-700 border-amber-200/60';
     } else if (s === 'aberto' || s === 'aberta') {
-      colorClass = 'bg-orange-50 text-orange-700 border-orange-200';
+      colorClass = 'bg-orange-50 text-orange-700 border-orange-200/60';
     } else if (s === 'crítico' || s === 'crítica') {
-      colorClass = 'bg-red-50 text-red-700 border-red-200';
+      colorClass = 'bg-red-50 text-red-700 border-red-200/60';
     }
 
     return (
-      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border ${colorClass}`}>
+      <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${colorClass}`}>
         {status}
       </span>
     );
@@ -238,7 +260,7 @@ const WorkOrders = () => {
           className="bg-primary hover:bg-primary-dark text-white px-4 py-2.5 rounded-lg text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 transition-all"
         >
           <Plus size={18} />
-          Criar Nova Solicitação
+          Abrir Chamado
         </button>
       </div>
 
@@ -336,10 +358,9 @@ const WorkOrders = () => {
                   <table className="w-full text-left border-collapse">
                     <thead>
                       <tr className="bg-slate-50/50 border-b border-slate-100">
-                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-24">ID</th>
-                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Categoria</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">ID</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-48">Alvo</th>
-                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Tipo</th>
+                        <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-64">Categoria / Tipo</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500">Problema</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Setor</th>
                         <th className="p-4 text-xs font-semibold uppercase tracking-wider text-slate-500 w-32">Prioridade</th>
@@ -354,20 +375,30 @@ const WorkOrders = () => {
                         <tr key={order.id} onClick={() => navigate(`/work-orders/${order.id}`)} className="group hover:bg-slate-50 transition-colors cursor-pointer">
                           <td className="p-4 text-sm font-medium text-primary">#{order.order_number}</td>
                           <td className="p-4">
-                            <span className="inline-flex py-1 px-2 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                              {formatCategory(order.maintenance_category)}
-                            </span>
-                          </td>
-                          <td className="p-4">
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-900">{order.assets?.name || 'Geral'}</span>
                               <span className="text-xs text-slate-500">{order.assets?.model || '-'}</span>
                             </div>
                           </td>
                           <td className="p-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200">
-                              {formatType(order.failure_type, order.maintenance_category)}
-                            </span>
+                            <div className="flex flex-wrap gap-2">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border shadow-sm ${formatCategory(order.maintenance_category) === 'MÁQUINA'
+                                ? 'bg-blue-50 text-blue-700 border-blue-200/50'
+                                : formatCategory(order.maintenance_category) === 'PREDIAL'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200/50'
+                                  : 'bg-slate-50 text-slate-600 border-slate-200/50'
+                                }`}>
+                                {formatCategory(order.maintenance_category)}
+                              </span>
+                              {order.maintenance_type && order.maintenance_type !== order.maintenance_category && (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider border shadow-sm ${order.maintenance_type === 'Corretiva'
+                                  ? 'bg-red-50 text-red-700 border-red-200/50'
+                                  : 'bg-emerald-50 text-emerald-700 border-emerald-200/50'
+                                  }`}>
+                                  {order.maintenance_type}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="p-4 text-sm text-slate-700">{order.issue}</td>
                           <td className="p-4 text-sm text-slate-700">{order.assets?.sector || order.sector || '-'}</td>
@@ -464,13 +495,23 @@ const WorkOrders = () => {
                           )}
                         </div>
                         <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{order.assets?.name || 'Geral'}</h4>
-                        <div className="mb-2 flex items-center gap-1 flex-wrap">
-                          <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                        <div className="mb-3 flex items-center gap-2 flex-wrap">
+                          <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md border shadow-sm ${formatCategory(order.maintenance_category) === 'MÁQUINA'
+                            ? 'bg-blue-50 text-blue-700 border-blue-200/50'
+                            : formatCategory(order.maintenance_category) === 'PREDIAL'
+                              ? 'bg-amber-50 text-amber-700 border-amber-200/50'
+                              : 'bg-slate-50 text-slate-600 border-slate-200/50'
+                            }`}>
                             {formatCategory(order.maintenance_category)}
                           </span>
-                          <span className="text-[10px] font-bold uppercase text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                            {formatType(order.failure_type, order.maintenance_category)}
-                          </span>
+                          {order.maintenance_type && order.maintenance_type !== order.maintenance_category && (
+                            <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md border shadow-sm ${order.maintenance_type === 'Corretiva'
+                              ? 'bg-red-50 text-red-700 border-red-200/50'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200/50'
+                              }`}>
+                              {order.maintenance_type}
+                            </span>
+                          )}
                         </div>
                         <p className="text-xs text-slate-500 line-clamp-2 mb-2">{order.issue}</p>
                         <div className="flex items-center gap-2 mt-2 pt-2 border-t border-slate-50">

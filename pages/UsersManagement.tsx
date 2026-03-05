@@ -294,7 +294,7 @@ const UsersManagement = () => {
                                     </td>
                                     <td className="px-6 py-4">
                                         <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded text-slate-600">
-                                            {u.role === 'admin_root' ? 'Admin Root' : u.role === 'admin' ? 'Admin Industrial' : 'Usuário / Solicitante'}
+                                            {u.role === 'admin_root' ? 'Admin Root' : u.role === 'admin' ? 'Administrador de OS' : 'Usuário / Solicitante'}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4">
@@ -365,7 +365,7 @@ const UsersManagement = () => {
                                         className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700"
                                     >
                                         <option value="user">Usuário / Solicitante</option>
-                                        <option value="admin">Admin Industrial</option>
+                                        <option value="admin">Administrador de OS</option>
                                         <option value="admin_root">Admin Root</option>
                                     </select>
                                 </div>

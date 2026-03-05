@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import bcrypt from 'bcryptjs';
+import { NotificationService } from '../services/NotificationService';
 
 // Tipos
 export type UserRole = 'admin_root' | 'admin' | 'user';
@@ -195,7 +196,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     phone,
                     role: 'user', // Sempre criar como 'user' inicialmente (segurança)
                     requested_role: requestedRole, // O role desejado fica em requested_role
-                    status: 'pending'
+                    status: 'pending',
+                    email_notifications: true,
+                    whatsapp_notifications: true,
+                    push_notifications: true,
+                    daily_report: true
                 })
                 .select()
                 .single();
@@ -204,6 +209,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 console.error('Insert error:', insertError);
                 return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
             }
+
+            // Notificar registro realizado (aguardando aprovação)
+            await NotificationService.notifyUserRegistered({
+                id: newUser.id,
+                name: newUser.name,
+                email: newUser.email,
+                phone: newUser.phone,
+                role: newUser.role,
+                status: newUser.status
+            });
 
             return { success: true };
         } catch (error) {
@@ -277,6 +292,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .eq('id', userId);
 
             if (error) throw error;
+
+            // Buscar dados completos para notificação
+            const { data: finalUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (finalUser) {
+                await NotificationService.notifyUserApproved({
+                    id: finalUser.id,
+                    name: finalUser.name,
+                    email: finalUser.email,
+                    phone: finalUser.phone,
+                    role: finalUser.role,
+                    status: finalUser.status
+                });
+            }
+
             return { success: true };
         } catch (error: any) {
             console.error('Error approving user:', error);
@@ -296,6 +330,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .eq('id', userId);
 
             if (error) throw error;
+
+            // Buscar dados completos para notificação
+            const { data: finalUser } = await supabase
+                .from('users')
+                .select('*')
+                .eq('id', userId)
+                .single();
+
+            if (finalUser) {
+                await NotificationService.notifyUserRejected({
+                    id: finalUser.id,
+                    name: finalUser.name,
+                    email: finalUser.email,
+                    phone: finalUser.phone,
+                    role: finalUser.role,
+                    status: finalUser.status
+                });
+            }
+
             return { success: true };
         } catch (error: any) {
             console.error('Error rejecting user:', error);

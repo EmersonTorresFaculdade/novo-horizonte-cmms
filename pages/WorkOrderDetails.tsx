@@ -17,6 +17,7 @@ import {
    Clock,
    CheckCircle2,
    Play,
+   PlayCircle,
    Share2,
    LogOut,
    Calendar,
@@ -30,9 +31,14 @@ import {
    Zap,
    Loader2,
    Search,
+   Mail,
    X,
+   XCircle,
    Star,
-   RotateCcw
+   RotateCcw,
+   Box,
+   Hash,
+   Info
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, supabaseUntyped } from '../lib/supabase';
@@ -75,6 +81,7 @@ interface WorkOrder {
    requester?: {
       name: string;
       role: string;
+      email?: string;
    } | null;
    response_hours?: number;
    repair_hours?: number;
@@ -85,6 +92,11 @@ interface WorkOrder {
    responded_at?: string;
    resolved_at?: string;
    scheduled_at?: string;
+   parts_invoice_number?: string;
+   labor_invoice_number?: string;
+   labor_cost?: number;
+   manual_parts_cost?: number;
+   extra_costs?: { type: 'part' | 'labor' | 'other'; invoice: string; amount: number; description?: string }[];
 }
 
 interface Technician {
@@ -142,6 +154,10 @@ const WorkOrderDetails = () => {
    const [report, setReport] = useState('');
    const [hourlyRate, setHourlyRate] = useState<number>(0);
    const [scheduledAt, setScheduledAt] = useState<string>('');
+   const [laborCost, setLaborCost] = useState<number>(0);
+   const [extraCosts, setExtraCosts] = useState<{ type: 'part' | 'labor' | 'other'; invoice: string; amount: number; description?: string }[]>([]);
+   const [showExtraCosts, setShowExtraCosts] = useState(false);
+   const [manualPartsCost, setManualPartsCost] = useState<number>(0);
 
    // Funções Auxiliares
    const formatToLocalISO = (dateStr: string) => {
@@ -188,6 +204,9 @@ const WorkOrderDetails = () => {
    const [editFailureType, setEditFailureType] = useState('');
    const [editMaintenanceCategory, setEditMaintenanceCategory] = useState('');
    const [editMaintenanceType, setEditMaintenanceType] = useState('Corretiva');
+
+   const currentTech = technicians.find(t => t.id === selectedTechId);
+   const isThirdPartyTech = currentTech?.is_third_party === true || !!((workOrder as any)?.third_party_company_id);
 
    // Atividades e Comentários
    interface WorkOrderActivity {
@@ -315,6 +334,19 @@ const WorkOrderDetails = () => {
       }
    }, [id, fetchActivities]);
 
+   const fetchUsedParts = async () => {
+      if (!id) return;
+      const { data: partsData } = await supabase
+         .from('work_order_parts')
+         .select(`
+             id, item_id, quantity,
+             inventory_items (name, unit_value)
+         `)
+         .eq('work_order_id', id);
+
+      if (partsData) setUsedParts(partsData);
+   };
+
    const fetchOrderDetails = async () => {
       try {
          // Fetch Order
@@ -325,7 +357,7 @@ const WorkOrderDetails = () => {
                 assets (name, sector, category, model, manufacturer, code, warranty_expires_at, image_url),
                 technicians (name),
                 third_party_companies (name),
-                requester:users!requester_id (name, role)
+                requester:users!requester_id (name, role, email)
             `)
             .eq('id', id);
 
@@ -349,9 +381,10 @@ const WorkOrderDetails = () => {
          setEditMaintenanceCategory((workOrderData as any).maintenance_category || 'Equipamento');
          setEditMaintenanceType((workOrderData as any).maintenance_type || 'Corretiva');
          setReport(workOrderData.technical_report || ''); // Populate report state
-         setHourlyRate(workOrderData.hourly_rate || 0);
-
-         setPartsCost(Number((workOrderData as any).parts_cost) || 0);
+         setHourlyRate(data.hourly_rate || 0);
+         setLaborCost((workOrderData as any).labor_cost || 0);
+         setExtraCosts((workOrderData as any).extra_costs || []);
+         setManualPartsCost((workOrderData as any).manual_parts_cost || 0);
          setScheduledAt((workOrderData as any).scheduled_at || '');
 
          if (workOrderData.technician_id) setSelectedTechId(workOrderData.technician_id);
@@ -369,7 +402,7 @@ const WorkOrderDetails = () => {
          if (partsData) setUsedParts(partsData);
 
          // Fetch existing rating for this work order
-         if (workOrderData.technician_id) {
+         if (workOrderData.technician_id || (workOrderData as any).third_party_company_id) {
             const { data: ratingData } = await supabaseUntyped
                .from('technician_ratings')
                .select('*')
@@ -550,11 +583,13 @@ const WorkOrderDetails = () => {
                maintenance_type: editMaintenanceType,
                estimated_hours: 0,
                technical_report: report,
-               hourly_rate: isThirdParty ? hourlyRate : 0, // Labor cost only for third parties
+               labor_cost: laborCost,
+               extra_costs: extraCosts,
                response_hours: finalResponseHours,
                repair_hours: finalRepairHours,
                downtime_hours: finalDowntimeHours,
-               parts_cost: calculatedPartsCost,
+               manual_parts_cost: Number(manualPartsCost),
+               parts_cost: Number(manualPartsCost) + calculatedPartsCost,
                scheduled_at: finalScheduledAt,
                updated_at: now.toISOString(),
                ...slaUpdates
@@ -640,8 +675,7 @@ const WorkOrderDetails = () => {
             });
 
          if (error) throw error;
-
-         fetchOrderDetails();
+         fetchUsedParts();
          setSelectedPartId('');
          setPartQuantity(1);
       } catch (error) {
@@ -667,7 +701,7 @@ const WorkOrderDetails = () => {
                   .eq('id', partId);
 
                if (error) throw error;
-               fetchOrderDetails();
+               fetchUsedParts();
             } catch (error) {
                console.error('Error removing part:', error);
                setFeedback({
@@ -681,11 +715,11 @@ const WorkOrderDetails = () => {
    };
 
    const statusSteps = [
-      { id: 'Aberto', label: 'Aberto', icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50' },
-      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-blue-600', bg: 'bg-blue-50' },
-      { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-teal-600', bg: 'bg-teal-50' },
-      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-purple-600', bg: 'bg-purple-50' },
-      { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-emerald-500', bg: 'bg-emerald-50' }
+      { id: 'Aberto', label: 'Aberto', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
+      { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-slate-900', bg: 'bg-slate-100' },
+      { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-primary', bg: 'bg-primary/10' },
+      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-slate-900', bg: 'bg-slate-200' },
+      { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-primary', bg: 'bg-primary/10' }
    ];
 
    // Custom timeline logic: Agendado is determined by scheduled_at, not by status directly
@@ -713,68 +747,86 @@ const WorkOrderDetails = () => {
 
 
                {/* Header Section */}
-               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div className="space-y-1">
-                     <div className="flex items-center gap-4">
-                        <div className={`size-3 rounded-full animate-ping ${workOrder.priority === 'Crítica' ? 'bg-brand-alert' :
-                           workOrder.priority === 'Alta' ? 'bg-orange-600' :
-                              workOrder.priority === 'Média' ? 'bg-primary' :
-                                 'bg-emerald-600'}`}></div>
-                        <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-3">
-                           {workOrder.order_number}: {workOrder.issue}
-                        </h1>
-                        <div className="flex items-center gap-2">
-                           <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border
-                           ${workOrder.priority === 'Crítica' ? 'bg-red-50 text-red-700 border-red-100' :
-                                 workOrder.priority === 'Alta' ? 'bg-orange-50 text-orange-700 border-orange-100' :
-                                    workOrder.priority === 'Média' ? 'bg-emerald-50/50 text-blue-700 border-primary-light/10' :
-                                       'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
-                              Prioridade {workOrder.priority}
+               <div className="bg-white rounded-[2.5rem] shadow-xl shadow-slate-200/50 border border-slate-200 p-8 md:p-10 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-12 opacity-[0.03] group-hover:scale-110 transition-transform duration-1000">
+                     <Zap size={240} />
+                  </div>
+
+                  <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                     <div className="space-y-4">
+                        <div className="flex flex-wrap items-center gap-3">
+                           <div className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border shadow-sm
+                             ${workOrder.priority === 'Crítica' ? 'bg-red-50 text-red-600 border-red-100' :
+                                 workOrder.priority === 'Alta' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                    workOrder.priority === 'Média' ? 'bg-primary/5 text-primary border-primary/10' :
+                                       'bg-slate-50 text-slate-500 border-slate-100'}`}>
+                              PRIORIDADE {workOrder.priority}
+                           </div>
+                           <span className="bg-slate-900 text-white px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] border border-white/10 shadow-lg">
+                              OS #{workOrder.order_number}
                            </span>
                            {status === 'Cancelado' && (
-                              <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase border bg-slate-900 text-white border-slate-900 flex items-center gap-1">
-                                 <X size={10} strokeWidth={3} />
-                                 OS Cancelada
+                              <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-[0.2em] bg-red-600 text-white border-red-600 flex items-center gap-2">
+                                 <X size={12} strokeWidth={3} /> CANCELADA
                               </span>
                            )}
                         </div>
+
+                        <h1 className="text-4xl md:text-5xl font-black text-slate-900 tracking-tighter leading-[1.1]">
+                           {workOrder.issue}
+                        </h1>
+
+                        <div className="flex flex-wrap items-center gap-6 text-slate-400 font-medium">
+                           <div className="flex items-center gap-2.5">
+                              <div className="size-8 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
+                                 <User size={16} />
+                              </div>
+                              <div>
+                                 <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">Solicitado por</p>
+                                 <p className="text-sm font-bold text-slate-700">{workOrder.requester?.name || 'Administrador'}</p>
+                              </div>
+                           </div>
+                           <div className="h-8 w-px bg-slate-100 hidden sm:block"></div>
+                           <div className="flex items-center gap-2.5">
+                              <div className="size-8 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
+                                 <Mail size={16} />
+                              </div>
+                              <div>
+                                 <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">E-mail</p>
+                                 <p className="text-sm font-bold text-slate-700">{workOrder.requester?.email || 'adm@system.com'}</p>
+                              </div>
+                           </div>
+                           <div className="h-8 w-px bg-slate-100 hidden sm:block"></div>
+                           <div className="flex items-center gap-2.5">
+                              <div className="size-8 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500">
+                                 <Calendar size={16} />
+                              </div>
+                              <div>
+                                 <p className="text-[10px] font-black uppercase tracking-widest leading-none mb-0.5">Criado em</p>
+                                 <p className="text-sm font-bold text-slate-700">
+                                    {new Date(workOrder.created_at).toLocaleDateString('pt-BR')} às {new Date(workOrder.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                 </p>
+                              </div>
+                           </div>
+                        </div>
                      </div>
-                     <p className="text-sm text-slate-500 flex items-center gap-2">
-                        Aberta Por <span className="font-semibold text-slate-700">{workOrder.requester?.name || 'Administrador'}</span> em {new Date(workOrder.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })} às {new Date(workOrder.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                     </p>
-                  </div>
 
-
-               </div>
-
-               {/* Timeline Section */}
-               <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8">
-                  <div className="relative">
-                     {/* Background Line */}
-                     <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-slate-100 -translate-y-1/2 hidden md:block"></div>
-
-                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-2 relative z-10">
+                     {/* Unified Status Visualizer */}
+                     <div className="bg-slate-50 rounded-3xl p-6 border border-slate-100 flex flex-col md:flex-row items-center gap-10 md:gap-14">
                         {statusSteps.map((step, idx) => {
-                           const isLast = idx === statusSteps.length - 1;
-                           // Mais simples:
                            const done = idx <= currentStepIndex;
-                           const active = idx === currentStepIndex;
-
+                           const current = idx === currentStepIndex;
                            return (
-                              <div key={step.id} className="flex flex-col items-center text-center gap-2">
-                                 <div className={`size-10 md:size-12 rounded-full flex items-center justify-center transition-all border-4 ${done ? `${step.bg} ${step.color.replace('text-', 'border-')} shadow-lg shadow-${step.color.replace('text-', '')}/10` : 'bg-white border-slate-50 text-slate-300'
-                                    }`}>
-                                    <step.icon size={18} className={done ? step.color : 'text-slate-300'} />
+                              <div key={step.id} className="relative flex flex-col items-center group/step">
+                                 <div className={`size-14 rounded-2xl flex items-center justify-center transition-all duration-500 relative z-10 border-2 
+                                     ${done ? `${step.bg} ${step.color.replace('text-', 'border-').replace('primary', 'primary/20')} shadow-[0_8px_20px_-4px_rgba(0,223,130,0.1)]` : 'bg-white border-slate-100 text-slate-200'}`}>
+                                    <step.icon size={22} strokeWidth={2.5} className={done ? step.id === 'Agendado' || step.id === 'Concluído' ? 'text-primary' : 'text-slate-900' : 'text-slate-200'} />
+                                    {current && <span className="absolute -top-1 -right-1 size-4 bg-primary rounded-full animate-ping opacity-75"></span>}
                                  </div>
-                                 <div className="space-y-1">
-                                    <p className={`text-sm font-bold ${done ? 'text-slate-900' : 'text-slate-400'}`}>{step.label}</p>
-                                    <p className="text-[10px] font-medium text-slate-400 uppercase tracking-wider">
-                                       {active ? 'Em andamento' : done ? 'Concluído' : 'Aberto'}
-                                    </p>
-                                 </div>
-                                 {!isLast && (
-                                    <div className={`block md:hidden h-8 w-px bg-slate-100 my-2`}></div>
-                                 )}
+                                 <p className={`mt-3 text-[10px] font-black uppercase tracking-[0.15em] transition-colors ${done ? 'text-slate-900' : 'text-slate-400'}`}>
+                                    {step.label}
+                                 </p>
+                                 {idx < statusSteps.length - 1 && <div className="absolute top-7 left-full w-full h-0.5 bg-slate-100 hidden md:block"></div>}
                               </div>
                            );
                         })}
@@ -782,71 +834,86 @@ const WorkOrderDetails = () => {
                   </div>
                </div>
 
+
+
+
                {/* Main Content Layout */}
                <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                   {/* Left Column - Details & Execution */}
                   <div className="lg:col-span-8 space-y-8">
-                     {/* Card: Detalhes do Chamado */}
-                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                              <FileText size={16} className="text-primary" />
-                              Detalhes do Chamado
+                     {/* Card: Detalhes Técnicos */}
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden group/card transition-all hover:shadow-md">
+                        <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-4">
+                              <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                                 <FileText size={20} strokeWidth={2.5} />
+                              </div>
+                              Especificações Técnicas
                            </h3>
                         </div>
 
-                        <div className="p-8">
-                           <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-12 mb-10">
-                              <div>
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">ID do Ativo</p>
-                                 <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
+                        <div className="p-8 md:p-10">
+                           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12 mb-10">
+                              <div className="space-y-2">
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Ativo</p>
+                                 <div className="flex items-center gap-2">
+                                    <Box size={14} className="text-slate-400" />
+                                    <p className="text-sm font-bold text-slate-900">{workOrder.assets?.name || 'Manual'}</p>
+                                 </div>
                               </div>
-                              <div>
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Localização</p>
-                                 <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
+                              <div className="space-y-2">
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Local / Setor</p>
+                                 <div className="flex items-center gap-2">
+                                    <MapPin size={14} className="text-slate-400" />
+                                    <p className="text-sm font-bold text-slate-700">{workOrder.assets?.sector || 'N/A'}</p>
+                                 </div>
                               </div>
-                              <div>
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Categoria</p>
-                                 <p className="text-sm font-bold text-slate-700 capitalize">
-                                    {workOrder.maintenance_category || 'Geral'}
-                                 </p>
+                              <div className="space-y-2">
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Categoria</p>
+                                 <div className="flex items-center gap-2">
+                                    <Building2 size={14} className="text-slate-400" />
+                                    <p className="text-sm font-bold text-slate-700 capitalize">{workOrder.maintenance_category || 'Geral'}</p>
+                                 </div>
                               </div>
-                              <div>
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tipo de Serviço</p>
-                                 <p className="text-sm font-bold text-slate-700">
-                                    {workOrder.maintenance_type || 'Corretiva'}
-                                 </p>
+                              <div className="space-y-2">
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Serviço</p>
+                                 <div className="flex items-center gap-2">
+                                    <Zap size={14} className="text-slate-400" />
+                                    <p className="text-sm font-bold text-slate-700">{workOrder.maintenance_type || 'Corretiva'}</p>
+                                 </div>
                               </div>
                            </div>
 
                            <div className="space-y-4">
-                              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Descrição</p>
-                              <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 text-slate-700 text-sm leading-relaxed min-h-[100px]">
-                                 {workOrder.issue}
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">Descrição do Problema</p>
+                              <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 text-slate-700 text-sm leading-relaxed font-medium min-h-[120px] italic shadow-inner">
+                                 "{workOrder.issue}"
                               </div>
                            </div>
                         </div>
                      </div>
 
+
                      {/* Card: Ordem de Serviço (Execução) */}
-                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                           <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                              <Wrench size={16} className="text-primary" />
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden group/card transition-all hover:shadow-md">
+                        <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                           <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-4">
+                              <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                                 <Wrench size={20} strokeWidth={2.5} />
+                              </div>
                               Execução do Serviço
                            </h3>
                            <select
                               value={status}
                               onChange={(e) => setStatus(e.target.value)}
                               disabled={isConcluded || !isAdmin}
-
-                              className={`px-3 py-1 rounded-md text-[10px] font-bold uppercase border
-                               ${status === 'Aberto' ? 'bg-slate-50 text-slate-600 border-slate-200' :
-                                    status === 'Recebido' ? 'bg-blue-50 text-blue-700 border-primary-light/20' :
-                                       status === 'Agendado' ? 'bg-teal-50 text-teal-700 border-teal-200' :
-                                          status === 'Em Manutenção' ? 'bg-purple-50 text-purple-700 border-purple-200' :
-                                             status === 'Cancelado' ? 'bg-slate-900 text-white border-slate-900' :
-                                                'bg-emerald-50 text-emerald-700 border-emerald-200'}`}
+                              className={`px-4 py-2 rounded-full text-[10px] font-black uppercase border shadow-sm transition-all focus:ring-8 focus:ring-primary/5 cursor-pointer outline-none
+                                ${status === 'Aberto' ? 'bg-amber-50 text-amber-700 border-amber-200/60' :
+                                    status === 'Recebido' ? 'bg-slate-100 text-slate-700 border-slate-200/60' :
+                                       status === 'Agendado' ? 'bg-primary/10 text-primary border-primary/20' :
+                                          status === 'Em Manutenção' ? 'bg-slate-900 text-white border-slate-950' :
+                                             status === 'Cancelado' ? 'bg-red-600 text-white border-red-700' :
+                                                'bg-primary text-slate-900 border-primary shadow-lg shadow-primary/20'}`}
                            >
                               <option value="Aberto">Aberto</option>
                               <option value="Recebido">Recebido</option>
@@ -987,30 +1054,130 @@ const WorkOrderDetails = () => {
                               </div>
                            </div>
 
-                           {(() => {
-                              const selectedTech = technicians.find(t => t.id === selectedTechId);
-                              if (selectedTech?.is_third_party) {
-                                 return (
-                                    <div className="space-y-4 max-w-xs transition-all animate-in fade-in slide-in-from-top-1">
-                                       <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Custo de Mão de Obra (Empresa Parceira)</p>
-                                       <div className="relative">
-                                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">R$</span>
+                           {/* Manual and Multiple Invoices System */}
+                           <div className="space-y-6">
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[2px]">Custos Adicionais e Notas Fiscais</h4>
+                                 <button
+                                    onClick={() => setShowExtraCosts(!showExtraCosts)}
+                                    className="flex items-center gap-2 px-4 py-2 bg-slate-50 hover:bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest rounded-xl border border-slate-200 transition-all hover:scale-[1.02] shadow-sm"
+                                 >
+                                    <Plus size={14} className={showExtraCosts ? 'rotate-45' : ''} />
+                                    {showExtraCosts ? 'Recolher Painel' : 'Adicionar Custos Manuais'}
+                                 </button>
+                              </div>
+
+                              {showExtraCosts && (
+                                 <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-slate-50/50 p-6 rounded-2xl border border-dashed border-slate-200">
+                                       <div className="space-y-2">
+                                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Categoria</p>
+                                          <select
+                                             id="extraCostType"
+                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary transition-all"
+                                          >
+                                             <option value="part">Materiais / Peças</option>
+                                             {isThirdPartyTech && <option value="labor">Mão de Obra / Serviço</option>}
+                                             <option value="other">Outros / Despesas</option>
+                                          </select>
+                                       </div>
+                                       <div className="space-y-2">
+                                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Nº Nota Fiscal</p>
                                           <input
-                                             type="number"
-                                             step="0.01"
-                                             value={hourlyRate}
-                                             onChange={(e) => setHourlyRate(Number(e.target.value))}
-                                             disabled={isConcluded || !isAdmin}
-                                             placeholder="0,00"
-                                             className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-primary transition-all shadow-sm focus:ring-4 focus:ring-primary/5"
+                                             id="extraCostInvoice"
+                                             type="text"
+                                             placeholder="NF-e..."
+                                             className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary transition-all"
                                           />
                                        </div>
-                                       <p className="text-[9px] text-slate-400 italic">Insira o valor total cobrado pela empresa parceira para esta OS.</p>
+                                       <div className="space-y-2">
+                                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1">Valor</p>
+                                          <div className="relative">
+                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs">R$</span>
+                                             <input
+                                                id="extraCostAmount"
+                                                type="number"
+                                                step="0.01"
+                                                placeholder="0,00"
+                                                onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
+                                                className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-primary transition-all shadow-sm"
+                                             />
+                                          </div>
+                                       </div>
+                                       <button
+                                          onClick={() => {
+                                             const type = (document.getElementById('extraCostType') as HTMLSelectElement).value as any;
+                                             const invoice = (document.getElementById('extraCostInvoice') as HTMLInputElement).value;
+                                             const amount = Number((document.getElementById('extraCostAmount') as HTMLInputElement).value);
+
+                                             if (amount > 0) {
+                                                const newItem = { type, invoice, amount };
+                                                const newList = [...extraCosts, newItem];
+                                                setExtraCosts(newList);
+
+                                                // Update totals immediately for summary
+                                                const parts = newList.filter(c => c.type === 'part').reduce((acc, c) => acc + c.amount, 0);
+                                                const labor = newList.filter(c => c.type === 'labor').reduce((acc, c) => acc + c.amount, 0);
+                                                setManualPartsCost(parts);
+                                                setLaborCost(labor);
+
+                                                // Clear inputs
+                                                (document.getElementById('extraCostInvoice') as HTMLInputElement).value = '';
+                                                (document.getElementById('extraCostAmount') as HTMLInputElement).value = '';
+                                             }
+                                          }}
+                                          className="self-end px-6 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all active:scale-95"
+                                       >
+                                          Adicionar
+                                       </button>
                                     </div>
-                                 );
-                              }
-                              return null;
-                           })()}
+
+                                    {extraCosts.length > 0 ? (
+                                       <div className="grid grid-cols-1 gap-2">
+                                          {extraCosts.map((cost, idx) => (
+                                             <div key={idx} className="flex items-center justify-between p-3 bg-white border border-slate-100 rounded-xl hover:border-slate-200 transition-all shadow-sm group animate-in fade-in slide-in-from-left-1">
+                                                <div className="flex items-center gap-4">
+                                                   <span className={`px-2.5 py-1 rounded text-[9px] font-black uppercase tracking-widest ${cost.type === 'part' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                                                      cost.type === 'labor' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                                         'bg-slate-50 text-slate-600 border border-slate-100'
+                                                      }`}>
+                                                      {cost.type === 'part' ? 'Material' : cost.type === 'labor' ? 'Serviço' : 'Outro'}
+                                                   </span>
+                                                   <div className="space-y-0.5">
+                                                      <p className="text-xs font-bold text-slate-700">{cost.invoice || 'Sem Nota'}</p>
+                                                      <p className="text-[9px] text-slate-400 font-medium tracking-tight uppercase">Documento Fiscal</p>
+                                                   </div>
+                                                </div>
+                                                <div className="flex items-center gap-6">
+                                                   <p className="text-sm font-black text-slate-900">
+                                                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cost.amount)}
+                                                   </p>
+                                                   <button
+                                                      onClick={() => {
+                                                         const newList = extraCosts.filter((_, i) => i !== idx);
+                                                         setExtraCosts(newList);
+                                                         const parts = newList.filter(c => c.type === 'part').reduce((acc, c) => acc + c.amount, 0);
+                                                         const labor = newList.filter(c => c.type === 'labor').reduce((acc, c) => acc + c.amount, 0);
+                                                         setManualPartsCost(parts);
+                                                         setLaborCost(labor);
+                                                      }}
+                                                      className="opacity-0 group-hover:opacity-100 p-2 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                   >
+                                                      <Trash2 size={14} />
+                                                   </button>
+                                                </div>
+                                             </div>
+                                          ))}
+                                       </div>
+                                    ) : (
+                                       <div className="py-8 text-center bg-slate-50/20 rounded-2xl border border-dashed border-slate-100">
+                                          <p className="text-xs text-slate-400 italic">Nenhum custo manual registrado ainda.</p>
+                                       </div>
+                                    )}
+                                 </div>
+                              )}
+                           </div>
+
 
                            <div className="space-y-4">
                               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Relatório Técnico / Solução</p>
@@ -1020,7 +1187,7 @@ const WorkOrderDetails = () => {
                                  disabled={isConcluded || !isAdmin}
 
                                  placeholder="Descreva o trabalho realizado, a causa raiz identificada e a resolução..."
-                                 className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all min-h-[120px] shadow-sm"
+                                 className="w-full p-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all min-h-[120px] shadow-sm hover:border-slate-300"
                               />
                            </div>
 
@@ -1092,6 +1259,7 @@ const WorkOrderDetails = () => {
                                           type="number"
                                           min="1"
                                           value={partQuantity}
+                                          onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
                                           onChange={(e) => setPartQuantity(Number(e.target.value))}
                                           className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all shadow-sm text-center font-bold"
                                        />
@@ -1150,163 +1318,9 @@ const WorkOrderDetails = () => {
 
                   {/* Right Column - Sidebar Widgets */}
                   <div className="lg:col-span-4 space-y-8">
-                     {/* Widget: Tempos da OS */}
-                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
-                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                           <Timer size={14} className="text-primary" />
-                           Tempos da OS
-                        </h4>
-
-                        <div className="space-y-2">
-                           <div className="flex justify-between text-[10px] font-bold uppercase">
-                              <span className="text-slate-500">Tempo de Resposta</span>
-                              <span className={responseTime.pending ? 'text-orange-500' : 'text-emerald-600'}>
-                                 {responseTime.pending ? 'Em andamento' : responseTime.label}
-                              </span>
-                           </div>
-                           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all duration-500 ${responseTime.pending ? 'bg-orange-400 animate-pulse' : 'bg-emerald-500'}`} style={{ width: responseTime.pending ? '100%' : '100%' }}></div>
-                           </div>
-                           <p className="text-[10px] text-slate-400">Abertura → Início Manutenção</p>
-                        </div>
-
-                        <div className="space-y-2">
-                           <div className="flex justify-between text-[10px] font-bold uppercase">
-                              <span className="text-slate-500">Tempo de Resolução</span>
-                              <span className={!workOrder?.responded_at ? 'text-slate-400' : resolutionTime.pending ? 'text-orange-500' : 'text-emerald-600'}>
-                                 {!workOrder?.responded_at ? 'Aguardando' : resolutionTime.pending ? 'Em andamento' : resolutionTime.label}
-                              </span>
-                           </div>
-                           <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                              <div className={`h-full rounded-full transition-all duration-500 ${!workOrder?.responded_at ? 'bg-slate-200' : resolutionTime.pending ? 'bg-orange-400 animate-pulse' : 'bg-emerald-500'}`} style={{ width: !workOrder?.responded_at ? '0%' : '100%' }}></div>
-                           </div>
-                           <p className="text-[10px] text-slate-400">Início Manutenção → Conclusão</p>
-                        </div>
-                     </div>
-
-                     {/* Widget: Avaliação do Serviço */}
-                     {isConcluded && existingRating && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-4">
-                           <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                              <Star size={14} className="text-amber-400 fill-amber-400" />
-                              Avaliação do Serviço
-                           </h4>
-                           <div className="flex items-center gap-3">
-                              <div className="flex items-center gap-0.5">
-                                 {[1, 2, 3, 4, 5].map((star) => (
-                                    <Star
-                                       key={star}
-                                       size={20}
-                                       className={star <= existingRating.rating
-                                          ? 'text-amber-400 fill-amber-400'
-                                          : 'text-slate-200'
-                                       }
-                                    />
-                                 ))}
-                              </div>
-                              <span className="text-lg font-bold text-slate-800">{existingRating.rating}/5</span>
-                           </div>
-                           {existingRating.comment && (
-                              <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
-                                 <p className="text-sm text-slate-600 italic">"{existingRating.comment}"</p>
-                              </div>
-                           )}
-                           <p className="text-[10px] text-emerald-600 font-bold flex items-center gap-1">
-                              <CheckCircle2 size={12} />
-                              Avaliação enviada em {new Date(existingRating.created_at).toLocaleDateString('pt-BR')}
-                           </p>
-                        </div>
-                     )}
-
-                     {/* Widget: Asset Card */}
-                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                        <div className="h-32 bg-slate-900 flex items-center justify-center overflow-hidden relative group">
-                           {(workOrder.assets as any)?.image_url ? (
-                              <img
-                                 src={(workOrder.assets as any).image_url}
-                                 alt={workOrder.assets?.name || 'Ativo'}
-                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                              />
-                           ) : (
-                              <Building2 size={48} className="text-slate-700 opacity-50 group-hover:scale-110 transition-transform" />
-                           )}
-                           <div className="absolute inset-0 bg-gradient-to-t from-slate-900/80 to-transparent"></div>
-                        </div>
-                        <div className="p-6 space-y-6">
-                           <div className="space-y-1">
-                              <h4 className="text-base font-bold text-slate-900">{workOrder.assets?.name || 'Geral'}</h4>
-                              <p className="text-xs text-slate-500">{workOrder.assets?.model || 'Modelo não especificado'}</p>
-                           </div>
-
-                           <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase">Categoria</p>
-                                 <p className="text-xs font-semibold text-slate-700">{workOrder.assets?.category || 'N/A'}</p>
-                              </div>
-                              <div className="space-y-1">
-                                 <p className="text-[10px] font-bold text-slate-400 uppercase">Setor</p>
-                                 <p className="text-xs font-semibold text-slate-700">{(workOrder.assets as any)?.sector || 'N/A'}</p>
-                              </div>
-                           </div>
-
-                           <button
-                              onClick={() => {
-                                 const targetCode = workOrder.assets?.code;
-                                 console.log('DEBUG: Ver Histórico Clicked. Asset Code:', targetCode);
-                                 navigate(`/work-orders?search=${targetCode || ''}`);
-                              }}
-                              className="w-full py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 text-xs font-bold rounded-xl border border-slate-200 transition-all"
-                           >
-                              Ver Histórico do Ativo
-                           </button>
-                        </div>
-                     </div>
-
-                     {/* Widget: Resumo de Custos */}
-                     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-6">
-                        <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
-                           <LineChart size={14} className="text-emerald-500" />
-                           Resumo de Custos
-                        </h4>
-
-                        <div className="space-y-4">
-                           <div className="flex justify-between items-center text-sm">
-                              <span className="text-slate-500">Mão de Obra</span>
-                              <span className="font-semibold text-slate-700">
-                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                    ((workOrder as any).third_party_company_id || (workOrder as any).third_party_companies) ? (workOrder.hourly_rate || 0) : 0
-                                 )}
-                              </span>
-                           </div>
-                           <div className="flex justify-between items-center text-sm">
-                              <span className="text-slate-500">Peças e Materiais</span>
-                              <span className="font-semibold text-slate-700">
-                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                    usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
-                                 )}
-                              </span>
-                           </div>
-                           <div className="pt-4 border-t border-slate-100 flex justify-between items-center">
-                              <span className="text-xs font-bold text-slate-900 uppercase">Total Estimado</span>
-                              <span className="text-lg font-black text-emerald-600">
-                                 {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                                    ((((workOrder as any).third_party_company_id || (workOrder as any).third_party_companies) ? (workOrder.hourly_rate || 0) : 0)) +
-                                    usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
-                                 )}
-                              </span>
-                           </div>
-                        </div>
-
-                        <div className="p-3 bg-slate-50 border border-slate-100 rounded-lg">
-                           <p className="text-[10px] text-slate-500 leading-tight italic">
-                              * Custos de mão de obra são aplicáveis apenas para serviços executados por empresas parceiras.
-                           </p>
-                        </div>
-                     </div>
-
                      {/* Widget: Avaliação do Serviço */}
                      {status === 'Concluído' && (workOrder?.technician_id || (workOrder as any).third_party_company_id) && (
-                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5">
+                        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 space-y-5 animate-in fade-in slide-in-from-top-4 duration-500">
                            <h4 className="text-xs font-bold text-slate-800 uppercase tracking-widest flex items-center gap-2">
                               <Star size={14} className="text-amber-500" />
                               Avaliação do Serviço
@@ -1336,7 +1350,7 @@ const WorkOrderDetails = () => {
                               </div>
                            ) : (
                               <div className="space-y-4">
-                                 <p className="text-xs text-slate-500">Como você avalia o serviço de <strong>{workOrder?.technicians?.name || (workOrder as any).third_party_companies?.name}</strong>?</p>
+                                 <p className="text-xs text-slate-500 leading-relaxed">Avalie o serviço de <strong>{workOrder?.technicians?.name || (workOrder as any).third_party_companies?.name}</strong>:</p>
                                  <div className="flex items-center gap-1">
                                     {[1, 2, 3, 4, 5].map(star => (
                                        <button
@@ -1360,7 +1374,7 @@ const WorkOrderDetails = () => {
                                  <textarea
                                     value={techRatingComment}
                                     onChange={(e) => setTechRatingComment(e.target.value)}
-                                    placeholder="Comentário (opcional)..."
+                                    placeholder="Deixe um comentário opcional..."
                                     className="w-full p-3 border border-slate-200 rounded-lg text-xs resize-none h-16 focus:ring-2 focus:ring-amber-200 focus:border-amber-300 outline-none transition-all"
                                  />
                                  <button
@@ -1409,255 +1423,428 @@ const WorkOrderDetails = () => {
                            )}
                         </div>
                      )}
-                  </div>
-               </div>
-            </div>
+                     {/* Widget: Tempos da OS */}
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 p-8 space-y-8 group/card transition-all hover:shadow-md overflow-hidden relative">
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover/card:scale-110 transition-transform duration-1000 rotate-12">
+                           <Timer size={140} />
+                        </div>
+                        <h4 className="text-xs font-black text-slate-900 uppercase tracking-[.2em] flex items-center gap-3">
+                           <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                              <Timer size={18} strokeWidth={2.5} />
+                           </div>
+                           SLA & Desempenho
+                        </h4>
 
-            {/* Sticky Bottom Action Bar */}
-            <div className="fixed bottom-0 left-0 md:left-72 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] z-40">
-               <div className="max-w-[1440px] mx-auto px-6 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                     <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${status === 'Concluído' ? 'bg-green-100 text-green-700' :
-                        status === 'Em Manutenção' ? 'bg-blue-100 text-blue-700' :
-                           status === 'Cancelado' ? 'bg-slate-100 text-slate-700' :
-                              'bg-amber-100 text-amber-700'
-                        }`}>{status}</span>
+                        <div className="space-y-6">
+                           <div className="space-y-3">
+                              <div className="flex justify-between items-end">
+                                 <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo de Resposta (MTTA)</p>
+                                    <p className={`text-2xl font-black tracking-tight ${responseTime.pending ? 'text-amber-500 animate-pulse' : 'text-slate-900'}`}>
+                                       {responseTime.pending ? 'Calculando...' : responseTime.label}
+                                    </p>
+                                 </div>
+                                 <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${responseTime.pending ? 'bg-amber-50 text-amber-600' : 'bg-primary/10 text-primary'}`}>
+                                    {responseTime.pending ? 'Pendente' : 'Concluído'}
+                                 </div>
+                              </div>
+                              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden p-0.5">
+                                 <div className={`h-full rounded-full transition-all duration-1000 ${responseTime.pending ? 'bg-gradient-to-r from-orange-400 to-orange-500 animate-pulse' : 'bg-gradient-to-r from-indigo-500 to-emerald-500'}`} style={{ width: responseTime.pending ? '100%' : '100%' }}></div>
+                              </div>
+                           </div>
+
+                           <div className="space-y-3 text-right">
+                              <div className="flex justify-between items-end flex-row-reverse">
+                                 <div>
+                                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tempo de Reparo (MTTR)</p>
+                                    <p className={`text-2xl font-black tracking-tight ${!workOrder?.responded_at ? 'text-slate-200' : resolutionTime.pending ? 'text-slate-900 animate-pulse' : 'text-slate-900'}`}>
+                                       {!workOrder?.responded_at ? '--:--' : resolutionTime.pending ? 'Em Manutenção' : resolutionTime.label}
+                                    </p>
+                                 </div>
+                                 <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${!workOrder?.responded_at ? 'bg-slate-50 text-slate-400' : resolutionTime.pending ? 'bg-slate-900 text-white' : 'bg-primary/10 text-primary'}`}>
+                                    {!workOrder?.responded_at ? 'Aguardando' : resolutionTime.pending ? 'Ativo' : 'Finalizado'}
+                                 </div>
+                              </div>
+                              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden p-0.5 shadow-inner">
+                                 <div className={`h-full rounded-full transition-all duration-1000 ${!workOrder?.responded_at ? 'bg-slate-200' : resolutionTime.pending ? 'bg-slate-900 animate-pulse' : 'bg-primary shadow-lg shadow-primary/20'}`} style={{ width: !workOrder?.responded_at ? '0%' : '100%' }}></div>
+                              </div>
+                           </div>
+                        </div>
+                     </div>
+
+
+                     {/* Widget: Asset Card */}
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden group/card transition-all hover:shadow-md">
+                        <div className="h-44 bg-slate-900 flex items-center justify-center overflow-hidden relative">
+                           {(workOrder.assets as any)?.image_url ? (
+                              <img
+                                 src={(workOrder.assets as any).image_url}
+                                 alt={workOrder.assets?.name || 'Ativo'}
+                                 className="w-full h-full object-cover group-hover/card:scale-110 transition-transform duration-1000 opacity-60"
+                              />
+                           ) : (
+                              <div className="flex flex-col items-center gap-3">
+                                 <Building2 size={48} className="text-slate-700 opacity-50 group-hover/card:scale-110 transition-transform duration-700" />
+                                 <span className="text-[10px] font-black text-slate-700 uppercase tracking-widest">Sem Imagem</span>
+                              </div>
+                           )}
+                           <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent"></div>
+                           <div className="absolute bottom-6 left-8">
+                              <p className="text-[10px] font-black text-white/40 uppercase tracking-widest leading-none mb-1.5">Asset Tag ID</p>
+                              <div className="flex items-center gap-2">
+                                 <div className="size-2 bg-primary rounded-full animate-pulse shadow-[0_0_10px_rgba(0,223,130,0.8)]"></div>
+                                 <p className="text-xl font-black text-white tracking-[0.1em]">{workOrder.assets?.code || 'S/ TAG'}</p>
+                              </div>
+                           </div>
+                        </div>
+                        <div className="p-8 space-y-8">
+                           <div className="space-y-1.5">
+                              <h4 className="text-2xl font-black text-slate-900 tracking-tight leading-tight">{workOrder.assets?.name || 'Recurso Geral'}</h4>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[.2em]">{workOrder.assets?.model || 'Modelo não cadastrado'}</p>
+                           </div>
+
+                           <div className="grid grid-cols-2 gap-6">
+                              <div className="space-y-1">
+                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Gênero / Cat</p>
+                                 <p className="text-xs font-bold text-slate-600 truncate">{workOrder.assets?.category || 'N/A'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                 <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Localidade</p>
+                                 <p className="text-xs font-bold text-slate-600 truncate">{(workOrder.assets as any)?.sector || 'N/A'}</p>
+                              </div>
+                           </div>
+
+                           <button
+                              onClick={() => navigate(`/work-orders?search=${workOrder.assets?.code || ''}`)}
+                              className="w-full py-4 bg-slate-50 hover:bg-slate-950 hover:text-white text-slate-600 text-[10px] font-black uppercase tracking-[0.2em] rounded-2xl border border-slate-200 transition-all duration-300 shadow-sm"
+                           >
+                              Explorar Histórico
+                           </button>
+                        </div>
+                     </div>
+
+
+                     {/* Widget: Resumo de Custos */}
+                     <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden group/card transition-all hover:shadow-md relative">
+                        <div className="absolute top-0 right-0 p-8 opacity-[0.03] group-hover/card:scale-110 transition-transform duration-1000 -rotate-6">
+                           <LineChart size={140} />
+                        </div>
+                        <div className="p-8 space-y-8">
+                           <h4 className="text-xs font-black text-slate-900 uppercase tracking-[.2em] flex items-center gap-3">
+                              <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                                 <LineChart size={18} strokeWidth={2.5} />
+                              </div>
+                              Consolidado Financeiro
+                           </h4>
+
+                           <div className="space-y-5">
+                              <div className="flex justify-between items-center group/cost">
+                                 <div className="flex items-center gap-3">
+                                    <div className="size-2 bg-slate-900 rounded-full group-hover/cost:scale-150 transition-transform"></div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mão de Obra</span>
+                                 </div>
+                                 <span className="text-sm font-black text-slate-900">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                       isThirdPartyTech ? (laborCost || 0) : 0
+                                    )}
+                                 </span>
+                              </div>
+                              <div className="flex justify-between items-center group/cost">
+                                 <div className="flex items-center gap-3">
+                                    <div className="size-2 bg-primary rounded-full group-hover/cost:scale-150 transition-transform"></div>
+                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Peças & Mat.</span>
+                                 </div>
+                                 <span className="text-sm font-black text-slate-900">
+                                    {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                       (manualPartsCost || 0) + usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
+                                    )}
+                                 </span>
+                              </div>
+                              <div className="pt-8 border-t border-slate-100 relative">
+                                 <div className="flex justify-between items-end mb-2">
+                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Estimado</span>
+                                    <div className="flex flex-col items-end">
+                                       <span className="text-3xl font-black text-slate-900 tracking-tighter">
+                                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                                             (isThirdPartyTech ? (laborCost || 0) : 0) +
+                                             (manualPartsCost || 0) +
+                                             usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
+                                          )}
+                                       </span>
+                                       <div className="flex items-center gap-1 text-[8px] font-black text-primary uppercase tracking-widest mt-1">
+                                          <div className="size-1.5 bg-primary rounded-full animate-pulse"></div>
+                                          Valores em Real (BRL)
+                                       </div>
+                                    </div>
+                                 </div>
+                              </div>
+                           </div>
+
+                           <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
+                              <p className="text-[9px] text-slate-400 leading-relaxed font-bold uppercase tracking-wider">
+                                 * Custos de mão de obra aplicáveis apenas para serviços terceirizados conforme política interna.
+                              </p>
+                           </div>
+                        </div>
+
+
+                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                     <button
-                        onClick={() => window.print()}
-                        className="hidden sm:flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all no-print"
-                     >
-                        <FileText size={16} />
-                        Imprimir OS
-                     </button>
-                     {isAdmin && status !== 'Cancelado' && !isConcluded && (
+               </div >
+
+               {/* Sticky Bottom Action Bar */}
+               < div className="fixed bottom-0 left-0 md:left-72 right-0 bg-white/95 backdrop-blur-md border-t border-slate-200 shadow-[0_-4px_20px_rgba(0,0,0,0.06)] z-40" >
+                  <div className="max-w-[1440px] mx-auto px-6 py-3 flex items-center justify-between">
+                     <div className="flex items-center gap-2 text-sm text-slate-500">
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${status === 'Concluído' ? 'bg-green-100 text-green-700' :
+                           status === 'Em Manutenção' ? 'bg-blue-100 text-blue-700' :
+                              status === 'Cancelado' ? 'bg-slate-100 text-slate-700' :
+                                 'bg-amber-100 text-amber-700'
+                           }`}>{status}</span>
+                     </div>
+                     <div className="flex items-center gap-3">
                         <button
-                           onClick={async () => {
-                              setFeedback({
-                                 type: 'confirm',
-                                 title: 'Cancelar OS?',
-                                 message: 'Tem certeza que deseja cancelar esta Ordem de Serviço permanentemente?',
-                                 onConfirm: async () => {
-                                    try {
-                                       setSaving(true);
+                           onClick={() => window.print()}
+                           className="hidden sm:flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg text-sm font-bold hover:bg-slate-200 transition-all no-print"
+                        >
+                           <FileText size={16} />
+                           Imprimir OS
+                        </button>
+                        {isAdmin && status !== 'Cancelado' && !isConcluded && (
+                           <button
+                              onClick={async () => {
+                                 setFeedback({
+                                    type: 'confirm',
+                                    title: 'Cancelar OS?',
+                                    message: 'Tem certeza que deseja cancelar esta Ordem de Serviço permanentemente?',
+                                    onConfirm: async () => {
+                                       try {
+                                          setSaving(true);
 
-                                       // 1. Notify BEFORE deletion while record exists for enrichment
-                                       await NotificationService.notifyWorkOrderCancelled({
-                                          id: workOrder.id,
-                                          title: `OS CANCELADA: ${workOrder.order_number}`,
-                                          description: editIssue || workOrder.issue,
-                                          status: 'Cancelado',
-                                          assetId: workOrder.asset_id,
-                                          requesterId: workOrder.requester_id,
-                                          order_number: workOrder.order_number,
-                                          asset_id: workOrder.asset_id,
-                                          requester_id: workOrder.requester_id,
-                                          priority: workOrder.priority || editPriority,
-                                          technicianName: (workOrder as any).technician?.name || (workOrder as any).technicians?.name
-                                       } as any, user?.name || 'Administrador');
+                                          // 1. Notify BEFORE deletion while record exists for enrichment
+                                          await NotificationService.notifyWorkOrderCancelled({
+                                             id: workOrder.id,
+                                             title: `OS CANCELADA: ${workOrder.order_number}`,
+                                             description: editIssue || workOrder.issue,
+                                             status: 'Cancelado',
+                                             assetId: workOrder.asset_id,
+                                             requesterId: workOrder.requester_id,
+                                             order_number: workOrder.order_number,
+                                             asset_id: workOrder.asset_id,
+                                             requester_id: workOrder.requester_id,
+                                             priority: workOrder.priority || editPriority,
+                                             technicianName: (workOrder as any).technician?.name || (workOrder as any).technicians?.name
+                                          } as any, user?.name || 'Administrador');
 
-                                       // 2. Physical Deletion
-                                       const { error: cancelError } = await (supabase.rpc as any)('cancel_work_order', {
-                                          p_work_order_id: id,
-                                          p_admin_name: user?.name || 'Administrador'
-                                       });
+                                          // 2. Physical Deletion
+                                          const { error: cancelError } = await (supabase.rpc as any)('cancel_work_order', {
+                                             p_work_order_id: id,
+                                             p_admin_name: user?.name || 'Administrador'
+                                          });
 
-                                       if (cancelError) throw cancelError;
+                                          if (cancelError) throw cancelError;
 
-                                       setFeedback({
-                                          type: 'success',
-                                          title: 'OS Removida',
-                                          message: 'A Ordem de Serviço foi excluída e o número foi liberado.',
-                                          showLoading: true
-                                       });
+                                          setFeedback({
+                                             type: 'success',
+                                             title: 'OS Removida',
+                                             message: 'A Ordem de Serviço foi excluída e o número foi liberado.',
+                                             showLoading: true
+                                          });
 
-                                       setTimeout(() => {
-                                          navigate('/work-orders');
-                                       }, 2000);
-                                    } catch (error) {
-                                       console.error('Error canceling order:', error);
-                                       setFeedback({
-                                          type: 'error',
-                                          title: 'Erro ao Cancelar',
-                                          message: (error as any).message || 'Ocorreu um erro inesperado.'
-                                       });
-                                    } finally {
-                                       setSaving(false);
+                                          setTimeout(() => {
+                                             navigate('/work-orders');
+                                          }, 2000);
+                                       } catch (error) {
+                                          console.error('Error canceling order:', error);
+                                          setFeedback({
+                                             type: 'error',
+                                             title: 'Erro ao Cancelar',
+                                             message: (error as any).message || 'Ocorreu um erro inesperado.'
+                                          });
+                                       } finally {
+                                          setSaving(false);
+                                       }
+
                                     }
-
-                                 }
-                              });
-                           }}
-                           className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-red-200 text-brand-alert rounded-lg text-xs md:text-sm font-bold hover:bg-red-50 transition-all"
-                        >
-                           <X size={16} />
-                           <span className="hidden sm:inline">Cancelar OS</span>
-                           <span className="sm:hidden">Cancelar</span>
-                        </button>
-                     )}
-                     {isAdmin && (
-                        isConcluded ? (
-                           <button
-                              onClick={handleReopen}
-                              disabled={saving}
-                              className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-amber-500 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-amber-600 transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
-                           >
-                              {saving ? <Loader2 className="animate-spin" size={18} /> : <RotateCcw size={18} />}
-                              <span>Reabrir OS</span>
-                           </button>
-                        ) : (
-                           <button
-                              onClick={() => {
-                                 if (status === 'Concluído' && workOrder?.status !== 'Concluído') {
-                                    setShowRatingPopup(true);
-                                 } else {
-                                    handleSave();
-                                 }
+                                 });
                               }}
-                              disabled={saving || (status === 'Cancelado' && workOrder?.status === 'Cancelado')}
-                              className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-primary text-white rounded-lg text-xs md:text-sm font-bold hover:bg-primary-dark transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+                              className="flex items-center gap-2 px-3 md:px-4 py-2 bg-white border border-red-200 text-brand-alert rounded-lg text-xs md:text-sm font-bold hover:bg-red-50 transition-all"
                            >
-                              {saving ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
-                              <span>
-                                 {status === 'Concluído' ? 'Finalizar Serviço' : (
-                                    <>
-                                       Salvar <span className="hidden sm:inline">Alterações</span>
-                                    </>
-                                 )}
-                              </span>
+                              <X size={16} />
+                              <span className="hidden sm:inline">Cancelar OS</span>
+                              <span className="sm:hidden">Cancelar</span>
                            </button>
-                        )
-                     )}
-                  </div>
-               </div>
-            </div>
-
-            {/* Rating Popup Modal */}
-            {showRatingPopup && (
-               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRatingPopup(false)}>
-                  <div
-                     className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200"
-                     onClick={(e) => e.stopPropagation()}
-                  >
-                     {/* Header */}
-                     <div className="bg-gradient-to-r from-[#0a2540] to-[#1a3a5c] p-6 text-center">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm mb-3">
-                           <Star size={32} className="text-amber-400 fill-amber-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-white">Avalie o Serviço</h3>
-                        <p className="text-sm text-slate-300 mt-1">
-                           Como foi o trabalho do técnico?
-                        </p>
-                     </div>
-
-                     {/* Body */}
-                     <div className="p-6">
-                        {/* Stars */}
-                        <div className="flex items-center justify-center gap-2 mb-2">
-                           {[1, 2, 3, 4, 5].map((star) => (
+                        )}
+                        {isAdmin && (
+                           isConcluded ? (
                               <button
-                                 key={star}
-                                 type="button"
-                                 onClick={() => setTechRating(star)}
-                                 onMouseEnter={() => setRatingHover(star)}
-                                 onMouseLeave={() => setRatingHover(0)}
-                                 className="p-1 transition-transform hover:scale-110 active:scale-95"
+                                 onClick={handleReopen}
+                                 disabled={saving}
+                                 className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-amber-500 text-white rounded-lg text-xs md:text-sm font-bold hover:bg-amber-600 transition-all shadow-md shadow-amber-500/20 disabled:opacity-50"
                               >
-                                 <Star
-                                    size={36}
-                                    className={`transition-colors ${star <= (ratingHover || techRating)
-                                       ? 'text-amber-400 fill-amber-400 drop-shadow-sm'
-                                       : 'text-slate-200'
-                                       }`}
-                                 />
+                                 {saving ? <Loader2 className="animate-spin" size={18} /> : <RotateCcw size={18} />}
+                                 <span>Reabrir OS</span>
                               </button>
-                           ))}
-                        </div>
-                        <p className="text-center text-sm font-bold text-slate-500 mb-4">
-                           {techRating === 0 && 'Clique nas estrelas para avaliar'}
-                           {techRating === 1 && 'Ruim'}
-                           {techRating === 2 && 'Regular'}
-                           {techRating === 3 && 'Bom'}
-                           {techRating === 4 && 'Muito Bom'}
-                           {techRating === 5 && 'Excelente!'}
-                        </p>
-
-                        {/* Comment */}
-                        <textarea
-                           value={techRatingComment}
-                           onChange={(e) => setTechRatingComment(e.target.value)}
-                           placeholder="Comentário opcional..."
-                           rows={3}
-                           className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:bg-white transition-all resize-none placeholder:text-slate-400"
-                        />
-                     </div>
-
-                     {/* Footer */}
-                     <div className="px-6 pb-6 flex gap-3">
-                        <button
-                           onClick={() => {
-                              setShowRatingPopup(false);
-                              setTechRating(0);
-                              setTechRatingComment('');
-                              handleSave();
-                           }}
-                           className="flex-1 py-3 px-4 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
-                        >
-                           Pular
-                        </button>
-                        <button
-                           disabled={techRating === 0 || ratingSaving}
-                           onClick={async () => {
-                              if (techRating === 0) return;
-                              setRatingSaving(true);
-                              try {
-                                 const techId = selectedTechId || workOrder?.technician_id;
-                                 if (techId) {
-                                    await supabaseUntyped
-                                       .from('technician_ratings')
-                                       .insert({
-                                          work_order_id: id,
-                                          technician_id: techId,
-                                          rated_by: user?.id,
-                                          rating: techRating,
-                                          comment: techRatingComment || null
-                                       });
-                                 }
-                              } catch (err) {
-                                 console.error('Error saving rating:', err);
-                              } finally {
-                                 setRatingSaving(false);
-                                 setShowRatingPopup(false);
-                                 handleSave();
-                              }
-                           }}
-                           className="flex-1 py-3 px-4 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                        >
-                           {ratingSaving ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
-                           Avaliar e Finalizar
-                        </button>
+                           ) : (
+                              <button
+                                 onClick={() => {
+                                    if (status === 'Concluído' && workOrder?.status !== 'Concluído') {
+                                       setShowRatingPopup(true);
+                                    } else {
+                                       handleSave();
+                                    }
+                                 }}
+                                 disabled={saving || (status === 'Cancelado' && workOrder?.status === 'Cancelado')}
+                                 className="flex items-center gap-2 px-4 md:px-5 py-2 md:py-2.5 bg-primary text-white rounded-lg text-xs md:text-sm font-bold hover:bg-primary-dark transition-all shadow-md shadow-primary/20 disabled:opacity-50"
+                              >
+                                 {saving ? <Loader2 className="animate-spin" size={18} /> : <Zap size={18} />}
+                                 <span>
+                                    {status === 'Concluído' ? 'Finalizar Serviço' : (
+                                       <>
+                                          Salvar <span className="hidden sm:inline">Alterações</span>
+                                       </>
+                                    )}
+                                 </span>
+                              </button>
+                           )
+                        )}
                      </div>
                   </div>
-               </div>
-            )}
+               </div >
 
-            {/* Feedback Modal Reutilizável */}
-            {feedback && (
-               <FeedbackModal
-                  isOpen={!!feedback}
-                  onClose={() => setFeedback(null)}
-                  type={feedback.type}
-                  title={feedback.title}
-                  message={feedback.message}
-                  onConfirm={feedback.onConfirm}
-                  showLoadingDots={feedback.showLoading}
-               />
-            )}
+               {/* Rating Popup Modal */}
+               {
+                  showRatingPopup && (
+                     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowRatingPopup(false)}>
+                        <div
+                           className="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200"
+                           onClick={(e) => e.stopPropagation()}
+                        >
+                           {/* Header */}
+                           <div className="bg-gradient-to-r from-[#0a2540] to-[#1a3a5c] p-6 text-center">
+                              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 backdrop-blur-sm mb-3">
+                                 <Star size={32} className="text-amber-400 fill-amber-400" />
+                              </div>
+                              <h3 className="text-xl font-bold text-white">Avalie o Serviço</h3>
+                              <p className="text-sm text-slate-300 mt-1">
+                                 Como foi o trabalho do técnico?
+                              </p>
+                           </div>
+
+                           {/* Body */}
+                           <div className="p-6">
+                              {/* Stars */}
+                              <div className="flex items-center justify-center gap-2 mb-2">
+                                 {[1, 2, 3, 4, 5].map((star) => (
+                                    <button
+                                       key={star}
+                                       type="button"
+                                       onClick={() => setTechRating(star)}
+                                       onMouseEnter={() => setRatingHover(star)}
+                                       onMouseLeave={() => setRatingHover(0)}
+                                       className="p-1 transition-transform hover:scale-110 active:scale-95"
+                                    >
+                                       <Star
+                                          size={36}
+                                          className={`transition-colors ${star <= (ratingHover || techRating)
+                                             ? 'text-amber-400 fill-amber-400 drop-shadow-sm'
+                                             : 'text-slate-200'
+                                             }`}
+                                       />
+                                    </button>
+                                 ))}
+                              </div>
+                              <p className="text-center text-sm font-bold text-slate-500 mb-4">
+                                 {techRating === 0 && 'Clique nas estrelas para avaliar'}
+                                 {techRating === 1 && 'Ruim'}
+                                 {techRating === 2 && 'Regular'}
+                                 {techRating === 3 && 'Bom'}
+                                 {techRating === 4 && 'Muito Bom'}
+                                 {techRating === 5 && 'Excelente!'}
+                              </p>
+
+                              {/* Comment */}
+                              <textarea
+                                 value={techRatingComment}
+                                 onChange={(e) => setTechRatingComment(e.target.value)}
+                                 placeholder="Comentário opcional..."
+                                 rows={3}
+                                 className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:bg-white transition-all resize-none placeholder:text-slate-400"
+                              />
+                           </div>
+
+                           {/* Footer */}
+                           <div className="px-6 pb-6 flex gap-3">
+                              <button
+                                 onClick={() => {
+                                    setShowRatingPopup(false);
+                                    setTechRating(0);
+                                    setTechRatingComment('');
+                                    handleSave();
+                                 }}
+                                 className="flex-1 py-3 px-4 text-sm font-bold text-slate-500 bg-slate-100 rounded-xl hover:bg-slate-200 transition-colors"
+                              >
+                                 Pular
+                              </button>
+                              <button
+                                 disabled={techRating === 0 || ratingSaving}
+                                 onClick={async () => {
+                                    if (techRating === 0) return;
+                                    setRatingSaving(true);
+                                    try {
+                                       const techId = selectedTechId || workOrder?.technician_id;
+                                       const thirdPartyId = (workOrder as any)?.third_party_company_id;
+
+                                       if (techId || thirdPartyId) {
+                                          await supabaseUntyped
+                                             .from('technician_ratings')
+                                             .insert({
+                                                work_order_id: id,
+                                                technician_id: techId || null,
+                                                third_party_company_id: thirdPartyId || null,
+                                                user_id: user?.id,
+                                                rating: techRating,
+                                                comment: techRatingComment || null
+                                             });
+                                       }
+                                    } catch (err) {
+                                       console.error('Error saving rating:', err);
+                                    } finally {
+                                       setRatingSaving(false);
+                                       setShowRatingPopup(false);
+                                       handleSave();
+                                    }
+                                 }}
+                                 className="flex-1 py-3 px-4 text-sm font-bold text-white bg-primary rounded-xl hover:bg-primary-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                              >
+                                 {ratingSaving ? <Loader2 size={16} className="animate-spin" /> : <Star size={16} />}
+                                 Avaliar e Finalizar
+                              </button>
+                           </div>
+                        </div>
+                     </div>
+                  )
+               }
+
+               {/* Feedback Modal Reutilizável */}
+               {
+                  feedback && (
+                     <FeedbackModal
+                        isOpen={!!feedback}
+                        onClose={() => setFeedback(null)}
+                        type={feedback.type}
+                        title={feedback.title}
+                        message={feedback.message}
+                        onConfirm={feedback.onConfirm}
+                        showLoadingDots={feedback.showLoading}
+                     />
+                  )
+               }
+            </div>
          </div>
 
          {/* VERSÃO PARA IMPRESSÃO FORMAL (Apenas @media print) */}
-         <div className="hidden print:block font-sans text-black bg-white p-0 m-0 print:p-0">
+         < div className="hidden print:block font-sans text-black bg-white p-0 m-0 print:p-0" >
             <style>
                {`
                    @media print {

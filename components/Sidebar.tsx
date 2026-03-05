@@ -33,7 +33,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { profile } = useProfile();
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { settings } = useSettings();
   const { unreadCount } = useNotifications();
 
@@ -58,10 +58,41 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
 
   const fetchOpenOrdersCount = async () => {
     try {
-      const { count, error } = await supabase
+      if (!user) return;
+
+      let query = supabase
         .from('work_orders')
         .select('*', { count: 'exact', head: true })
         .in('status', ['Aberto', 'Em Manutenção']);
+
+      const isAdminRoot = user?.role === 'admin_root';
+      const isCommonAdmin = user?.role === 'admin';
+
+      const managedCats: string[] = [];
+      if (user.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA');
+      if (user.manage_predial) managedCats.push('Predial', 'PREDIAL');
+      if (user.manage_others) managedCats.push('Outros', 'OUTROS');
+
+      if (!isAdminRoot) {
+        if (isCommonAdmin) {
+          // Admin sees counts for all OS in categories they manage
+          if (managedCats.length > 0) {
+            query = query.in('maintenance_category', managedCats);
+          } else {
+            query = query.eq('maintenance_category', 'NONE');
+          }
+        } else {
+          // Common user sees counts for ONLY THEIR OWN OS in categories they manage
+          query = query.eq('requester_id', user.id);
+          if (managedCats.length > 0) {
+            query = query.in('maintenance_category', managedCats);
+          } else {
+            query = query.eq('maintenance_category', 'NONE');
+          }
+        }
+      }
+
+      const { count, error } = await query;
 
       if (error) throw error;
       setOpenOrdersCount(count || 0);
@@ -78,7 +109,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
       case 'admin_root':
         return 'Admin Root';
       case 'admin':
-        return 'Admin Industrial';
+        return 'Administrador de OS';
       case 'user':
         return 'Usuário';
       default:
@@ -128,16 +159,18 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
-          <NavLink
-            to="/dashboard"
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-              }`
-            }
-          >
-            <LayoutDashboard size={20} />
-            <span className="text-sm font-medium">Dashboard</span>
-          </NavLink>
+          {(isAdmin() || user?.manage_equipment || user?.manage_predial || user?.manage_others) && (
+            <NavLink
+              to="/dashboard"
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`
+              }
+            >
+              <LayoutDashboard size={20} />
+              <span className="text-sm font-medium">Dashboard</span>
+            </NavLink>
+          )}
 
           <div className="pt-4 pb-2 px-4">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gestão</p>

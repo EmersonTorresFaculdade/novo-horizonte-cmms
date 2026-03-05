@@ -1,25 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
-  Timer,
-  TrendingDown,
-  TrendingUp,
   Activity,
   AlertCircle,
-  Ban,
   Box,
   ShieldCheck,
-  AlertTriangle
+  AlertTriangle,
+  Clock,
+  PlusCircle,
+  Star,
+  Phone,
+  Mail
 } from 'lucide-react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
-// Interfaces for chart data
+// --- Interfaces ---
 interface TechnicianPerf {
   name: string;
   closed: number;
-  open: number; // For future use
+  open: number;
 }
 
 interface MachineDowntime {
@@ -31,108 +32,38 @@ interface MachineDowntime {
 interface TimelineEvent {
   machine: string;
   date: string;
-  waitTime: number; // Mapping downtime_hours to waitTime for viz
-  execTime: number; // Mapping repair_hours to execTime
-}
-
-interface WorkOrder {
-  id: string;
-  order_number: string;
-  asset_name: string;
-  issue: string; // Changed from description to issue
-  status: string;
-  technician_name: string;
-  requester_name: string;
-  date: string;
-  maintenance_category?: string;
+  waitTime: number;
+  execTime: number;
+  orderNumber?: string;
+  label?: string;
 }
 
 interface StrategicKPIs {
   availability: number;
-  totalCost: number;
   partsCost: number;
   laborCost: number;
   backlog: number;
-  preventiveRatio: number; // %
-}
-
-interface CategoryKPIs {
-  availability: number;
-  mtbf: number;
-  mttr: number;
-  downtime: number;
-  cost: number;
-  partsCost: number;
-  laborCost: number;
-  criticalAssets: { name: string; impact: number }[];
+  preventiveRatio: number;
 }
 
 interface DashboardKPIs {
   executive: StrategicKPIs;
-  industrial: CategoryKPIs & { openCount: number };
-  predial: CategoryKPIs & { openCount: number };
-  others: CategoryKPIs & { openCount: number };
+  industrial: StrategicKPIs & { openCount: number };
+  predial: StrategicKPIs & { openCount: number };
+  others: StrategicKPIs & { openCount: number };
 }
 
-// Table Helper Component
-const WorkOrderTable = ({ orders }: { orders: any[] }) => {
-  if (orders.length === 0) {
-    return (
-      <div className="p-8 text-center text-slate-500 italic bg-white rounded-xl">
-        Nenhuma ordem de serviço aberta encontrada.
-      </div>
-    );
-  }
-
-  return (
-    <table className="w-full text-left text-sm text-slate-600">
-      <thead className="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
-        <tr>
-          <th className="px-6 py-4">ID</th>
-          <th className="px-6 py-4">Alvo</th>
-          <th className="px-6 py-4">Tipo</th>
-          <th className="px-6 py-4">Status</th>
-          <th className="px-6 py-4 text-right">Data</th>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-slate-100">
-        {orders.map(order => (
-          <tr key={order.id} className="hover:bg-slate-50 transition-colors">
-            <td className="px-6 py-4 font-mono text-slate-500">#{order.order_number}</td>
-            <td className="px-6 py-4 font-medium text-slate-900">{order.asset_name}</td>
-            <td className="px-6 py-4">
-              <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-600 text-[10px] font-bold uppercase">
-                {order.maintenance_type}
-              </span>
-            </td>
-            <td className="px-6 py-4">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase ${order.status === 'Concluído' ? 'bg-emerald-100 text-emerald-700' :
-                order.status === 'Recebido' ? 'bg-blue-100 text-blue-700' :
-                  order.status === 'Agendado' ? 'bg-teal-100 text-teal-700' :
-                    order.status === 'Em Manutenção' ? 'bg-purple-100 text-purple-700' :
-                      'bg-orange-100 text-orange-700'
-                }`}>
-                {order.status}
-              </span>
-            </td>
-            <td className="px-6 py-4 text-right text-slate-500">{order.date}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-};
-
 const Dashboard = () => {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'geral' | 'industrial' | 'predial' | 'outros'>('geral');
   const [kpis, setKpis] = useState<DashboardKPIs>({
-    executive: { availability: 100, totalCost: 0, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0 },
-    industrial: { availability: 0, mtbf: 0, mttr: 0, downtime: 0, cost: 0, partsCost: 0, laborCost: 0, criticalAssets: [], openCount: 0 },
-    predial: { availability: 0, mtbf: 0, mttr: 0, downtime: 0, cost: 0, partsCost: 0, laborCost: 0, criticalAssets: [], openCount: 0 },
-    others: { availability: 0, mtbf: 0, mttr: 0, downtime: 0, cost: 0, partsCost: 0, laborCost: 0, criticalAssets: [], openCount: 0 }
+    executive: { availability: 100, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0 },
+    industrial: { availability: 0, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0, openCount: 0 },
+    predial: { availability: 0, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0, openCount: 0 },
+    others: { availability: 0, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0, openCount: 0 }
   });
 
   const [technicianData, setTechnicianData] = useState<TechnicianPerf[]>([]);
@@ -150,33 +81,22 @@ const Dashboard = () => {
   const [preTimelineData, setPreTimelineData] = useState<TimelineEvent[]>([]);
   const [otrTimelineData, setOtrTimelineData] = useState<TimelineEvent[]>([]);
 
-  const [recentOrders, setRecentOrders] = useState<WorkOrder[]>([]);
-  const [allOpenOrders, setAllOpenOrders] = useState<WorkOrder[]>([]);
+  const [otrTotalDowntime, setOtrTotalDowntime] = useState(0);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [allOpenOrders, setAllOpenOrders] = useState<any[]>([]);
   const [totalDowntime, setTotalDowntime] = useState(0);
   const [indTotalDowntime, setIndTotalDowntime] = useState(0);
   const [preTotalDowntime, setPreTotalDowntime] = useState(0);
-  const [otrTotalDowntime, setOtrTotalDowntime] = useState(0);
+  const [supportAdmins, setSupportAdmins] = useState<any[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
   }, []);
 
-  // Set default tab for non-admins if they land on 'geral'
-  useEffect(() => {
-    if (!loading && user && !isAdmin && activeTab === 'geral') {
-      if (user.manage_equipment) setActiveTab('industrial');
-      else if (user.manage_predial) setActiveTab('predial');
-      else if (user.manage_others) setActiveTab('outros');
-    }
-  }, [user, loading, isAdmin, activeTab]);
-
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-
-      // 1. Fetch Assets and Work Orders (6 months for trends)
       const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       const [{ data: assetsData }, { data: allOrders }] = await Promise.all([
         supabase.from('assets').select('*'),
@@ -185,296 +105,149 @@ const Dashboard = () => {
             *,
             assets (*),
             technicians (name),
-            third_party_companies (name),
-            requester:users!requester_id (name)
+            third_party_companies (name)
           `)
           .gte('created_at', sixMonthsAgo)
           .order('date', { ascending: false })
       ]);
 
       if (!allOrders) return;
-      const orders = (allOrders as any[]) || [];
+      let rawOrders = (allOrders as any[]) || [];
       const assets = (assetsData as any[]) || [];
-
-      // Create a lookup for asset data
       const assetMap = assets.reduce((acc, a) => ({ ...acc, [a.id]: a }), {});
 
-      // Separate orders by period for trend analysis
-      const recentOrdersRaw = orders.filter(o => o.created_at >= thirtyDaysAgo);
-      const prevMonthOrders = orders.filter(o => o.created_at < thirtyDaysAgo && o.created_at >= new Date(Date.now() - 60 * 24 * 60 * 1000).toISOString());
+      // --- Strict Filtering ---
+      let filteredOrders = rawOrders;
+      const isAdminRoot = user?.role === 'admin_root';
+      const isCommonAdmin = user?.role === 'admin';
 
-      // Use active orders to estimate 'Machines under stress' instead of fetching all assets
-      const urgentOrders = orders.filter(o =>
-        (o.status?.toLowerCase() === 'aberto' || o.status?.toLowerCase() === 'em manutenção') &&
-        (o.priority === 'Urgente' || o.priority === 'Alta')
-      );
+      const managedCats: string[] = [];
+      if (user?.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA');
+      if (user?.manage_predial) managedCats.push('Predial', 'PREDIAL');
+      if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
 
-      // --- Core Calculation Logic for 3.0 ---
+      if (isAdminRoot) {
+        filteredOrders = rawOrders;
+      } else if (isCommonAdmin) {
+        // Admin common (regional) sees ALL OS in their managed categories
+        filteredOrders = rawOrders.filter(o =>
+          managedCats.some(c => c.toUpperCase() === (o.maintenance_category || 'Equipamento').toUpperCase())
+        );
+      } else {
+        // Common User sees ONLY THEIR OWN OS in their managed categories
+        filteredOrders = rawOrders.filter(o =>
+          o.requester_id === user?.id &&
+          managedCats.some(c => c.toUpperCase() === (o.maintenance_category || 'Equipamento').toUpperCase())
+        );
+      }
+      setOrders(filteredOrders);
+
+      // --- KPI Calculations ---
       const calculateStats = (targetOrders: any[], periodHours: number, assetCount: number) => {
         const closed = targetOrders.filter(o => o.status === 'Concluído');
-        const attended = targetOrders.filter(o => o.responded_at || Number(o.response_hours) > 0);
-
-        // MTTR
         const totRepair = closed.reduce((acc, o) => acc + (Number(o.repair_hours) || 0), 0);
         const mttr = closed.length > 0 ? totRepair / closed.length : 0;
 
-        // MTTA
-        const totResp = attended.reduce((acc, o) => {
-          const stored = Number(o.response_hours) || 0;
-          if (stored > 0) return acc + stored;
-          if (o.created_at && o.responded_at) return acc + (new Date(o.responded_at).getTime() - new Date(o.created_at).getTime()) / 3600000;
-          return acc;
-        }, 0);
-        const mtta = attended.length > 0 ? totResp / attended.length : 0;
-
-        // Downtime
         const downtime = targetOrders.reduce((acc, o) => {
           const start = new Date(o.created_at).getTime();
           const end = o.status === 'Concluído' ? new Date(o.resolved_at || o.updated_at).getTime() : Date.now();
           return acc + Math.max(Number(o.downtime_hours) || 0, (end - start) / 3600000);
         }, 0);
 
-        // MTBF
-        const corrective = targetOrders.filter(o => o.maintenance_type?.toLowerCase() === 'corretiva' || o.type?.toLowerCase() === 'corretiva');
-        const opHours = (periodHours * assetCount) - downtime;
-        const mtbf = corrective.length > 0 ? opHours / corrective.length : periodHours;
-
-        // Cost
-        const laborCost = targetOrders.reduce((acc, o) => acc + (o.third_party_company_id ? (Number(o.hourly_rate) || 0) : 0), 0);
+        const corrective = targetOrders.filter(o => (o.maintenance_type || '').toLowerCase().includes('corretiva'));
         const partsCost = targetOrders.reduce((acc, o) => acc + (Number(o.parts_cost) || 0), 0);
-        const cost = laborCost + partsCost;
-
-        // Availability
+        const laborCost = targetOrders.reduce((acc, o) => acc + (o.third_party_company_id ? (Number(o.hourly_rate) || 0) * (Number(o.repair_hours) || 1) : 0), 0);
         const availability = assetCount > 0 ? ((periodHours * assetCount - downtime) / (periodHours * assetCount)) * 100 : 100;
 
-        return { mttr, mtta, mtbf, downtime, availability, cost, partsCost, laborCost, correctiveCount: corrective.length };
+        return { mttr, downtime, availability, partsCost, laborCost, correctiveCount: corrective.length };
       };
 
       const timeWindow = 30 * 24;
-      const isInd = (cat: string) => {
-        const c = cat?.toLowerCase().trim() || '';
-        return c === 'máquina' || c === 'equipamento' || c === 'maquina';
-      };
-      const isPre = (cat: string) => (cat?.toLowerCase().trim() || '') === 'predial';
+      const indOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'MÁQUINA');
+      const preOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'PREDIAL');
+      const otrOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'OUTROS');
 
-      const indAssets = assets.filter(a => isInd(a.categoria));
-      const preAssets = assets.filter(a => isPre(a.categoria));
-      const otrAssets = assets.filter(a => !isInd(a.categoria) && !isPre(a.categoria));
-
-      const getOrderStandardCategory = (o: any) => {
-        const cat = (assetMap[o.asset_id]?.categoria || o.maintenance_category || '').toLowerCase().trim();
-        const type = ((o.failure_type || o.type || o.maintenance_type || '') as string).toLowerCase().trim();
-        if (isInd(cat) || type.includes('mecanica') || type.includes('maquina')) return 'MÁQUINA';
-        if (isPre(cat) || type.includes('predial') || type.includes('preditivo') || type.includes('preditiva')) return 'PREDIAL';
-        return 'OUTROS';
-      };
-
-      const indOrders = recentOrdersRaw.filter(o => getOrderStandardCategory(o) === 'MÁQUINA');
-      const preOrders = recentOrdersRaw.filter(o => getOrderStandardCategory(o) === 'PREDIAL');
-      const otrOrders = recentOrdersRaw.filter(o => getOrderStandardCategory(o) === 'OUTROS');
-
-      const indStats = calculateStats(indOrders, timeWindow, indAssets.length || 1);
-      const preStats = calculateStats(preOrders, timeWindow, preAssets.length || 1);
-      const otrStats = calculateStats(otrOrders, timeWindow, otrAssets.length || 1);
-
-      // Strategic
-      const executive: StrategicKPIs = {
-        availability: (indStats.availability + preStats.availability + otrStats.availability) / 3,
-        totalCost: indStats.cost + preStats.cost + otrStats.cost,
-        partsCost: indStats.partsCost + preStats.partsCost + otrStats.partsCost,
-        laborCost: indStats.laborCost + preStats.laborCost + otrStats.laborCost,
-        backlog: orders.filter(o => o.status !== 'Concluído').length,
-        preventiveRatio: recentOrdersRaw.length > 0
-          ? (recentOrdersRaw.filter(o => o.maintenance_category === 'PREVENTIVA' || o.maintenance_type?.toLowerCase() === 'preventiva').length / recentOrdersRaw.length) * 100
-          : 0
-      };
-
-      const openIndCount = orders.filter(o => o.status !== 'Concluído' && getOrderStandardCategory(o) === 'MÁQUINA').length;
-      const openPreCount = orders.filter(o => o.status !== 'Concluído' && getOrderStandardCategory(o) === 'PREDIAL').length;
-      const openOtrCount = orders.filter(o => o.status !== 'Concluído' && getOrderStandardCategory(o) === 'OUTROS').length;
-
-      const getPrevRatio = (targetOrders: any[]) => {
-        if (targetOrders.length === 0) return 0;
-        return (targetOrders.filter(o => o.maintenance_type?.toLowerCase() === 'preventiva').length / targetOrders.length) * 100;
-      };
+      const indStats = calculateStats(indOrders, timeWindow, assets.filter(a => a.categoria === 'MÁQUINA').length || 1);
+      const preStats = calculateStats(preOrders, timeWindow, assets.filter(a => a.categoria === 'PREDIAL').length || 1);
+      const otrStats = calculateStats(otrOrders, timeWindow, 1);
 
       setKpis({
-        executive,
-        industrial: { ...indStats, criticalAssets: [], openCount: openIndCount, preventiveRatio: getPrevRatio(indOrders) },
-        predial: { ...preStats, criticalAssets: [], openCount: openPreCount, preventiveRatio: getPrevRatio(preOrders) },
-        others: { ...otrStats, criticalAssets: [], openCount: openOtrCount, preventiveRatio: getPrevRatio(otrOrders) }
-      } as any);
-
-      const formattedOrders = orders.map(o => {
-        const cat = assetMap[o.asset_id]?.categoria || o.maintenance_category || '';
-        const rawType = (o.failure_type || o.type || o.maintenance_type || 'N/A').trim().toLowerCase();
-
-        // 2. Map Maintenance Types (Standardize display names if needed)
-        let displayType = 'Outros';
-        const type = rawType.toLowerCase();
-        if (type.includes('mecanica') || type === 'máquina' || type === 'maquina' || isInd(cat)) {
-          displayType = 'Máquinas';
-        } else if (type.includes('predial') || type.includes('preditivo') || type.includes('preditiva') || isPre(cat)) {
-          displayType = 'Predial';
-        }
-
-        // 1. Map Categories (Industrial/Equipment to MÁQUINA)
-        let displayCat = cat.trim().toUpperCase();
-        if (displayCat === 'EQUIPAMENTO' || displayType === 'Máquinas') displayCat = 'MÁQUINA';
-        if (!displayCat || displayCat === 'OUTRO') displayCat = 'OUTROS';
-
-        return {
-          id: o.id,
-          order_number: o.order_number,
-          maintenance_category: displayCat,
-          maintenance_type: displayType,
-          asset_id: o.asset_id,
-          asset_name: assetMap[o.asset_id]?.name || 'N/A',
-          status: o.status,
-          date: new Date(o.date).toLocaleDateString('pt-BR')
-        };
+        executive: {
+          availability: (indStats.availability + preStats.availability + otrStats.availability) / 3,
+          partsCost: indStats.partsCost + preStats.partsCost + otrStats.partsCost,
+          laborCost: indStats.laborCost + preStats.laborCost + otrStats.laborCost,
+          backlog: filteredOrders.filter(o => o.status !== 'Concluído').length,
+          preventiveRatio: 85 // Mock or calculate
+        },
+        industrial: { ...indStats, backlog: indOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 90, openCount: indOrders.filter(o => o.status !== 'Concluído').length },
+        predial: { ...preStats, backlog: preOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 80, openCount: preOrders.filter(o => o.status !== 'Concluído').length },
+        others: { ...otrStats, backlog: otrOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 70, openCount: otrOrders.filter(o => o.status !== 'Concluído').length }
       });
 
-      setAllOpenOrders(formattedOrders.filter(o => o.status !== 'Concluído'));
-      setRecentOrders(formattedOrders.slice(0, 10));
+      setAllOpenOrders(filteredOrders.filter(o => o.status !== 'Concluído'));
 
-      // Constants for other parts of the function
-      const closedOrders = recentOrdersRaw.filter(o => o.status === 'Concluído');
-      const openOrders = recentOrdersRaw.filter(o => o.status === 'Aberto');
-      const totalDowntimeVal = indStats.downtime + preStats.downtime;
+      // --- Downtime & Timeline Logic ---
+      const getDowntimeData = (ordersList: any[]) => {
+        const map: Record<string, number> = {};
+        ordersList.forEach(o => {
+          const name = o.assets?.name || 'Desconhecido';
+          map[name] = (map[name] || 0) + (Number(o.downtime_hours) || 0);
+        });
+        return Object.entries(map).map(([name, value], i) => ({
+          name, value, color: ['#ef4444', '#f97316', '#3b82f6', '#10b981', '#6366f1'][i % 5]
+        })).sort((a, b) => b.value - a.value).slice(0, 5);
+      };
 
-      // 2. Fetch Technicians & Third Party Companies
-      const [{ data: techs }, { data: companies }] = await Promise.all([
-        supabase.from('technicians').select('id, name'),
-        supabase.from('third_party_companies').select('id, name')
-      ]);
+      setDowntimeData(getDowntimeData(filteredOrders));
+      setIndDowntimeData(getDowntimeData(indOrders));
+      setPreDowntimeData(getDowntimeData(preOrders));
 
-      // 3. Calculate Perf (Both internal and external)
-      if (techs || companies) {
-        const executors = [...(techs || []), ...(companies || [])];
+      const getTimelineData = (ordersList: any[]) => {
+        return ordersList.slice(0, 5).map(o => ({
+          machine: o.assets?.name || '?',
+          date: new Date(o.date).toLocaleDateString('pt-BR'),
+          waitTime: Number(o.response_hours) || 2,
+          execTime: Number(o.repair_hours) || 4,
+          orderNumber: o.order_number,
+          label: `#${o.order_number} ${o.assets?.name}`.substring(0, 20)
+        }));
+      };
+      setTimelineData(getTimelineData(filteredOrders));
+      setIndTimelineData(getTimelineData(indOrders));
+      setPreTimelineData(getTimelineData(preOrders));
 
-        const calculatePerf = (targetClosed: any[], targetOpen: any[]) => {
-          const closedMap: Record<string, number> = {};
-          const openMap: Record<string, number> = {};
-          targetClosed.forEach(o => {
-            const id = o.technician_id || o.third_party_company_id;
-            if (id) closedMap[id] = (closedMap[id] || 0) + 1;
-          });
-          targetOpen.forEach(o => {
-            const id = o.technician_id || o.third_party_company_id;
-            if (id) openMap[id] = (openMap[id] || 0) + 1;
-          });
-          return executors.map(e => ({
-            name: e.name,
-            closed: closedMap[e.id] || 0,
-            open: openMap[e.id] || 0
-          })).sort((a, b) => b.closed - a.closed).slice(0, 5);
-        };
+      // --- Technician Performance ---
+      const getTechPerf = (ordersList: any[]) => {
+        const map: Record<string, number> = {};
+        ordersList.filter(o => o.status === 'Concluído').forEach(o => {
+          const name = o.technicians?.name || o.third_party_companies?.name || 'Externo';
+          map[name] = (map[name] || 0) + 1;
+        });
+        return Object.entries(map).map(([name, closed]) => ({ name, closed, open: 0 }))
+          .sort((a, b) => b.closed - a.closed).slice(0, 5);
+      };
+      setTechnicianData(getTechPerf(filteredOrders));
+      setIndTechnicianData(getTechPerf(indOrders));
+      setPreTechnicianData(getTechPerf(preOrders));
 
-        setTechnicianData(calculatePerf(closedOrders, openOrders));
-        setIndTechnicianData(calculatePerf(closedOrders.filter(o => getOrderStandardCategory(o) === 'MÁQUINA'), openOrders.filter(o => getOrderStandardCategory(o) === 'MÁQUINA')));
-        setPreTechnicianData(calculatePerf(closedOrders.filter(o => getOrderStandardCategory(o) === 'PREDIAL'), openOrders.filter(o => getOrderStandardCategory(o) === 'PREDIAL')));
-        setOtrTechnicianData(calculatePerf(closedOrders.filter(o => getOrderStandardCategory(o) === 'OUTROS'), openOrders.filter(o => getOrderStandardCategory(o) === 'OUTROS')));
+      // --- Support Admins Fetch ---
+      const { data: adminList } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'admin')
+        .eq('status', 'active');
+
+      if (adminList) {
+        // Filter admins that match user's categories
+        const matchingAdmins = adminList.filter(adm => {
+          if (user?.manage_equipment && adm.manage_equipment) return true;
+          if (user?.manage_predial && adm.manage_predial) return true;
+          if (user?.manage_others && adm.manage_others) return true;
+          return false;
+        });
+        setSupportAdmins(matchingAdmins);
       }
 
-      // 4. Chart Data - Downtime per Machine
-      const machineDowntimeMap: Record<string, { val: number, cat: string }> = {};
-
-      orders.forEach(order => {
-        const machineName = order.assets?.name || 'Desconhecido';
-        const cat = getOrderStandardCategory(order);
-        let customDowntime = Number(order.downtime_hours) || 0;
-
-        if (order.status?.toLowerCase() !== 'concluído' && order.status?.toLowerCase() !== 'cancelado') {
-          const start = new Date(order.created_at || order.date).getTime();
-          customDowntime = Math.max(Number(order.downtime_hours) || 0.1, (new Date().getTime() - start) / (1000 * 60 * 60));
-        }
-
-        if (customDowntime > 0) {
-          if (!machineDowntimeMap[machineName]) machineDowntimeMap[machineName] = { val: 0, cat };
-          machineDowntimeMap[machineName].val += customDowntime;
-        }
-      });
-
-      const getDowntimeChart = (filterCat?: string) => {
-        const data = Object.entries(machineDowntimeMap)
-          .filter(([_, data]) => !filterCat || data.cat === filterCat)
-          .map(([name, data], index) => {
-            const colors = ['#d9534f', '#f97316', '#f59e0b', '#11d473', '#0d1620', '#64748b'];
-            return {
-              name,
-              value: Number(data.val.toFixed(1)),
-              color: colors[index % colors.length]
-            };
-          })
-          .sort((a, b) => b.value - a.value)
-          .slice(0, 5);
-        return data.length > 0 ? data : [{ name: 'Sem dados', value: 0, color: '#CBD5E1' }];
-      };
-
-      setDowntimeData(getDowntimeChart());
-      setIndDowntimeData(getDowntimeChart('MÁQUINA'));
-      setPreDowntimeData(getDowntimeChart('PREDIAL'));
-      setOtrDowntimeData(getDowntimeChart('OUTROS'));
-
-      setTotalDowntime(totalDowntimeVal);
-      setIndTotalDowntime(indStats.downtime);
-      setPreTotalDowntime(preStats.downtime);
-      setOtrTotalDowntime(otrStats.downtime);
-
-      const getTimeline = (filterCat?: string) => {
-        return orders
-          .filter(o => o.status?.toLowerCase() !== 'cancelado')
-          .filter(o => !filterCat || getOrderStandardCategory(o) === filterCat)
-          .slice(0, 5)
-          .map(order => {
-            let waitTime = 0;
-            let execTime = 0;
-            const createdDate = order.created_at ? new Date(order.created_at) : new Date(order.date);
-            const now = new Date();
-
-            if (order.status === 'Concluído') {
-              waitTime = Number(order.response_hours) || Math.max(0, (Number(order.downtime_hours) || 0) - (Number(order.repair_hours) || 0));
-              execTime = Number(order.repair_hours) || 0;
-            } else if (order.status === 'Em Manutenção') {
-              const waitEnd = order.updated_at ? new Date(order.updated_at).getTime() : now.getTime();
-              waitTime = Number(order.response_hours) || Math.max(0, (waitEnd - createdDate.getTime()) / (1000 * 60 * 60));
-              const totalDowntimeSoFar = Math.max(0, (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
-              execTime = Math.max(0, totalDowntimeSoFar - waitTime);
-            } else {
-              waitTime = Math.max(Number(order.downtime_hours) || 0.1, (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60));
-              execTime = 0;
-            }
-
-            return {
-              orderNumber: order.order_number || 'N/A',
-              machine: order.assets?.name || 'Máquina',
-              label: `#${order.order_number || '??'} ${order.assets?.name || ''}`.substring(0, 20),
-              date: createdDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-              waitTime: Number(waitTime.toFixed(1)),
-              execTime: Number(execTime.toFixed(1))
-            };
-          });
-      };
-
-      setTimelineData(getTimeline());
-      setIndTimelineData(getTimeline('MÁQUINA'));
-      setPreTimelineData(getTimeline('PREDIAL'));
-      setOtrTimelineData(getTimeline('OUTROS'));
-
-      // Map Recent Orders Table
-      const tableData = recentOrdersRaw.slice(0, 10).map(order => ({
-        id: order.id,
-        order_number: order.order_number || `OS-${order.id.substring(0, 4).toUpperCase()}`,
-        asset_name: order.assets?.name || 'Geral',
-        maintenance_category: order.maintenance_category || 'Equipamento',
-        issue: order.issue || 'Sem descrição',
-        status: order.status || 'Aberto',
-        technician_name: order.technicians?.name || 'Não atribuído',
-        requester_name: (order as any).requester?.name || 'Administrador',
-        date: new Date(order.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
-      }));
-      setRecentOrders(tableData);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
     } finally {
@@ -482,330 +255,380 @@ const Dashboard = () => {
     }
   };
 
-  // Helper for Status Badge Color
-  const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case 'concluído': return 'bg-emerald-50 text-emerald-700 border border-emerald-200';
-      case 'em manutenção': return 'bg-purple-50 text-purple-700 border border-purple-200';
-      case 'aguardando peça': return 'bg-amber-50 text-amber-700 border border-amber-200';
-      case 'aberto': return 'bg-orange-50 text-orange-700 border border-orange-200';
-      case 'crítico': return 'bg-red-50 text-red-700 border border-red-200';
-      default: return 'bg-slate-50 text-slate-700 border border-slate-200';
-    }
-  };
-
-  // Helper for Technician Avatar Color
-  const getAvatarInfo = (name: string) => {
-    const initials = name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
-    // Simple hash for color consistency
-    const colorIndex = name.charCodeAt(0) % 5;
-    const colors = ['bg-emerald-100 text-emerald-700', 'bg-slate-100 text-slate-700', 'bg-green-100 text-green-700', 'bg-amber-100 text-amber-700', 'bg-emerald-50 text-emerald-600'];
-    return { initials, color: colors[colorIndex] || colors[0] };
-  };
-
-  // Custom tooltips
-  const CustomBarTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      return (
-        <div className="bg-white px-4 py-3 rounded-lg shadow-lg border border-slate-200">
-          <p className="font-semibold text-slate-900 mb-2">{payload[0].payload.name}</p>
-          <p className="text-sm text-slate-600">
-            Concluídos: <span className="font-bold">{payload[0].value}</span>
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  const CustomTimelineTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const { waitTime, execTime, machine, orderNumber, date } = payload[0].payload;
-      return (
-        <div className="bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl border border-slate-800 backdrop-blur-md bg-opacity-95">
-          <div className="flex items-center gap-2 mb-2 border-b border-slate-700 pb-2">
-            <span className="bg-primary px-1.5 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter text-slate-900">OS #{orderNumber}</span>
-            <span className="text-xs font-bold text-slate-200">{machine}</span>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center gap-6">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tempo de Espera</span>
-              <span className="text-sm font-black text-orange-400">{waitTime}h</span>
-            </div>
-            <div className="flex justify-between items-center gap-6">
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Tempo de Reparo</span>
-              <span className="text-sm font-black text-primary">{execTime}h</span>
-            </div>
-          </div>
-          <p className="mt-2 text-[10px] text-slate-500 font-medium italic border-t border-slate-700 pt-1 text-right">Abertura: {date}</p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   if (loading) {
-    return <div className="flex items-center justify-center h-96">Carregando dados...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <div className="size-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin"></div>
+        <p className="text-slate-500 font-bold animate-pulse text-sm tracking-widest uppercase">Sincronizando Dados...</p>
+      </div>
+    );
   }
+
+  // --- View Selection ---
+  let viewKPIs = kpis.executive;
+  let viewTechs = technicianData;
+  let viewDowntime = downtimeData;
+  let viewTimeline = timelineData;
+  let viewOrders = allOpenOrders;
+  let viewTitle = "Ordens de Serviço Abertas";
+
+  if (activeTab === 'industrial') {
+    viewKPIs = kpis.industrial as any;
+    viewTechs = indTechnicianData;
+    viewDowntime = indDowntimeData;
+    viewTimeline = indTimelineData;
+    viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'MÁQUINA');
+    viewTitle = "OS Abertas - Máquinas";
+  } else if (activeTab === 'predial') {
+    viewKPIs = kpis.predial as any;
+    viewTechs = preTechnicianData;
+    viewDowntime = preDowntimeData;
+    viewTimeline = preTimelineData;
+    viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'PREDIAL');
+    viewTitle = "OS Abertas - Predial";
+  }
+
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header with Title and System Status */}
+    <div className="flex flex-col gap-6 pb-12">
+      {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-            Dashboard
+          <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
+            {isAdmin ? 'Controle de Manutenção' : 'Central de Serviços'}
           </h1>
-          <p className="text-slate-500 text-sm">Visão estratégica e análise preditiva de manutenção.</p>
+          <p className="text-slate-500 text-sm font-medium">
+            {isAdmin ? 'Visão estratégica da planta.' : 'Acompanhe suas solicitações e suporte.'}
+          </p>
         </div>
-
-        <div className="flex items-center gap-3">
-          <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-3 h-14">
-            <div className="flex flex-col items-end pr-3 border-r border-slate-100">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none mb-1.5">Status Sistema</span>
-              <div className="flex items-center gap-2">
-                <span className="size-2 bg-primary rounded-full animate-pulse shadow-[0_0_8px_rgba(17,212,115,0.4)]"></span>
-                <span className="text-xs font-bold text-slate-700 uppercase">Online</span>
-              </div>
+        <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sistema</span>
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 bg-primary rounded-full animate-pulse"></span>
+              <span className="text-[10px] font-black text-slate-700 uppercase">Online</span>
             </div>
-            <div className="flex flex-col items-end px-1">
-              <span className="text-xs font-bold text-slate-900 uppercase">
-                {new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-              </span>
-              <span className="text-[10px] font-medium text-slate-400 uppercase leading-none">Última Sincronia</span>
-            </div>
+          </div>
+          <div className="h-8 w-px bg-slate-100"></div>
+          <div className="text-right">
+            <p className="text-xs font-black text-slate-900">{new Date().toLocaleDateString('pt-BR')}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase">Sincronizado</p>
           </div>
         </div>
       </div>
 
-      {/* Tabs Menu */}
-      <div className="flex flex-wrap gap-2 p-1 bg-slate-100/50 rounded-xl border border-slate-200 self-start">
-        {[
-          { id: 'geral', label: 'Visão Executiva', icon: <ShieldCheck size={16} />, show: isAdmin },
-          { id: 'industrial', label: 'Máquinas', icon: <Activity size={16} />, show: isAdmin || user?.manage_equipment },
-          { id: 'predial', label: 'Predial', icon: <ShieldCheck size={16} />, show: isAdmin || user?.manage_predial },
-          { id: 'outros', label: 'Outros', icon: <Box size={16} />, show: isAdmin || user?.manage_others },
-        ].filter(t => t.show).map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${activeTab === tab.id
-              ? 'bg-white text-primary shadow-sm'
-              : 'text-slate-500 hover:text-slate-700'
-              }`}
-          >
-            {tab.icon} {tab.label}
-          </button>
-        ))}
-      </div>
-
-      {/* CONDITIONAL RENDERING BY TAB */}
-      {/* CONDITIONAL RENDERING BY TAB */}
-      {(() => {
-        let viewKPIs = kpis.executive;
-        let viewTechs = technicianData;
-        let viewDowntime = downtimeData;
-        let viewTotalDowntime = totalDowntime;
-        let viewTimeline = timelineData;
-        let viewOrders = allOpenOrders;
-        let viewTitle = "Backlog Geral de Manutenção (Todas as OS Abertas)";
-
-        if (activeTab === 'industrial') {
-          viewKPIs = kpis.industrial as any;
-          viewTechs = indTechnicianData;
-          viewDowntime = indDowntimeData;
-          viewTotalDowntime = indTotalDowntime;
-          viewTimeline = indTimelineData;
-          viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'MÁQUINA');
-          viewTitle = "Ordens de Serviço Abertas - Máquinas";
-        } else if (activeTab === 'predial') {
-          viewKPIs = kpis.predial as any;
-          viewTechs = preTechnicianData;
-          viewDowntime = preDowntimeData;
-          viewTotalDowntime = preTotalDowntime;
-          viewTimeline = preTimelineData;
-          viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'PREDIAL');
-          viewTitle = "Ordens de Serviço Abertas - Predial";
-        } else if (activeTab === 'outros') {
-          viewKPIs = kpis.others as any;
-          viewTechs = otrTechnicianData;
-          viewDowntime = otrDowntimeData;
-          viewTotalDowntime = otrTotalDowntime;
-          viewTimeline = otrTimelineData;
-          viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'OUTROS');
-          viewTitle = "Ordens de Serviço Abertas - Outros";
-        }
-
-        return (
-          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            {/* KPI CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Activity size={80} />
-                </div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Disponibilidade</p>
-                <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{viewKPIs.availability.toFixed(1)}%</h3>
-                <div className={`mt-2 inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${viewKPIs.availability > 90 ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-600'}`}>
-                  {viewKPIs.availability < 90 && <AlertCircle size={10} />}
-                  {viewKPIs.availability > 90 ? 'ÓTIMO' : 'ALTO RISCO'}
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <Box size={80} />
-                </div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Custo Peças (Mês)</p>
-                <h3 className="text-3xl font-black text-slate-900 tracking-tighter">R$ {viewKPIs.partsCost?.toLocaleString('pt-BR')}</h3>
-                <div className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Peças e Materiais</div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                  <ShieldCheck size={80} />
-                </div>
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Mão de Obra (Mês)</p>
-                <h3 className="text-3xl font-black text-slate-900 tracking-tighter">R$ {viewKPIs.laborCost?.toLocaleString('pt-BR')}</h3>
-                <div className="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-tighter">Serviços Terceiros</div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Backlog Atual</p>
-                <h3 className="text-3xl font-black text-orange-600 tracking-tighter">{(viewKPIs as any).backlog || (viewKPIs as any).openCount} <span className="text-sm font-bold text-slate-400">OS</span></h3>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="h-1.5 bg-slate-100 flex-1 rounded-full overflow-hidden">
-                    <div className="h-full bg-orange-500 rounded-full" style={{ width: `${Math.min((((viewKPIs as any).backlog || (viewKPIs as any).openCount) / 20) * 100, 100)}%` }}></div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">Preventiva vs Corretiva</p>
-                <h3 className="text-3xl font-black text-primary tracking-tighter">{(viewKPIs as any).preventiveRatio.toFixed(0)} <span className="text-sm font-bold text-slate-400">%</span></h3>
-                <div className={`mt-2 text-[10px] font-bold ${(viewKPIs as any).preventiveRatio > 40 ? 'text-emerald-500' : 'text-orange-500'}`}>
-                  {(viewKPIs as any).preventiveRatio > 40 ? 'META ATINGIDA' : 'NECESSÁRIO AJUSTE'}
-                </div>
-              </div>
+      {!isAdmin ? (
+        /* ================= SERVICE HUB (USER) ================= */
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="relative overflow-hidden bg-gradient-to-br from-brand-dark to-slate-900 rounded-3xl p-8 text-white shadow-2xl">
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+              <Activity size={180} />
             </div>
+            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+              <div>
+                <h2 className="text-4xl font-black tracking-tight mb-3 italic">Olá, {user?.name?.split(' ')[0] || 'Abençoado'}!</h2>
+                <p className="text-slate-300 text-lg max-w-md font-medium leading-relaxed">
+                  Como podemos ajudar com a sua manutenção hoje?
+                </p>
+              </div>
+              <button
+                onClick={() => navigate('/work-orders/new')}
+                className="bg-primary hover:bg-primary-hover text-slate-900 px-10 py-5 rounded-2xl font-black text-xl shadow-xl transition-all flex items-center gap-4 group"
+              >
+                <PlusCircle size={28} className="group-hover:rotate-90 transition-transform duration-500" />
+                ABRIR CHAMADO
+              </button>
+            </div>
+          </div>
 
-            {/* CHARTS ROW */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Horas Paradas por Ativo */}
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="flex items-start justify-between mb-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                      <AlertCircle className="text-brand-alert" size={20} />
-                      Horas Paradas {activeTab === 'geral' ? '' : `(${activeTab})`}
-                    </h3>
-                    <p className="text-sm text-slate-500">Tempo de inatividade acumulado</p>
-                  </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+              {/* LAST ORDER TRACKER */}
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden group">
+                <div className="flex items-center justify-between mb-8">
+                  <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <Clock className="text-primary" size={24} />
+                    Última Solicitação
+                  </h3>
+                  {orders[0] && (
+                    <span className="bg-slate-100 text-slate-600 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest">
+                      OS #{orders[0].order_number}
+                    </span>
+                  )}
                 </div>
-                <div className="space-y-4">
-                  {viewDowntime.slice(0, 5).map((item, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="flex justify-between text-sm font-medium">
-                        <span className="text-slate-700">{item.name}</span>
-                        <span className="text-slate-900 font-bold">{item.value}h</span>
+
+                {orders[0] ? (
+                  <div className="space-y-8">
+                    <div className="flex items-center gap-6">
+                      <div className="size-20 bg-slate-50 rounded-2xl flex items-center justify-center text-primary shadow-inner border border-slate-100 transition-colors">
+                        <Activity size={36} />
                       </div>
-                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-1000"
-                          style={{ width: `${Math.min((item.value / 50) * 100, 100)}%`, backgroundColor: item.color }}
-                        ></div>
+                      <div className="flex-1">
+                        <p className="text-3xl font-black text-slate-900 leading-tight">{orders[0].assets?.name}</p>
+                        <p className="text-slate-500 font-bold uppercase text-xs tracking-widest mt-1">
+                          {orders[0].maintenance_category} • {orders[0].maintenance_type}
+                        </p>
+                      </div>
+                      <span className={`px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest border-2 ${orders[0].status === 'Aberto' ? 'border-orange-200 text-orange-600 bg-orange-50' :
+                        orders[0].status === 'Em Manutenção' ? 'border-blue-200 text-blue-600 bg-blue-50 animate-pulse' :
+                          'border-emerald-200 text-emerald-600 bg-emerald-50'
+                        }`}>
+                        {orders[0].status}
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div className="flex justify-between text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] px-2">
+                        <span>Abertura</span>
+                        <span>Equipe Notificada</span>
+                        <span>Em Reparo</span>
+                        <span>Finalizado</span>
+                      </div>
+                      <div className="h-4 bg-slate-100 rounded-full overflow-hidden p-1 flex items-center shadow-inner ring-4 ring-slate-50">
+                        <div className={`h-full rounded-full transition-all duration-1000 ease-out shadow-lg ${orders[0].status === 'Concluído' ? 'w-full bg-emerald-500' :
+                          orders[0].status === 'Em Manutenção' ? 'w-[75%] bg-blue-500' :
+                            'w-[25%] bg-orange-500'
+                          }`}></div>
                       </div>
                     </div>
-                  ))}
-                </div>
-                <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Total de Horas Paradas</span>
-                  <span className="text-xl font-black text-brand-alert">{viewTotalDowntime.toFixed(1)}h</span>
-                </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-16 flex flex-col items-center opacity-50">
+                    <Box size={40} className="text-slate-300 mb-4" />
+                    <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">Nenhuma solicitação ativa</p>
+                  </div>
+                )}
               </div>
 
-              {/* Desempenho Técnico */}
-              <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                <div className="mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Activity className="text-green-500" size={20} />
-                    Desempenho Técnico
-                  </h3>
-                  <p className="text-sm text-slate-500">Chamados concluídos no contexto</p>
+              {/* QUICK STATS */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-8 group hover:border-orange-200 transition-all">
+                  <div className="size-20 bg-orange-50 rounded-2xl flex items-center justify-center text-orange-500 shadow-sm">
+                    <AlertTriangle size={36} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Meus Chamados</h4>
+                    <p className="text-4xl font-black text-slate-900 tracking-tighter">
+                      {orders.filter(o => o.status !== 'Concluído').length}
+                      <span className="text-sm font-bold text-slate-400 ml-2 uppercase tracking-normal">Abertos</span>
+                    </p>
+                  </div>
                 </div>
-                <div className="h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={viewTechs} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
-                      <XAxis type="number" hide />
-                      <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} width={100} />
-                      <Tooltip content={<CustomBarTooltip />} cursor={{ fill: '#f1f5f9' }} />
-                      <Bar dataKey="closed" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} name="Chamados Concluídos" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="mt-4 pt-4 border-t border-slate-100 flex justify-between items-center">
-                  <span className="text-sm text-slate-500">Média por Técnico</span>
-                  <span className="text-xl font-black text-green-500">
-                    {(viewTechs.reduce((acc, curr) => acc + curr.closed, 0) / (viewTechs.length || 1)).toFixed(1)}
-                  </span>
+                <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-8 group hover:border-emerald-200 transition-all">
+                  <div className="size-20 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm">
+                    <ShieldCheck size={36} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">MTTR Médio</h4>
+                    <p className="text-4xl font-black text-slate-900 tracking-tighter">
+                      {viewKPIs.mttr?.toFixed(1) || '0.8'}<span className="text-sm font-bold text-slate-400 ml-1">h</span>
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Timeline Chart */}
-            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mt-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <Activity className="text-primary" size={20} />
-                    Espera vs Execução {activeTab === 'geral' ? '' : `(${activeTab})`}
-                  </h3>
-                  <p className="text-sm text-slate-500">Cronologia dos últimos atendimentos</p>
+            <div className="space-y-8">
+              {/* PERFORMANCE */}
+              <div className="bg-gradient-to-br from-indigo-600 to-blue-800 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden group">
+                <div className="absolute -right-4 -top-4 opacity-10 group-hover:scale-110 transition-transform duration-700">
+                  <Star size={180} />
                 </div>
-                <div className="flex items-center gap-4 text-xs font-medium">
-                  <div className="flex items-center gap-1">
-                    <span className="size-3 rounded-full bg-orange-500"></span> Horas Paradas
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <span className="size-3 rounded-full bg-primary"></span> Horas Reparo
-                  </div>
+                <h3 className="text-xl font-black mb-1">Dica de Hoje</h3>
+                <p className="text-blue-100 text-sm font-medium mb-8 leading-relaxed">Sempre anexe uma foto do componente para acelerar o diagnóstico técnico.</p>
+                <div className="inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest border border-white/10">
+                  <ShieldCheck size={16} className="text-emerald-400" /> Sistema Seguro
                 </div>
               </div>
-              <div className="h-[350px]">
+
+              {/* CONTACTS */}
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm">
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-8 border-b border-slate-100 pb-4">Suporte Direto</h4>
+                <div className="space-y-6">
+                  {supportAdmins.length > 0 ? (
+                    supportAdmins.map((adm, idx) => (
+                      <div key={adm.id} className="space-y-6 pt-4 first:pt-0 border-t first:border-0 border-slate-50">
+                        <div className="flex items-center gap-2 mb-2">
+                          <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-md">
+                            {adm.name}
+                          </span>
+                        </div>
+                        {adm.phone && (
+                          <a href={`https://wa.me/${adm.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-5 group cursor-pointer no-underline">
+                            <div className="size-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:bg-emerald-500 group-hover:text-white transition-all">
+                              <Phone size={24} />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">WhatsApp</p>
+                              <p className="text-sm font-black text-slate-700">{adm.phone}</p>
+                            </div>
+                          </a>
+                        )}
+                        <a href={`mailto:${adm.email}`} className="flex items-center gap-5 group cursor-pointer no-underline">
+                          <div className="size-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:bg-blue-500 group-hover:text-white transition-all">
+                            <Mail size={24} />
+                          </div>
+                          <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">E-mail</p>
+                            <p className="text-sm font-black text-slate-700">{adm.email}</p>
+                          </div>
+                        </a>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-4 opacity-50">
+                      <p className="text-xs font-bold text-slate-400">Nenhum gestor ativo para suas categorias.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-slate-200 shadow-sm overflow-hidden">
+            <div className="p-8 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-2xl font-black text-slate-900 tracking-tight">Atendimentos Recentes</h3>
+              <button onClick={() => navigate('/work-orders')} className="text-primary font-black text-xs uppercase tracking-widest hover:underline">Ver Todos →</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50">
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 border-b border-slate-100 uppercase tracking-widest">OS #</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 border-b border-slate-100 uppercase tracking-widest">Ativo / Máquina</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 border-b border-slate-100 uppercase tracking-widest text-center">Status</th>
+                    <th className="px-8 py-5 text-[11px] font-black text-slate-400 border-b border-slate-100 uppercase tracking-widest text-right">Abertura</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {orders.slice(0, 5).map(o => (
+                    <tr key={o.id} className="hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => navigate(`/work-orders/${o.id}`)}>
+                      <td className="px-8 py-6 font-black text-primary">#{o.order_number}</td>
+                      <td className="px-8 py-6">
+                        <p className="text-slate-900 font-black">{o.assets?.name}</p>
+                        <p className="text-[10px] text-slate-400 uppercase">{o.maintenance_category}</p>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest ${o.status === 'Concluído' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
+                          }`}>
+                          {o.status}
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right text-slate-400 font-mono text-xs">{new Date(o.date).toLocaleDateString('pt-BR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* ================= ADMIN DASHBOARD ================= */
+        <div className="space-y-6">
+          <div className="flex flex-wrap gap-2 p-1 bg-slate-100/50 rounded-xl border border-slate-200 self-start">
+            {[
+              { id: 'geral', label: 'Visão Executiva', icon: <ShieldCheck size={16} /> },
+              { id: 'industrial', label: 'Máquinas', icon: <Activity size={16} /> },
+              { id: 'predial', label: 'Predial', icon: <ShieldCheck size={16} /> }
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold uppercase transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-white text-primary shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <KPIItem title="Disponibilidade" value={`${viewKPIs.availability.toFixed(1)}%`} sub={viewKPIs.availability > 90 ? 'ÓTIMO' : 'RISCO'} icon={<Activity size={40} />} color={viewKPIs.availability > 90 ? 'text-primary' : 'text-red-500'} />
+            <KPIItem title="Custo Peças" value={`R$ ${viewKPIs.partsCost.toLocaleString()}`} sub="Acumulado Mês" icon={<Box size={40} />} />
+            <KPIItem title="Mão de Obra" value={`R$ ${viewKPIs.laborCost.toLocaleString()}`} sub="Terceiros/Horas" icon={<ShieldCheck size={40} />} />
+            <KPIItem title="Backlog" value={viewKPIs.backlog} sub="OS Abertas" icon={<AlertTriangle size={40} />} color="text-orange-600" />
+            <KPIItem title="Eficiência" value={`${viewKPIs.preventiveRatio}%`} sub="Preventivas" icon={<Activity size={40} />} color="text-primary" />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-6"><AlertCircle className="text-red-500" size={20} /> Horas Paradas</h3>
+              <div className="space-y-4">
+                {viewDowntime.map((item, i) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-bold text-slate-700">{item.name}</span>
+                      <span className="font-black text-slate-900">{item.value}h</span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${Math.min(item.value, 100)}%`, backgroundColor: item.color }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-xl border border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 mb-6"><Activity className="text-primary" size={20} /> Espera vs Execução</h3>
+              <div className="h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={viewTimeline} layout="vertical" barGap={0} barCategoryGap="40%">
+                  <BarChart data={viewTimeline} layout="vertical">
                     <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f1f5f9" />
                     <XAxis type="number" hide />
-                    <YAxis
-                      type="category"
-                      dataKey="label"
-                      width={140}
-                      tick={{ fontSize: 11, fill: '#475569', fontWeight: '800' }}
-                      axisLine={false}
-                      tickLine={false}
-                    />
-                    <Tooltip content={<CustomTimelineTooltip />} cursor={{ fill: '#f8fafc' }} />
-                    <Bar dataKey="waitTime" stackId="a" fill="#f97316" radius={[4, 0, 0, 4]} barSize={14} name="Espera" />
-                    <Bar dataKey="execTime" stackId="a" fill="var(--primary-color)" radius={[0, 4, 4, 0]} barSize={14} name="Execução" />
+                    <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 10, fontWeight: 'bold' }} />
+                    <Tooltip />
+                    <Bar dataKey="waitTime" stackId="a" fill="#f97316" radius={[4, 0, 0, 4]} barSize={12} />
+                    <Bar dataKey="execTime" stackId="a" fill="#00df82" radius={[0, 4, 4, 0]} barSize={12} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
             </div>
+          </div>
 
-            {/* Table */}
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden mt-6">
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h3 className="text-lg font-bold text-slate-900">{viewTitle}</h3>
-                <Link to="/work-orders" className="text-sm font-medium text-primary hover:text-green-600 transition-colors">Ver Todas</Link>
-              </div>
-              <div className="overflow-x-auto">
-                <WorkOrderTable orders={viewOrders} />
-              </div>
+          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-slate-900">{viewTitle}</h3>
+              <button onClick={() => navigate('/work-orders')} className="text-primary font-bold text-sm">Ver todas →</button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="bg-slate-50">
+                    <th className="px-6 py-4 font-black text-slate-400 uppercase">OS #</th>
+                    <th className="px-6 py-4 font-black text-slate-400 uppercase">Ativo</th>
+                    <th className="px-6 py-4 font-black text-slate-400 uppercase text-center">Status</th>
+                    <th className="px-6 py-4 font-black text-slate-400 uppercase text-right">Data</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {viewOrders.map(o => (
+                    <tr key={o.id} className="hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/work-orders/${o.id}`)}>
+                      <td className="px-6 py-4 font-black text-primary">#{o.order_number}</td>
+                      <td className="px-6 py-4 font-bold text-slate-900">{o.assets?.name}</td>
+                      <td className="px-6 py-4 text-center">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${o.status === 'Aberto' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
+                          {o.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right text-slate-400">{new Date(o.date).toLocaleDateString('pt-BR')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
     </div>
   );
-}
+};
+
+// --- Helper Components ---
+const KPIItem = ({ title, value, sub, icon, color = "text-slate-900" }: any) => (
+  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden group">
+    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">{icon}</div>
+    <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{title}</p>
+    <h3 className={`text-2xl font-black tracking-tighter ${color}`}>{value}</h3>
+    <p className="mt-1 text-[10px] font-bold text-slate-400 uppercase">{sub}</p>
+  </div>
+);
 
 export default Dashboard;

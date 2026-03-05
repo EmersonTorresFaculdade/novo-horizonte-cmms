@@ -25,6 +25,7 @@ import {
 import FeedbackModal from '../components/FeedbackModal';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../contexts/SettingsContext';
+import { useAuth } from '../contexts/AuthContext';
 import {
     BarChart,
     Bar,
@@ -99,6 +100,8 @@ class ErrorBoundary extends React.Component<
 
 const ReportsContent = () => {
     const { settings } = useSettings();
+    const { user } = useAuth();
+    const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
     const [searchParams] = useSearchParams();
     const [period, setPeriod] = useState('month');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
@@ -817,10 +820,26 @@ const ReportsContent = () => {
                     { name: 'Predial', value: currentData.filter((wo: any) => wo.maintenance_category === 'PREDIAL').length }
                 ],
                 assetsStatus: [],
-                technicianPerformance: technicians?.map(t => ({
-                    name: t.name,
-                    completed: currentData.filter(wo => wo.technician_id === t.id && wo.status === 'Concluído').length
-                })).sort((a, b) => b.completed - a.completed).slice(0, 5) || [],
+                technicianPerformance: (() => {
+                    // Filter technicians by specialty based on categoryFilter
+                    // Filter technicians by user's active keys (chaves ativas)
+                    const filteredTechs = (technicians || []).filter(t => {
+                        const spec = (t.specialty || '').toLowerCase().trim();
+                        // If admin with all keys or no keys set, show all
+                        if (isAdmin && user?.manage_equipment && user?.manage_predial && user?.manage_others) return true;
+                        if (isAdmin && !user?.manage_equipment && !user?.manage_predial && !user?.manage_others) return true;
+
+                        let allowed = false;
+                        if (user?.manage_equipment && (spec === 'máquinas' || spec === 'maquinas')) allowed = true;
+                        if (user?.manage_predial && spec === 'predial') allowed = true;
+                        if (user?.manage_others && spec === 'outros') allowed = true;
+                        return allowed;
+                    });
+                    return filteredTechs.map(t => ({
+                        name: t.name,
+                        completed: currentData.filter(wo => wo.technician_id === t.id && wo.status === 'Concluído').length
+                    })).sort((a, b) => b.completed - a.completed).slice(0, 5);
+                })(),
                 topProblematicAssets: problematicAssets,
                 temporalEvolution
             });

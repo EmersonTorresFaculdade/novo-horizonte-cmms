@@ -14,6 +14,15 @@ interface WorkOrderPayload {
     technicianName?: string;
 }
 
+interface UserPayload {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+    role: string;
+    status: string;
+}
+
 export const NotificationService = {
     async notifyWorkOrderCreated(workOrder: WorkOrderPayload) {
         await this.sendWebhook('work_order_created', workOrder);
@@ -31,18 +40,21 @@ export const NotificationService = {
         await this.sendWebhook('work_order_cancelled', workOrder, adminName);
     },
 
+    async notifyUserRegistered(user: UserPayload) {
+        await this.sendUserWebhook('user_registered', user);
+    },
+
+    async notifyUserApproved(user: UserPayload) {
+        await this.sendUserWebhook('user_approved', user);
+    },
+
+    async notifyUserRejected(user: UserPayload) {
+        await this.sendUserWebhook('user_rejected', user);
+    },
+
     async sendWebhook(event: string, workOrder: WorkOrderPayload, adminName?: string) {
         try {
-            // Get session if available, but don't strictly block (Edge Function might have its own auth check or be public)
             const { data: { session } } = await supabase.auth.getSession();
-
-            console.log(`DEBUG: Invoking Edge Function for event: ${event}`);
-            console.log('DEBUG: Payload:', {
-                event,
-                status: workOrder.status,
-                id: workOrder.id,
-                scheduled_at: (workOrder as any).scheduled_at
-            });
 
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
@@ -50,7 +62,7 @@ export const NotificationService = {
                     adminName,
                     workOrder: {
                         ...workOrder,
-                        url: `https://manutencao.novohorizonte.com/#/work-orders/${workOrder.id}`
+                        url: `${window.location.origin}/#/work-orders/${workOrder.id}`
                     },
                 },
                 headers: session ? {
@@ -58,17 +70,32 @@ export const NotificationService = {
                 } : {}
             });
 
-            if (error) {
-                console.error('Edge Function returned error:', error);
-                // Return success false to handle in UI if needed
-                return { success: false, error };
-            }
-
-            console.log('Notification sent successfully:', data);
+            if (error) throw error;
             return { success: true, data };
-
         } catch (error) {
             console.error('Error sending notification webhook:', error);
+            return { success: false, error };
+        }
+    },
+
+    async sendUserWebhook(event: string, user: UserPayload) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+
+            const { data, error } = await supabase.functions.invoke('send-notification', {
+                body: {
+                    event,
+                    user,
+                },
+                headers: session ? {
+                    Authorization: `Bearer ${session.access_token}`
+                } : {}
+            });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error sending user notification webhook:', error);
             return { success: false, error };
         }
     }
