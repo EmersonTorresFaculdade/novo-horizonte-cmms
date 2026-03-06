@@ -25,6 +25,25 @@
             "brand-accent": "#f59e0b",                   /* Amarelo de notificações de ordens (recuperado) */
             "brand-alert": "#d9534f",                    /* Vermelho para avisos */
             background: "var(--bg-color)",
+          },
+          keyframes: {
+            wiggle: {
+              '0%, 100%': { transform: 'rotate(-10deg)' },
+              '50%': { transform: 'rotate(10deg)' },
+            },
+            'fade-in': {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            'slide-in-top': {
+              '0%': { transform: 'translateY(-10px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            }
+          },
+          animation: {
+            wiggle: 'wiggle 0.3s ease-in-out infinite',
+            'fade-in': 'fade-in 0.2s ease-out',
+            'slide-in-top': 'slide-in-top 0.2s ease-out',
           }
         },
       },

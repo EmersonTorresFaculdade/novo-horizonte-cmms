@@ -22,7 +22,11 @@ import {
   CircleDot,
   FileText,
   Download,
-  CalendarDays
+  CalendarDays,
+  Shield,
+  BookOpen,
+  FileSearch,
+  LifeBuoy
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -64,6 +68,15 @@ interface DashboardKPIs {
   industrial: StrategicKPIs & { openCount: number };
   predial: StrategicKPIs & { openCount: number };
   others: StrategicKPIs & { openCount: number };
+}
+
+interface PredictedFailure {
+  assetId: string;
+  assetName: string;
+  category: string;
+  predictedDate: string;
+  daysRemaining: number;
+  urgency: 'low' | 'medium' | 'high';
 }
 
 // --- Helpers ---
@@ -116,6 +129,7 @@ const Dashboard = () => {
   const [indTotalDowntime, setIndTotalDowntime] = useState(0);
   const [preTotalDowntime, setPreTotalDowntime] = useState(0);
   const [supportAdmins, setSupportAdmins] = useState<any[]>([]);
+  const [predictedFailures, setPredictedFailures] = useState<PredictedFailure[]>([]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -273,6 +287,46 @@ const Dashboard = () => {
         });
         setSupportAdmins(matchingAdmins);
       }
+
+      // --- Predictive Analysis Logic ---
+      const predictions: PredictedFailure[] = [];
+      const correctiveOrders = rawOrders.filter(o =>
+        (o.maintenance_type || '').toLowerCase().includes('corretiva') &&
+        o.status === 'Concluído'
+      );
+
+      const assetsWithOrders = Array.from(new Set(correctiveOrders.map(o => o.asset_id)));
+
+      assetsWithOrders.forEach(aid => {
+        const assetOrders = correctiveOrders
+          .filter(o => o.asset_id === aid)
+          .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+        if (assetOrders.length >= 2) {
+          let totalInterval = 0;
+          for (let i = 1; i < assetOrders.length; i++) {
+            totalInterval += new Date(assetOrders[i].date).getTime() - new Date(assetOrders[i - 1].date).getTime();
+          }
+          const avgInterval = totalInterval / (assetOrders.length - 1);
+          const lastOrderDate = new Date(assetOrders[assetOrders.length - 1].date).getTime();
+          const nextPredictedDate = lastOrderDate + avgInterval;
+
+          const daysRemaining = Math.ceil((nextPredictedDate - Date.now()) / (1000 * 60 * 60 * 24));
+
+          if (daysRemaining <= 10 && daysRemaining > -30) {
+            predictions.push({
+              assetId: aid,
+              assetName: assetOrders[0].assets?.name || 'Desconhecido',
+              category: assetOrders[0].maintenance_category,
+              predictedDate: new Date(nextPredictedDate).toLocaleDateString('pt-BR'),
+              daysRemaining,
+              urgency: daysRemaining <= 3 ? 'high' : daysRemaining <= 7 ? 'medium' : 'low'
+            });
+          }
+        }
+      });
+
+      setPredictedFailures(predictions.sort((a, b) => a.daysRemaining - b.daysRemaining).slice(0, 4));
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -524,6 +578,28 @@ const Dashboard = () => {
                   )}
                 </div>
               </div>
+
+              {/* KNOWLEDGE CENTER */}
+              <div className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                  <BookOpen size={120} />
+                </div>
+                <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-8 border-b border-slate-100 pb-4">Centro de Excelência</h4>
+                <div className="grid grid-cols-2 gap-4">
+                  <button className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group">
+                    <BookOpen size={32} className="text-primary mb-3 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Manuais</span>
+                  </button>
+                  <button className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group">
+                    <FileSearch size={32} className="text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">POPs</span>
+                  </button>
+                  <button className="col-span-2 flex items-center justify-center gap-4 p-5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-md group">
+                    <LifeBuoy size={24} className="text-primary group-hover:rotate-45 transition-transform" />
+                    <span className="text-xs font-black uppercase tracking-widest">Base de Conhecimento FAQ</span>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -654,6 +730,53 @@ const Dashboard = () => {
           </div>
 
           {/* CHARTS */}
+          {/* PREDICTIVE ANALYSIS WIDGET */}
+          {isAdmin && predictedFailures.length > 0 && (
+            <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white border border-slate-700 shadow-xl overflow-hidden relative group">
+              <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform duration-700">
+                <Shield size={120} />
+              </div>
+              <div className="relative z-10">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-black flex items-center gap-2">
+                      <Zap className="text-primary" size={20} /> Análise Preditiva IA
+                    </h3>
+                    <p className="text-slate-400 text-xs font-bold uppercase tracking-widest mt-1">Tendência de falhas baseada no histórico</p>
+                  </div>
+                  <span className="bg-primary/20 text-primary px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border border-primary/20">Ativo</span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  {predictedFailures.map(fail => (
+                    <div key={fail.assetId} className="bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-all group/item">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className={`size-8 rounded-lg flex items-center justify-center ${fail.urgency === 'high' ? 'bg-red-500/20 text-red-400' :
+                          fail.urgency === 'medium' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-primary/20 text-primary'
+                          }`}>
+                          <AlertTriangle size={16} />
+                        </div>
+                        <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${fail.urgency === 'high' ? 'bg-red-500 text-white' :
+                          fail.urgency === 'medium' ? 'bg-amber-500 text-white' :
+                            'bg-primary text-slate-900'
+                          }`}>
+                          {fail.daysRemaining <= 0 ? 'ATRASO' : `${fail.daysRemaining} DIAS`}
+                        </span>
+                      </div>
+                      <p className="text-sm font-black truncate">{fail.assetName}</p>
+                      <p className="text-[10px] text-slate-400 uppercase font-bold mt-1 tracking-wider">{fail.category}</p>
+                      <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                        <span className="text-[10px] text-slate-400 font-bold uppercase">Previsão</span>
+                        <span className="text-[11px] font-bold text-white">{fail.predictedDate}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* DOWNTIME */}
             <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
@@ -726,28 +849,67 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* TECHNICIAN PERFORMANCE */}
+          {/* TECHNICIAN PERFORMANCE — LEADERBOARD PRO */}
           {viewTechs.length > 0 && (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <Star className="text-yellow-500" size={20} /> Ranking de Técnicos
-                </h3>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-3 py-1 rounded-lg">Concluídas</span>
+            <div className="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm relative overflow-hidden">
+              <div className="flex items-center justify-between mb-10">
+                <div>
+                  <h3 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <Star className="text-yellow-500 fill-yellow-500" size={24} /> Performance de Campo
+                  </h3>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Liderança em ordens concluídas</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 bg-primary rounded-full"></span>
+                  <span className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Tempo Real</span>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                {viewTechs.map((tech, i) => (
-                  <div key={tech.name} className="relative bg-slate-50/50 rounded-xl p-4 border border-slate-100 hover:border-primary/30 transition-all group">
-                    {i === 0 && (
-                      <div className="absolute -top-2 -right-2 size-7 bg-yellow-400 rounded-full flex items-center justify-center text-xs font-black text-yellow-900 shadow-sm">
-                        🏆
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+                {viewTechs.slice(0, 5).map((tech, i) => {
+                  const isTop = i === 0;
+                  return (
+                    <div
+                      key={tech.name}
+                      className={`relative rounded-3xl p-6 transition-all duration-300 group ${isTop
+                          ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl scale-105 z-10'
+                          : 'bg-slate-50 border border-slate-100 hover:border-primary/30 hover:bg-white hover:shadow-lg'
+                        }`}
+                    >
+                      {isTop && (
+                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 size-10 bg-yellow-400 rounded-2xl flex items-center justify-center text-xl shadow-xl ring-4 ring-white group-hover:rotate-12 transition-transform">
+                          🏆
+                        </div>
+                      )}
+
+                      <div className="flex flex-col items-center text-center">
+                        <div className={`size-12 rounded-full flex items-center justify-center mb-4 font-black text-lg ${isTop ? 'bg-white/10 text-white' : 'bg-white text-slate-400 border border-slate-200'
+                          }`}>
+                          {i + 1}º
+                        </div>
+                        <p className={`text-sm font-black truncate w-full mb-1 ${isTop ? 'text-white' : 'text-slate-900'}`}>{tech.name}</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest ${isTop ? 'text-slate-400' : 'text-slate-400'}`}>Técnico</p>
+
+                        <div className="mt-6 w-full space-y-3">
+                          <div className="flex justify-between items-end">
+                            <span className={`text-[10px] font-black uppercase ${isTop ? 'text-slate-400' : 'text-slate-500'}`}>Concluídas</span>
+                            <span className="text-2xl font-black tabular-nums">{tech.closed}</span>
+                          </div>
+                          <div className={`h-1.5 rounded-full overflow-hidden ${isTop ? 'bg-white/10' : 'bg-slate-200'}`}>
+                            <div
+                              className={`h-full rounded-full transition-all duration-1000 ${isTop ? 'bg-primary' : 'bg-primary'}`}
+                              style={{ width: `${(tech.closed / (tech.closed + tech.open || 1)) * 100}%` }}
+                            ></div>
+                          </div>
+                          <div className="flex justify-between text-[9px] font-black uppercase tracking-tighter opacity-60">
+                            <span>Eficiência</span>
+                            <span>{Math.round((tech.closed / (tech.closed + tech.open || 1)) * 100)}%</span>
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <p className="text-xs font-bold text-slate-500 truncate mb-1">{tech.name}</p>
-                    <p className="text-2xl font-black text-slate-900 tracking-tighter">{tech.closed}</p>
-                    <p className="text-[10px] font-bold text-primary uppercase">OS concluídas</p>
-                  </div>
-                ))}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
