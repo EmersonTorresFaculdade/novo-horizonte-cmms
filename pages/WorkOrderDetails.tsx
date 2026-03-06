@@ -553,6 +553,12 @@ const WorkOrderDetails = () => {
                finalScheduledAt = now.toISOString();
             }
          }
+
+         // Caso a OS já esteja em manutenção mas o agendamento tenha ficado vazio (correção de legado)
+         if (status === 'Em Manutenção' && !finalScheduledAt) {
+            finalScheduledAt = workOrder?.responded_at || now.toISOString();
+         }
+
          if (!workOrder?.resolved_at && status === 'Concluído') {
             slaUpdates.resolved_at = now.toISOString();
             // Also auto-fill scheduled_at if it was never set
@@ -717,9 +723,9 @@ const WorkOrderDetails = () => {
    const statusSteps = [
       { id: 'Aberto', label: 'Aberto', icon: Clock, color: 'text-amber-500', bg: 'bg-amber-50' },
       { id: 'Recebido', label: 'Recebido', icon: User, color: 'text-slate-900', bg: 'bg-slate-100' },
-      { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-primary', bg: 'bg-primary/10' },
-      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-slate-900', bg: 'bg-slate-200' },
-      { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-primary', bg: 'bg-primary/10' }
+      { id: 'Agendado', label: 'Agendado', icon: Calendar, color: 'text-teal-600', bg: 'bg-teal-50' },
+      { id: 'Em Manutenção', label: 'Em Manutenção', icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { id: 'Concluído', label: 'Finalizado', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' }
    ];
 
    // Custom timeline logic: Agendado is determined by scheduled_at, not by status directly
@@ -816,11 +822,14 @@ const WorkOrderDetails = () => {
                         {statusSteps.map((step, idx) => {
                            const done = idx <= currentStepIndex;
                            const current = idx === currentStepIndex;
+                           // Borda sólida e nítida para passos concluídos
+                           const borderColor = done ? step.color.replace('text-', 'border-').replace('600', '300').replace('500', '200').replace('900', 'slate-300') : 'border-slate-100';
+
                            return (
                               <div key={step.id} className="relative flex flex-col items-center group/step">
                                  <div className={`size-14 rounded-2xl flex items-center justify-center transition-all duration-500 relative z-10 border-2 
-                                     ${done ? `${step.bg} ${step.color.replace('text-', 'border-').replace('primary', 'primary/20')} shadow-[0_8px_20px_-4px_rgba(0,223,130,0.1)]` : 'bg-white border-slate-100 text-slate-200'}`}>
-                                    <step.icon size={22} strokeWidth={2.5} className={done ? step.id === 'Agendado' || step.id === 'Concluído' ? 'text-primary' : 'text-slate-900' : 'text-slate-200'} />
+                                     ${done ? `${step.bg} ${borderColor} shadow-sm` : 'bg-white border-slate-100 text-slate-200'}`}>
+                                    <step.icon size={26} strokeWidth={done ? 3 : 2} className={done ? step.color : 'text-slate-200'} />
                                     {current && <span className="absolute -top-1 -right-1 size-4 bg-primary rounded-full animate-ping opacity-75"></span>}
                                  </div>
                                  <p className={`mt-3 text-[10px] font-black uppercase tracking-[0.15em] transition-colors ${done ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -905,7 +914,14 @@ const WorkOrderDetails = () => {
                            </h3>
                            <select
                               value={status}
-                              onChange={(e) => setStatus(e.target.value)}
+                              onChange={(e) => {
+                                 const newStatus = e.target.value;
+                                 setStatus(newStatus);
+                                 // Regra solicitada: Se pular o agendamento e ir direto para manutenção, preencher agendamento
+                                 if (newStatus === 'Em Manutenção' && !scheduledAt) {
+                                    setScheduledAt(new Date().toISOString());
+                                 }
+                              }}
                               disabled={isConcluded || !isAdmin}
                               className={`px-4 py-2 rounded-full text-[10px] font-black uppercase border shadow-sm transition-all focus:ring-8 focus:ring-primary/5 cursor-pointer outline-none
                                 ${status === 'Aberto' ? 'bg-amber-50 text-amber-700 border-amber-200/60' :
@@ -1530,29 +1546,45 @@ const WorkOrderDetails = () => {
                            <LineChart size={140} />
                         </div>
                         <div className="p-8 space-y-8">
-                           <h4 className="text-xs font-black text-slate-900 uppercase tracking-[.2em] flex items-center gap-3">
-                              <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
-                                 <LineChart size={18} strokeWidth={2.5} />
+                           <h4 className="text-xs font-black text-slate-900 uppercase tracking-[.2em] flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                 <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                                    <LineChart size={18} strokeWidth={2.5} />
+                                 </div>
+                                 Consolidado Financeiro
                               </div>
-                              Consolidado Financeiro
+                              {isThirdPartyTech ? (
+                                 <span className="px-3 py-1 bg-blue-50 text-blue-600 text-[8px] font-black uppercase tracking-widest rounded-full border border-blue-100">Terceirizado</span>
+                              ) : (
+                                 <span className="px-3 py-1 bg-slate-50 text-slate-500 text-[8px] font-black uppercase tracking-widest rounded-full border border-slate-100">Equipe Interna</span>
+                              )}
                            </h4>
 
                            <div className="space-y-5">
                               <div className="flex justify-between items-center group/cost">
                                  <div className="flex items-center gap-3">
-                                    <div className="size-2 bg-slate-900 rounded-full group-hover/cost:scale-150 transition-transform"></div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mão de Obra</span>
+                                    <div className={`size-2 rounded-full group-hover/cost:scale-150 transition-transform ${isThirdPartyTech ? 'bg-blue-500' : 'bg-slate-400'}`}></div>
+                                    <div className="flex flex-col">
+                                       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Mão de Obra</span>
+                                       {!isThirdPartyTech && workOrder?.responded_at && (
+                                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">HH: {resolutionTime.label}</span>
+                                       )}
+                                    </div>
                                  </div>
-                                 <span className="text-sm font-black text-slate-900">
+                                 <span className={`text-sm font-black ${isThirdPartyTech ? 'text-slate-900' : 'text-slate-400'}`}>
                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
                                        isThirdPartyTech ? (laborCost || 0) : 0
                                     )}
                                  </span>
                               </div>
+
                               <div className="flex justify-between items-center group/cost">
                                  <div className="flex items-center gap-3">
-                                    <div className="size-2 bg-primary rounded-full group-hover/cost:scale-150 transition-transform"></div>
-                                    <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Peças & Mat.</span>
+                                    <div className="size-2 bg-emerald-500 rounded-full group-hover/cost:scale-150 transition-transform"></div>
+                                    <div className="flex flex-col">
+                                       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Peças & Mat.</span>
+                                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-tighter">Materiais Aplicados</span>
+                                    </div>
                                  </div>
                                  <span className="text-sm font-black text-slate-900">
                                     {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
@@ -1560,9 +1592,13 @@ const WorkOrderDetails = () => {
                                     )}
                                  </span>
                               </div>
+
                               <div className="pt-8 border-t border-slate-100 relative">
                                  <div className="flex justify-between items-end mb-2">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Total Estimado</span>
+                                    <div className="flex flex-col gap-1">
+                                       <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Investimento Total</span>
+                                       <span className="text-[8px] font-bold text-slate-300 uppercase italic">* Valor estimado de fechamento</span>
+                                    </div>
                                     <div className="flex flex-col items-end">
                                        <span className="text-3xl font-black text-slate-900 tracking-tighter">
                                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
@@ -1571,18 +1607,20 @@ const WorkOrderDetails = () => {
                                              usedParts.reduce((acc, part) => acc + (part.quantity * (part.inventory_items?.unit_value || 0)), 0)
                                           )}
                                        </span>
-                                       <div className="flex items-center gap-1 text-[8px] font-black text-primary uppercase tracking-widest mt-1">
-                                          <div className="size-1.5 bg-primary rounded-full animate-pulse"></div>
-                                          Valores em Real (BRL)
+                                       <div className="flex items-center gap-1.5 text-[8px] font-black text-emerald-600 uppercase tracking-[.15em] mt-2 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100">
+                                          <div className="size-1.5 bg-emerald-500 rounded-full animate-pulse"></div>
+                                          Em Reais (BRL)
                                        </div>
                                     </div>
                                  </div>
                               </div>
                            </div>
 
-                           <div className="px-8 py-4 bg-slate-50 border-t border-slate-100">
-                              <p className="text-[9px] text-slate-400 leading-relaxed font-bold uppercase tracking-wider">
-                                 * Custos de mão de obra aplicáveis apenas para serviços terceirizados conforme política interna.
+                           <div className="px-8 py-5 bg-slate-50/80 border-t border-slate-100 italic">
+                              <p className="text-[9px] text-slate-400 leading-relaxed font-bold uppercase tracking-wider text-center">
+                                 {isThirdPartyTech
+                                    ? "* Custos de terceiros vinculados à Nota Fiscal e horas técnicas orçadas."
+                                    : "* Horas internas computadas para fins de gestão de produtividade e HH (Homem-Hora)."}
                               </p>
                            </div>
                         </div>

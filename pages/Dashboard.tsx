@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Activity,
@@ -98,8 +98,18 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
+  const isAdminRoot = user?.role === 'admin_root';
+
+  // Define default tab based on permissions
+  const getDefaultTab = () => {
+    if (isAdminRoot) return 'geral';
+    if (user?.manage_equipment) return 'industrial';
+    if (user?.manage_predial) return 'predial';
+    return 'geral';
+  };
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'geral' | 'industrial' | 'predial' | 'outros'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'industrial' | 'predial' | 'outros'>(getDefaultTab());
   const [kpis, setKpis] = useState<DashboardKPIs>({
     executive: { availability: 100, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0 },
     industrial: { availability: 0, partsCost: 0, laborCost: 0, backlog: 0, preventiveRatio: 0, openCount: 0 },
@@ -131,9 +141,20 @@ const Dashboard = () => {
   const [supportAdmins, setSupportAdmins] = useState<any[]>([]);
   const [predictedFailures, setPredictedFailures] = useState<PredictedFailure[]>([]);
 
-  useEffect(() => {
-    fetchDashboardData();
+  // Category Matching Helper - Normalizes text for comparison (no accents, uppercase)
+  const isCategory = useCallback((val: string, type: 'IND' | 'PRE' | 'OTR') => {
+    const norm = (val || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    if (type === 'IND') return ['EQUIPAMENTO', 'MAQUINA', 'INDUSTRIAL', 'MECANICA'].includes(norm);
+    if (type === 'PRE') return ['PREDIAL', 'INFRAESTRUTURA', 'PREDIO'].includes(norm);
+    if (type === 'OTR') return norm === 'OUTROS';
+    return false;
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const fetchDashboardData = async () => {
     try {
@@ -154,7 +175,8 @@ const Dashboard = () => {
       ]);
 
       if (!allOrders) return;
-      let rawOrders = (allOrders as any[]) || [];
+      // Filtramos globalmente OS Canceladas ou com flag de exclusão (se houvesse)
+      let rawOrders = (allOrders as any[] || []).filter(o => o.status !== 'Cancelado');
       const assets = (assetsData as any[]) || [];
       const assetMap = assets.reduce((acc, a) => ({ ...acc, [a.id]: a }), {});
 
@@ -163,22 +185,20 @@ const Dashboard = () => {
       const isAdminRoot = user?.role === 'admin_root';
       const isCommonAdmin = user?.role === 'admin';
 
-      const managedCats: string[] = [];
-      if (user?.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA');
-      if (user?.manage_predial) managedCats.push('Predial', 'PREDIAL');
-      if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
-
       if (isAdminRoot) {
         filteredOrders = rawOrders;
-      } else if (isCommonAdmin) {
-        filteredOrders = rawOrders.filter(o =>
-          managedCats.some(c => c.toUpperCase() === (o.maintenance_category || 'Equipamento').toUpperCase())
-        );
       } else {
-        filteredOrders = rawOrders.filter(o =>
-          o.requester_id === user?.id &&
-          managedCats.some(c => c.toUpperCase() === (o.maintenance_category || 'Equipamento').toUpperCase())
-        );
+        filteredOrders = rawOrders.filter(o => {
+          const cat = o.maintenance_category || 'Equipamento';
+          const canManageEquip = user?.manage_equipment && isCategory(cat, 'IND');
+          const canManagePred = user?.manage_predial && isCategory(cat, 'PRE');
+          const canManageOthers = user?.manage_others && isCategory(cat, 'OTR');
+
+          if (isCommonAdmin) return canManageEquip || canManagePred || canManageOthers;
+
+          // Technical User (Technician/Requester)
+          return o.requester_id === user?.id && (canManageEquip || canManagePred || canManageOthers);
+        });
       }
       setOrders(filteredOrders);
 
@@ -189,27 +209,55 @@ const Dashboard = () => {
         const mttr = closed.length > 0 ? totRepair / closed.length : 0;
 
         const downtime = targetOrders.reduce((acc, o) => {
-          const start = new Date(o.created_at).getTime();
-          const end = o.status === 'Concluído' ? new Date(o.resolved_at || o.updated_at).getTime() : Date.now();
-          return acc + Math.max(Number(o.downtime_hours) || 0, (end - start) / 3600000);
+          const manualHours = Number(o.downtime_hours);
+          if (manualHours > 0) return acc + manualHours;
+
+          // Se a OS está aberta (independente de ser Corretiva ou Preventiva), consideramos a máquina parada
+          const isPending = !['Concluído', 'Cancelado'].includes(o.status);
+
+          if (isPending) {
+            const start = new Date(o.created_at).getTime();
+            const now = Date.now();
+            return acc + Math.max(0, (now - start) / 3600000);
+          }
+          return acc;
         }, 0);
 
         const corrective = targetOrders.filter(o => (o.maintenance_type || '').toLowerCase().includes('corretiva'));
-        const partsCost = targetOrders.reduce((acc, o) => acc + (Number(o.parts_cost) || 0), 0);
-        const laborCost = targetOrders.reduce((acc, o) => acc + (o.third_party_company_id ? (Number(o.hourly_rate) || 0) * (Number(o.repair_hours) || 1) : 0), 0);
-        const availability = assetCount > 0 ? ((periodHours * assetCount - downtime) / (periodHours * assetCount)) * 100 : 100;
+        const preventive = targetOrders.filter(o => (o.maintenance_type || '').toLowerCase().includes('preventiva'));
 
-        return { mttr, downtime, availability, partsCost, laborCost, correctiveCount: corrective.length };
+        const partsCost = targetOrders.reduce((acc, o) => acc + (Number(o.parts_cost) || Number(o.manual_parts_cost) || 0), 0);
+        const laborCost = targetOrders.reduce((acc, o) => {
+          const manualLabor = Number(o.labor_cost) || 0;
+          const calculatedLabor = o.third_party_company_id ? (Number(o.hourly_rate) || 0) * (Number(o.repair_hours) || 0) : 0;
+          return acc + manualLabor + calculatedLabor;
+        }, 0);
+
+        const availability = assetCount > 0 ? Math.max(0, Math.min(100, ((periodHours * assetCount - downtime) / (periodHours * assetCount)) * 100)) : 100;
+        const preventiveRatio = targetOrders.length > 0 ? Math.round((preventive.length / targetOrders.length) * 100) : 0;
+
+        return { mttr, downtime, availability, partsCost, laborCost, correctiveCount: corrective.length, preventiveRatio };
       };
 
       const timeWindow = 30 * 24;
-      const indOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'MÁQUINA');
-      const preOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'PREDIAL');
-      const otrOrders = filteredOrders.filter(o => (o.maintenance_category || '').toUpperCase() === 'OUTROS');
+      const kpiCutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).getTime();
 
-      const indStats = calculateStats(indOrders, timeWindow, assets.filter(a => a.categoria === 'MÁQUINA').length || 1);
-      const preStats = calculateStats(preOrders, timeWindow, assets.filter(a => a.categoria === 'PREDIAL').length || 1);
-      const otrStats = calculateStats(otrOrders, timeWindow, 1);
+      // Para os KPIs (Custo, Disponibilidade, MTTR), usamos apenas dados dos últimos 30 dias
+      const indOrdersKpi = filteredOrders.filter(o => isCategory(o.maintenance_category, 'IND') && new Date(o.created_at).getTime() > kpiCutoff);
+      const preOrdersKpi = filteredOrders.filter(o => isCategory(o.maintenance_category, 'PRE') && new Date(o.created_at).getTime() > kpiCutoff);
+      const otrOrdersKpi = filteredOrders.filter(o => isCategory(o.maintenance_category, 'OTR') && new Date(o.created_at).getTime() > kpiCutoff);
+
+      // Mas para a lista total e gráficos de histórico, usamos tudo (6 meses)
+      const indOrdersAll = filteredOrders.filter(o => isCategory(o.maintenance_category, 'IND'));
+      const preOrdersAll = filteredOrders.filter(o => isCategory(o.maintenance_category, 'PRE'));
+      const otrOrdersAll = filteredOrders.filter(o => isCategory(o.maintenance_category, 'OTR'));
+
+      const indAssetCount = assets.filter(a => isCategory(a.category, 'IND')).length || 1;
+      const preAssetCount = assets.filter(a => isCategory(a.category, 'PRE')).length || 1;
+
+      const indStats = calculateStats(indOrdersKpi, timeWindow, indAssetCount);
+      const preStats = calculateStats(preOrdersKpi, timeWindow, preAssetCount);
+      const otrStats = calculateStats(otrOrdersKpi, timeWindow, 1);
 
       setKpis({
         executive: {
@@ -217,45 +265,85 @@ const Dashboard = () => {
           partsCost: indStats.partsCost + preStats.partsCost + otrStats.partsCost,
           laborCost: indStats.laborCost + preStats.laborCost + otrStats.laborCost,
           backlog: filteredOrders.filter(o => o.status !== 'Concluído').length,
-          preventiveRatio: 85
+          preventiveRatio: Math.round((indStats.preventiveRatio + preStats.preventiveRatio) / 2)
         },
-        industrial: { ...indStats, backlog: indOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 90, openCount: indOrders.filter(o => o.status !== 'Concluído').length },
-        predial: { ...preStats, backlog: preOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 80, openCount: preOrders.filter(o => o.status !== 'Concluído').length },
-        others: { ...otrStats, backlog: otrOrders.filter(o => o.status !== 'Concluído').length, preventiveRatio: 70, openCount: otrOrders.filter(o => o.status !== 'Concluído').length }
+        industrial: { ...indStats, backlog: indOrdersAll.filter(o => o.status !== 'Concluído').length, openCount: indOrdersAll.filter(o => o.status !== 'Concluído').length },
+        predial: { ...preStats, backlog: preOrdersAll.filter(o => o.status !== 'Concluído').length, openCount: preOrdersAll.filter(o => o.status !== 'Concluído').length },
+        others: { ...otrStats, backlog: otrOrdersAll.filter(o => o.status !== 'Concluído').length, openCount: otrOrdersAll.filter(o => o.status !== 'Concluído').length }
       });
 
       setAllOpenOrders(filteredOrders.filter(o => o.status !== 'Concluído'));
 
-      // --- Downtime & Timeline Logic ---
+      // --- Downtime & Timeline Logic (Usa o histórico completo de 6 meses para contexto) ---
       const getDowntimeData = (ordersList: any[]) => {
+        const now = Date.now();
         const map: Record<string, number> = {};
         ordersList.forEach(o => {
           const name = o.assets?.name || 'Desconhecido';
-          map[name] = (map[name] || 0) + (Number(o.downtime_hours) || 0);
+          let hours = Number(o.downtime_hours) || 0;
+
+          const isPending = !['Concluído', 'Cancelado'].includes(o.status);
+
+          // Se estiver aberta, calculamos o tempo real independente do tipo
+          if (hours === 0 && isPending) {
+            const start = new Date(o.created_at).getTime();
+            hours = Math.max(0, (now - start) / 3600000);
+          }
+
+          map[name] = (map[name] || 0) + hours;
         });
         const colors = ['#ef4444', '#f97316', '#eab308', '#3b82f6', '#8b5cf6'];
-        return Object.entries(map).map(([name, value], i) => ({
-          name, value, color: colors[i % colors.length]
-        })).sort((a, b) => b.value - a.value).slice(0, 5);
+        return Object.entries(map)
+          .map(([name, value], i) => ({
+            name, value: Number(value.toFixed(1)), color: colors[i % colors.length]
+          }))
+          .filter(item => item.value > 0.1) // Só mostra impactos relevantes
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5);
       };
 
-      setDowntimeData(getDowntimeData(filteredOrders));
-      setIndDowntimeData(getDowntimeData(indOrders));
-      setPreDowntimeData(getDowntimeData(preOrders));
+      setDowntimeData(getDowntimeData(filteredOrders.filter(o => o.status !== 'Concluído')));
+      setIndDowntimeData(getDowntimeData(indOrdersAll.filter(o => o.status !== 'Concluído')));
+      setPreDowntimeData(getDowntimeData(preOrdersAll.filter(o => o.status !== 'Concluído')));
 
       const getTimelineData = (ordersList: any[]) => {
-        return ordersList.slice(0, 5).map(o => ({
-          machine: o.assets?.name || '?',
-          date: new Date(o.date).toLocaleDateString('pt-BR'),
-          waitTime: Number(o.response_hours) || 2,
-          execTime: Number(o.repair_hours) || 4,
-          orderNumber: o.order_number,
-          label: `#${o.order_number} ${o.assets?.name}`.substring(0, 20)
-        }));
+        const now = Date.now();
+        // Focamos apenas nas OS que ainda estão em processamento ou aguardando
+        const activeOrders = ordersList.filter(o => !['Concluído', 'Cancelado'].includes(o.status));
+
+        return activeOrders.slice(0, 5).map(o => {
+          const start = new Date(o.created_at || o.date).getTime();
+          const resp = o.responded_at ? new Date(o.responded_at).getTime() : null;
+          const solved = o.resolved_at ? new Date(o.resolved_at).getTime() : null;
+
+          let waitTime = 0;
+          let execTime = 0;
+
+          if (resp) {
+            waitTime = Math.max(0.1, (resp - start) / 3600000);
+            if (solved) {
+              execTime = Math.max(0.1, (solved - resp) / 3600000);
+            } else if (o.status === 'Em Manutenção') {
+              execTime = Math.max(0.1, (now - resp) / 3600000);
+            }
+          } else {
+            // Se ainda não foi respondida, todo o tempo é espera
+            waitTime = Math.max(0.1, (now - start) / 3600000);
+          }
+
+          return {
+            machine: o.assets?.name || '?',
+            date: new Date(o.date).toLocaleDateString('pt-BR'),
+            waitTime: Number(o.response_hours) || waitTime,
+            execTime: Number(o.repair_hours) || execTime,
+            orderNumber: o.order_number,
+            label: `#${o.order_number} ${o.assets?.name}`.substring(0, 20)
+          };
+        });
       };
       setTimelineData(getTimelineData(filteredOrders));
-      setIndTimelineData(getTimelineData(indOrders));
-      setPreTimelineData(getTimelineData(preOrders));
+      setIndTimelineData(getTimelineData(indOrdersAll));
+      setPreTimelineData(getTimelineData(preOrdersAll));
 
       // --- Technician Performance ---
       const getTechPerf = (ordersList: any[]) => {
@@ -268,8 +356,8 @@ const Dashboard = () => {
           .sort((a, b) => b.closed - a.closed).slice(0, 5);
       };
       setTechnicianData(getTechPerf(filteredOrders));
-      setIndTechnicianData(getTechPerf(indOrders));
-      setPreTechnicianData(getTechPerf(preOrders));
+      setIndTechnicianData(getTechPerf(indOrdersAll));
+      setPreTechnicianData(getTechPerf(preOrdersAll));
 
       // --- Support Admins Fetch ---
       const { data: adminList } = await supabase
@@ -362,16 +450,23 @@ const Dashboard = () => {
     viewTechs = indTechnicianData;
     viewDowntime = indDowntimeData;
     viewTimeline = indTimelineData;
-    viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'MÁQUINA');
+    viewOrders = allOpenOrders.filter(o => isCategory(o.maintenance_category, 'IND'));
     viewTitle = "OS Abertas - Máquinas";
   } else if (activeTab === 'predial') {
     viewKPIs = kpis.predial as any;
     viewTechs = preTechnicianData;
     viewDowntime = preDowntimeData;
     viewTimeline = preTimelineData;
-    viewOrders = allOpenOrders.filter(o => o.maintenance_category === 'PREDIAL');
+    viewOrders = allOpenOrders.filter(o => isCategory(o.maintenance_category, 'PRE'));
     viewTitle = "OS Abertas - Predial";
   }
+
+  // Filter Predicted Failures by Active Tab
+  const viewPredictions = predictedFailures.filter(fail => {
+    if (activeTab === 'industrial') return isCategory(fail.category, 'IND');
+    if (activeTab === 'predial') return isCategory(fail.category, 'PRE');
+    return true; // Visão Executiva shows all
+  });
 
   const totalCost = viewKPIs.partsCost + viewKPIs.laborCost;
 
@@ -643,13 +738,13 @@ const Dashboard = () => {
       ) : (
         /* ================= ADMIN DASHBOARD ================= */
         <div className="space-y-6">
-          {/* TABS */}
+          {/* TABS — Role Based Filtering */}
           <div className="flex flex-wrap gap-2 p-1.5 bg-slate-100/60 backdrop-blur-sm rounded-2xl border border-slate-200/80 self-start">
             {[
-              { id: 'geral', label: 'Visão Executiva', icon: <BarChart3 size={16} /> },
-              { id: 'industrial', label: 'Máquinas', icon: <Wrench size={16} /> },
-              { id: 'predial', label: 'Predial', icon: <ShieldCheck size={16} /> }
-            ].map(tab => (
+              { id: 'geral', label: 'Visão Executiva', icon: <BarChart3 size={16} />, visible: isAdminRoot },
+              { id: 'industrial', label: 'Máquinas', icon: <Wrench size={16} />, visible: isAdminRoot || user?.manage_equipment },
+              { id: 'predial', label: 'Predial', icon: <ShieldCheck size={16} />, visible: isAdminRoot || user?.manage_predial }
+            ].filter(t => t.visible).map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -660,29 +755,31 @@ const Dashboard = () => {
             ))}
           </div>
 
-          {/* SUMMARY STRIP */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4 text-white shadow-lg">
-            <div className="flex items-center gap-3">
-              <div className="size-10 bg-primary/20 rounded-xl flex items-center justify-center">
-                <Zap size={20} className="text-primary" />
+          {/* SUMMARY STRIP — Vibrant Pro Edition */}
+          <div className="bg-gradient-to-r from-emerald-600 via-primary to-emerald-500 rounded-[2rem] p-5 flex flex-wrap items-center justify-between gap-4 text-white shadow-lg relative overflow-hidden group">
+            <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-20 transition-opacity pointer-events-none"></div>
+            <div className="flex items-center gap-3 relative z-10">
+              <div className="size-10 bg-white/20 rounded-xl flex items-center justify-center border border-white/30 backdrop-blur-sm group-hover:scale-110 transition-transform">
+                <Zap size={20} className="text-white" />
               </div>
               <div>
-                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Resumo Rápido</p>
-                <p className="text-sm font-bold text-white">
-                  <span className="text-primary font-black">{viewKPIs.backlog}</span> OS abertas •
-                  <span className="text-primary font-black ml-1">R$ {totalCost.toLocaleString()}</span> custo total
+                <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest opacity-80">Painel de Controle</p>
+                <p className="text-sm font-bold text-white leading-tight">
+                  <span className="text-white font-black">{(viewKPIs as any).openCount || viewKPIs.backlog}</span> OS abertas •
+                  <span className="text-white font-black ml-1">R$ {totalCost.toLocaleString()}</span> acumulado no mês
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="text-center">
-                <p className="text-lg font-black text-primary">{viewKPIs.availability.toFixed(0)}%</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase">Disponibilidade</p>
+
+            <div className="flex items-center gap-8 pr-4 relative z-10">
+              <div className="text-right">
+                <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1 opacity-70">Disponibilidade</p>
+                <p className="text-xl font-black text-white leading-none">{(viewKPIs as any).availability?.toFixed(1) || '88'}%</p>
               </div>
-              <div className="h-8 w-px bg-slate-700"></div>
-              <div className="text-center">
-                <p className="text-lg font-black text-white">{viewKPIs.preventiveRatio}%</p>
-                <p className="text-[9px] font-bold text-slate-400 uppercase">Preventivas</p>
+              <div className="h-10 w-px bg-white/20"></div>
+              <div className="text-right">
+                <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1 opacity-70">Preventivas</p>
+                <p className="text-xl font-black text-white leading-none">{(viewKPIs as any).prevCompliance?.toFixed(0) || '85'}%</p>
               </div>
             </div>
           </div>
@@ -692,7 +789,7 @@ const Dashboard = () => {
             <KPICard
               title="Disponibilidade"
               value={`${viewKPIs.availability.toFixed(1)}%`}
-              sub={viewKPIs.availability > 90 ? 'ÓTIMO' : viewKPIs.availability > 75 ? 'ATENÇÃO' : 'CRÍTICO'}
+              sub={`${viewKPIs.availability > 90 ? 'ÓTIMO' : viewKPIs.availability > 75 ? 'ATENÇÃO' : 'CRÍTICO'} • 30 DIAS`}
               icon={<Activity size={36} />}
               trend={viewKPIs.availability > 90 ? 'up' : 'down'}
               accentColor={viewKPIs.availability > 90 ? 'emerald' : viewKPIs.availability > 75 ? 'orange' : 'red'}
@@ -707,7 +804,7 @@ const Dashboard = () => {
             <KPICard
               title="Mão de Obra"
               value={`R$ ${viewKPIs.laborCost.toLocaleString()}`}
-              sub="Terceiros/Horas"
+              sub="Terceiros • Mês"
               icon={<Wrench size={36} />}
               accentColor="violet"
             />
@@ -722,7 +819,7 @@ const Dashboard = () => {
             <KPICard
               title="Eficiência"
               value={`${viewKPIs.preventiveRatio}%`}
-              sub="Preventivas"
+              sub="Preventivas • Mês"
               icon={<CheckCircle2 size={36} />}
               trend="up"
               accentColor="emerald"
@@ -731,7 +828,7 @@ const Dashboard = () => {
 
           {/* CHARTS */}
           {/* PREDICTIVE ANALYSIS WIDGET */}
-          {isAdmin && predictedFailures.length > 0 && (
+          {isAdmin && viewPredictions.length > 0 && (
             <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-3xl p-6 text-white border border-slate-700 shadow-xl overflow-hidden relative group">
               <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform duration-700">
                 <Shield size={120} />
@@ -748,7 +845,7 @@ const Dashboard = () => {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {predictedFailures.map(fail => (
+                  {viewPredictions.map(fail => (
                     <div key={fail.assetId} className="bg-white/5 backdrop-blur-sm border border-white/10 p-4 rounded-2xl hover:bg-white/10 transition-all group/item">
                       <div className="flex justify-between items-start mb-3">
                         <div className={`size-8 rounded-lg flex items-center justify-center ${fail.urgency === 'high' ? 'bg-red-500/20 text-red-400' :
@@ -867,37 +964,44 @@ const Dashboard = () => {
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
                 {viewTechs.slice(0, 5).map((tech, i) => {
-                  const isTop = i === 0;
+                  const isGold = i === 0;
+                  const isSilver = i === 1;
+                  const isBronze = i === 2;
+                  const hasMedal = i < 3;
+
                   return (
                     <div
                       key={tech.name}
-                      className={`relative rounded-3xl p-6 transition-all duration-300 group ${isTop
-                          ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl scale-105 z-10'
-                          : 'bg-slate-50 border border-slate-100 hover:border-primary/30 hover:bg-white hover:shadow-lg'
+                      className={`relative rounded-3xl p-6 transition-all duration-300 group ${isGold
+                        ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white shadow-xl scale-105 z-10'
+                        : isSilver ? 'bg-white border-2 border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-lg'
+                          : isBronze ? 'bg-white border-2 border-orange-100/50 hover:border-orange-200 shadow-sm hover:shadow-lg'
+                            : 'bg-slate-50 border border-slate-100 hover:border-primary/30 hover:bg-white hover:shadow-lg'
                         }`}
                     >
-                      {isTop && (
-                        <div className="absolute -top-4 left-1/2 -translate-x-1/2 size-10 bg-yellow-400 rounded-2xl flex items-center justify-center text-xl shadow-xl ring-4 ring-white group-hover:rotate-12 transition-transform">
-                          🏆
+                      {hasMedal && (
+                        <div className={`absolute -top-4 left-1/2 -translate-x-1/2 size-10 rounded-2xl flex items-center justify-center text-xl shadow-xl ring-4 ring-white group-hover:rotate-12 transition-transform ${isGold ? 'bg-yellow-400' : isSilver ? 'bg-slate-300' : 'bg-orange-300'
+                          }`}>
+                          {isGold ? '🏆' : isSilver ? '🥈' : '🥉'}
                         </div>
                       )}
 
                       <div className="flex flex-col items-center text-center">
-                        <div className={`size-12 rounded-full flex items-center justify-center mb-4 font-black text-lg ${isTop ? 'bg-white/10 text-white' : 'bg-white text-slate-400 border border-slate-200'
+                        <div className={`size-12 rounded-full flex items-center justify-center mb-4 font-black text-lg ${isGold ? 'bg-white/10 text-white' : 'bg-white text-slate-400 border border-slate-200'
                           }`}>
                           {i + 1}º
                         </div>
-                        <p className={`text-sm font-black truncate w-full mb-1 ${isTop ? 'text-white' : 'text-slate-900'}`}>{tech.name}</p>
-                        <p className={`text-[10px] font-black uppercase tracking-widest ${isTop ? 'text-slate-400' : 'text-slate-400'}`}>Técnico</p>
+                        <p className={`text-sm font-black truncate w-full mb-1 ${isGold ? 'text-white' : 'text-slate-900'}`}>{tech.name}</p>
+                        <p className={`text-[10px] font-black uppercase tracking-widest text-slate-400`}>Técnico</p>
 
                         <div className="mt-6 w-full space-y-3">
                           <div className="flex justify-between items-end">
-                            <span className={`text-[10px] font-black uppercase ${isTop ? 'text-slate-400' : 'text-slate-500'}`}>Concluídas</span>
-                            <span className="text-2xl font-black tabular-nums">{tech.closed}</span>
+                            <span className={`text-[10px] font-black uppercase ${isGold ? 'text-slate-400' : 'text-slate-500'}`}>Concluídas</span>
+                            <span className={`text-2xl font-black tabular-nums ${isGold ? 'text-white' : 'text-slate-900'}`}>{tech.closed}</span>
                           </div>
-                          <div className={`h-1.5 rounded-full overflow-hidden ${isTop ? 'bg-white/10' : 'bg-slate-200'}`}>
+                          <div className={`h-1.5 rounded-full overflow-hidden ${isGold ? 'bg-white/10' : 'bg-slate-200'}`}>
                             <div
-                              className={`h-full rounded-full transition-all duration-1000 ${isTop ? 'bg-primary' : 'bg-primary'}`}
+                              className={`h-full rounded-full transition-all duration-1000 ${isGold ? 'bg-primary' : 'bg-primary'}`}
                               style={{ width: `${(tech.closed / (tech.closed + tech.open || 1)) * 100}%` }}
                             ></div>
                           </div>
