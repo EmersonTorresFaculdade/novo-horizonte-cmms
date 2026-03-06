@@ -19,7 +19,10 @@ import {
   Wrench,
   Timer,
   CheckCircle2,
-  CircleDot
+  CircleDot,
+  FileText,
+  Download,
+  CalendarDays
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -333,18 +336,29 @@ const Dashboard = () => {
             {isAdmin ? 'Visão estratégica da planta em tempo real.' : 'Acompanhe suas solicitações e suporte.'}
           </p>
         </div>
-        <div className="bg-white/80 backdrop-blur-sm p-3 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sistema</span>
-            <div className="flex items-center gap-1.5">
-              <span className="size-2 bg-primary rounded-full animate-pulse"></span>
-              <span className="text-[10px] font-black text-slate-700 uppercase">Online</span>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <button
+              onClick={() => navigate('/reports')}
+              className="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-sm transition-all flex items-center gap-2 hover:shadow-md active:scale-[0.97]"
+            >
+              <FileText size={16} />
+              Relatórios
+            </button>
+          )}
+          <div className="bg-white/80 backdrop-blur-sm p-3 rounded-2xl border border-slate-200/80 shadow-sm flex items-center gap-4">
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sistema</span>
+              <div className="flex items-center gap-1.5">
+                <span className="size-2 bg-primary rounded-full animate-pulse"></span>
+                <span className="text-[10px] font-black text-slate-700 uppercase">Online</span>
+              </div>
             </div>
-          </div>
-          <div className="h-8 w-px bg-slate-200/60"></div>
-          <div className="text-right">
-            <p className="text-xs font-black text-slate-900">{new Date().toLocaleDateString('pt-BR')}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase">Sincronizado</p>
+            <div className="h-8 w-px bg-slate-200/60"></div>
+            <div className="text-right">
+              <p className="text-xs font-black text-slate-900">{new Date().toLocaleDateString('pt-BR')}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase">Sincronizado</p>
+            </div>
           </div>
         </div>
       </div>
