@@ -288,14 +288,12 @@ const ReportsContent = () => {
 
             const mtta = respondedWO.length > 0 ? (totalResponseHours / respondedWO.length).toFixed(1) : 0;
 
-            // Labor Cost Calculation - Only for third-party companies
+            // Labor Cost Calculation
             const laborCost = woData.reduce((acc, wo: any) => {
-                const isThirdParty = wo.third_party_company_id;
-                if (!isThirdParty) return acc;
-                return acc + (Number(wo.hourly_rate) || 0);
+                return acc + (Number(wo.labor_cost) || 0);
             }, 0);
 
-            const partsCostEst = (woData as any[]).reduce((acc, wo) => acc + (Number(wo.parts_cost) || 0), 0);
+            const partsCostEst = (woData as any[]).reduce((acc, wo) => acc + (Number(wo.parts_cost) || Number(wo.manual_parts_cost) || 0), 0);
 
             const totalCost = laborCost + partsCostEst;
 

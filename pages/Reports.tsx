@@ -199,7 +199,7 @@ const ReportsContent = () => {
         const completedWO = woData.filter(wo => wo.status?.toLowerCase() === 'concluído');
         const inMaintenanceWO = woData.filter(wo => wo.status?.toLowerCase() === 'em manutenção' || wo.status?.toLowerCase() === 'manutenção');
         const openWO = woData.filter(wo => wo.status?.toLowerCase() !== 'concluído' && wo.status?.toLowerCase() !== 'cancelado');
-        const preventiveWO = woData.filter(wo => wo.maintenance_category === 'PREVENTIVA').length;
+        const preventiveWO = woData.filter(wo => (wo.maintenance_type || '').toLowerCase().includes('preventiva')).length;
 
         // MTTR
         const totalRepairHours = completedWO.reduce((acc, wo) => acc + (Number(wo.repair_hours) || 0), 0);
@@ -211,15 +211,71 @@ const ReportsContent = () => {
         const backlogDays = estimatedBacklogHours / (activeTechs * 8);
 
         // MTBF & Reliability
-        const totalDowntimeHours = woData.reduce((acc, wo) => acc + (Number(wo.downtime_hours) || 0), 0);
+        const totalDowntimeHours = woData.reduce((acc, wo) => {
+            const manualHours = Number(wo.downtime_hours);
+            if (manualHours > 0) return acc + manualHours;
+            const isPending = !['Concluído', 'Cancelado'].includes(wo.status);
+            if (isPending) {
+                const start = new Date(wo.created_at).getTime();
+                const now = Date.now();
+                return acc + Math.max(0, (now - start) / 3600000);
+            }
+            return acc;
+        }, 0);
         const totalPossibleTime = days * 24 * (assetData.length || 1);
         const operationalTime = Math.max(0, totalPossibleTime - totalDowntimeHours);
         const mtbf = totalWO > 0 ? operationalTime / totalWO : operationalTime;
         const reliability = totalPossibleTime > 0 ? (operationalTime / totalPossibleTime) * 100 : 100;
 
+        // MTTA (SLA / Tempo de Resposta)
+        const respondedWO = woData.filter((wo) =>
+            (Number(wo.response_hours) > 0) ||
+            (wo.status?.toLowerCase() === 'em manutenção' || wo.status?.toLowerCase() === 'concluído')
+        );
+
+        const totalResponseHours = respondedWO.reduce((acc, wo) => {
+            const storedResponse = Number(wo.response_hours) || 0;
+            if (storedResponse > 0) return acc + storedResponse;
+            if (wo.created_at) {
+                const start = new Date(wo.created_at).getTime();
+                const end = wo.updated_at ? new Date(wo.updated_at).getTime() : new Date().getTime();
+                const diff = (end - start) / (1000 * 60 * 60);
+                return acc + Math.max(0, diff);
+            }
+            return acc;
+        }, 0);
+        const mtta = respondedWO.length > 0 ? totalResponseHours / respondedWO.length : 0;
+
+        // Custos por Setor e Top 5 Caros
+        let indCost = 0; let preCost = 0; let otrCost = 0;
+        const assetCostsMap: Record<string, number> = {};
+
+        woData.forEach(wo => {
+            const lc = Number(wo.labor_cost) || 0;
+            const pc = (Number(wo.parts_cost) || 0) + (Number(wo.manual_parts_cost) || 0);
+            const tc = lc + pc;
+
+            const cat = (wo.maintenance_category || '').toUpperCase();
+            if (['MÁQUINAS', 'EQUIPAMENTOS', 'INDUSTRIAL', 'EQUIPAMENTO'].includes(cat)) indCost += tc;
+            else if (cat === 'PREDIAL') preCost += tc;
+            else otrCost += tc;
+
+            if (wo.asset_id) {
+                assetCostsMap[wo.asset_id] = (assetCostsMap[wo.asset_id] || 0) + tc;
+            }
+        });
+
+        const topExpensiveAssets = Object.entries(assetCostsMap)
+            .map(([id, cost]) => {
+                const asset = assetData.find((a: any) => a.id === id);
+                return { name: asset ? asset.name : 'Desconhecido', cost, id };
+            })
+            .sort((a, b) => b.cost - a.cost)
+            .slice(0, 5);
+
         // Costs
-        const laborCost = woData.reduce((acc, wo) => acc + (wo.third_party_company_id ? (Number(wo.hourly_rate) || 0) : 0), 0);
-        const partsCost = woData.reduce((acc, wo) => acc + (Number(wo.parts_cost) || 0), 0);
+        const laborCost = woData.reduce((acc, wo) => acc + (Number(wo.labor_cost) || 0), 0);
+        const partsCost = woData.reduce((acc, wo) => acc + (Number(wo.parts_cost) || Number(wo.manual_parts_cost) || 0), 0);
         const totalCost = laborCost + partsCost;
 
         return {
@@ -231,11 +287,16 @@ const ReportsContent = () => {
             preventiveRatio: totalWO > 0 ? (preventiveWO / totalWO) * 100 : 0,
             correctiveRatio: totalWO > 0 ? ((totalWO - preventiveWO) / totalWO) * 100 : 0,
             mttr,
+            mtta,
             mtbf,
             reliability,
             laborCost,
             partsCost,
             totalCost,
+            indCost,
+            preCost,
+            otrCost,
+            topExpensiveAssets,
             avgCostPerAsset: assetData.length > 0 ? totalCost / assetData.length : 0
         };
     };
@@ -514,8 +575,8 @@ const ReportsContent = () => {
             p3Y = drawSectionHeader('Resumo de Custos do Período', p3Y);
             const costs = [
                 { l: 'Investimento Total Bruto', v: stats.current.totalCost },
-                { l: 'Mão de Obra e Terceirizados', v: stats.current.laborCost },
-                { l: 'Peças e Insumos', v: stats.current.partsCost },
+                { l: 'Custo Industrial (Máquinas)', v: stats.current.indCost || 0 },
+                { l: 'Custo Predial (Infra)', v: stats.current.preCost || 0 },
                 { l: 'Média de Custo por Ativo', v: stats.current.avgCostPerAsset }
             ];
 
@@ -532,10 +593,10 @@ const ReportsContent = () => {
 
             p3Y = drawSectionHeader('KPIs Técnicos de Manutenção', p3Y);
             const techKpis = [
-                { l: 'MTTR (Tempo Reparo)', v: `${stats.current.mttr?.toFixed(1)}h`, d: 'Meta < 2.0h' },
+                { l: 'MTTR (Tempo Reparo)', v: `${stats.current.mttr?.toFixed(1)}h`, d: 'Média Reparo' },
+                { l: 'SLA / MTTA (Tempo Resposta)', v: `${stats.current.mtta?.toFixed(1)}h`, d: 'Média Resposta' },
                 { l: 'MTBF (Entre Falhas)', v: `${stats.current.mtbf?.toFixed(1)}h`, d: 'Intervalo Médio' },
-                { l: 'Backlog Atual', v: `${stats.current.backlogDays?.toFixed(1)}d`, d: 'Carga de Trabalho' },
-                { l: 'Taxa Preventiva', v: `${stats.current.preventiveRatio?.toFixed(1)}%`, d: 'Meta > 80%' }
+                { l: 'Taxa Preventiva', v: `${stats.current.preventiveRatio?.toFixed(1)}%`, d: 'Ideal > 80%' }
             ];
 
             techKpis.forEach((k, i) => {
@@ -554,6 +615,27 @@ const ReportsContent = () => {
                 pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
                 pdf.text(k.d, x + dimW - 5, y + 18, { align: 'right' });
             });
+
+            p3Y += 75;
+            p3Y = drawSectionHeader('Top 5 Equipamentos Mais Custosos no Período', p3Y);
+
+            if (stats.current.topExpensiveAssets && stats.current.topExpensiveAssets.length > 0) {
+                stats.current.topExpensiveAssets.forEach((asset: any, i: number) => {
+                    const y = p3Y + (i * 12);
+                    pdf.setFontSize(10);
+                    pdf.setTextColor(TEXT_DARK[0], TEXT_DARK[1], TEXT_DARK[2]);
+                    pdf.text(`${i + 1}. ${asset.name}`, margin + 5, y + 7);
+                    pdf.setFont('helvetica', 'bold');
+                    pdf.text(asset.cost.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }), pageWidth - margin - 5, y + 7, { align: 'right' });
+                    pdf.setFont('helvetica', 'normal');
+                    pdf.setDrawColor(BORDER_LIGHT[0], BORDER_LIGHT[1], BORDER_LIGHT[2]);
+                    pdf.line(margin, y + 12, pageWidth - margin, y + 12);
+                });
+            } else {
+                pdf.setFontSize(10);
+                pdf.setTextColor(TEXT_GRAY[0], TEXT_GRAY[1], TEXT_GRAY[2]);
+                pdf.text("Sem custos diretos alocados por equipamento no período.", margin + 5, p3Y + 7);
+            }
 
             drawInstitutionalFooter(3, 4);
 
@@ -706,8 +788,36 @@ const ReportsContent = () => {
             const { data: assets } = await supabase.from('assets').select('*');
             const { data: technicians } = await supabase.from('technicians').select('*');
 
-            const currentData = woCurrent || [];
-            const prevData = woPrevious || [];
+            // Filter globally canceled/ignored orders
+            const currentRaw = (woCurrent as any[] || []).filter(wo => wo.status !== 'Cancelado');
+            const prevRaw = (woPrevious as any[] || []).filter(wo => wo.status !== 'Cancelado');
+
+            // --- Strict Filtering based on User Roles ---
+            let currentData = currentRaw;
+            let prevData = prevRaw;
+            const isAdminRoot = user?.role === 'admin_root';
+            const isCommonAdmin = user?.role === 'admin';
+
+            const filterByRole = (raw: any[]) => {
+                if (isAdminRoot) return raw;
+                return raw.filter(o => {
+                    const cat = o.maintenance_category || 'Equipamento';
+                    const isInd = ['MÁQUINAS', 'EQUIPAMENTOS', 'INDUSTRIAL', 'EQUIPAMENTO'].includes(cat.toUpperCase());
+                    const isPre = cat.toUpperCase() === 'PREDIAL';
+                    const isOtr = !isInd && !isPre;
+
+                    const canManageEquip = user?.manage_equipment && isInd;
+                    const canManagePred = user?.manage_predial && isPre;
+                    const canManageOthers = user?.manage_others && isOtr;
+
+                    if (isCommonAdmin) return canManageEquip || canManagePred || canManageOthers;
+                    return o.requester_id === user?.id && (canManageEquip || canManagePred || canManageOthers);
+                });
+            };
+
+            currentData = filterByRole(currentData);
+            prevData = filterByRole(prevData);
+
             const assetData = assets || [];
             const techData = technicians || [];
 
@@ -768,6 +878,13 @@ const ReportsContent = () => {
                 actionPlan.push("Avaliar necessidade de horas extras ou contratação temporária para reduzir backlog.");
             }
 
+            if (insights.length === 0) {
+                insights.push({ type: 'success', text: "Operação rodando dentro da plena normalidade. Nenhum alerta crítico detectado pela inteligência." });
+            }
+            if (actionPlan.length === 0) {
+                actionPlan.push("Manter as rotinas atuais do plano de manutenção preventiva.");
+            }
+
             // 6. Projections
             const projection = {
                 reliability: currentStats.reliability + (trends.reliability * 0.2), // Simple linear projection
@@ -804,20 +921,27 @@ const ReportsContent = () => {
             currentData.forEach(wo => statusCount[wo.status] = (statusCount[wo.status] || 0) + 1);
 
             const problematicAssets = Object.entries(currentData.reduce((acc: any, wo) => {
-                if (wo.asset_id) acc[wo.asset_id] = (acc[wo.asset_id] || 0) + (Number(wo.downtime_hours) || 0);
+                if (wo.asset_id) {
+                    let dh = Number(wo.downtime_hours) || 0;
+                    if (dh === 0 && !['Concluído', 'Cancelado'].includes(wo.status)) {
+                        const start = new Date(wo.created_at).getTime();
+                        dh = Math.max(0, (Date.now() - start) / 3600000);
+                    }
+                    if (dh > 0) acc[wo.asset_id] = (acc[wo.asset_id] || 0) + dh;
+                }
                 return acc;
             }, {})).map(([id, hours]) => ({
                 name: (assetData as any[]).find((a: any) => a.id === id)?.name || 'Outro',
-                hours
+                hours: Number((hours as number).toFixed(1))
             })).sort((a: any, b: any) => b.hours - a.hours).slice(0, 10);
 
             setChartData({
                 status: Object.entries(statusCount).map(([name, value]) => ({ name, value })),
                 priority: [], // Simplify for brevity, can rebuild if needed
                 maintenanceType: [
-                    { name: 'Preventiva', value: currentData.filter((wo: any) => wo.maintenance_category === 'PREVENTIVA').length },
-                    { name: 'Corretiva', value: currentData.filter((wo: any) => wo.maintenance_category === 'CORRETIVA').length },
-                    { name: 'Predial', value: currentData.filter((wo: any) => wo.maintenance_category === 'PREDIAL').length }
+                    { name: 'Corretiva', value: currentData.filter((wo: any) => (wo.maintenance_type || '').toLowerCase().includes('corretiva')).length },
+                    { name: 'Predial', value: currentData.filter((wo: any) => (wo.maintenance_category || '').toLowerCase().includes('predial')).length },
+                    { name: 'Preventiva', value: currentData.filter((wo: any) => (wo.maintenance_type || '').toLowerCase().includes('preventiva')).length }
                 ],
                 assetsStatus: [],
                 technicianPerformance: (() => {
@@ -1057,7 +1181,7 @@ const ReportsContent = () => {
                                             isAnimationActive={false}
                                         >
                                             {chartData.maintenanceType.map((_, index) => (
-                                                <Cell key={index} fill={['#3b82f6', '#10b981', '#f59e0b'][index % 3]} />
+                                                <Cell key={index} fill={['#10b981', '#f59e0b', '#3b82f6'][index % 3]} />
                                             ))}
                                         </Pie>
                                         <Tooltip />

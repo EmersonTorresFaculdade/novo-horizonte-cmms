@@ -228,9 +228,7 @@ const Dashboard = () => {
 
         const partsCost = targetOrders.reduce((acc, o) => acc + (Number(o.parts_cost) || Number(o.manual_parts_cost) || 0), 0);
         const laborCost = targetOrders.reduce((acc, o) => {
-          const manualLabor = Number(o.labor_cost) || 0;
-          const calculatedLabor = o.third_party_company_id ? (Number(o.hourly_rate) || 0) * (Number(o.repair_hours) || 0) : 0;
-          return acc + manualLabor + calculatedLabor;
+          return acc + (Number(o.labor_cost) || 0);
         }, 0);
 
         const availability = assetCount > 0 ? Math.max(0, Math.min(100, ((periodHours * assetCount - downtime) / (periodHours * assetCount)) * 100)) : 100;
