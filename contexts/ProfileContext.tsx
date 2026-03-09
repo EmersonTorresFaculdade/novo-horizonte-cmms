@@ -69,7 +69,7 @@ export const ProfileProvider: React.FC<ProfileProviderProps> = ({ children }) =>
                     name: user.name || 'Usuário',
                     email: user.email,
                     phone: user.phone || '',
-                    position: user.role === 'admin' ? 'Administrador' : 'Técnico',
+                    position: user.role === 'admin' || user.role === 'admin_root' ? 'Administrador' : 'Técnico',
                     department: 'Geral',
                     location: 'Matriz',
                     avatar: user.avatar_url || IMAGES.profileCarlos
