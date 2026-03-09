@@ -365,7 +365,7 @@ const Profile = () => {
                                 </span>
                                 <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-indigo-500/5 text-blue-600 font-black text-[10px] uppercase tracking-widest rounded-full border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] flex items-center gap-1.5">
                                     <Shield size={12} className="text-blue-500" />
-                                    {profileData.role === 'admin' || profileData.role === 'admin_root' ? 'ACESSO MASTER' : 'ACESSO TÉCNICO'}
+                                    {user?.role === 'admin' || user?.role === 'admin_root' ? 'ACESSO MASTER' : 'ACESSO TÉCNICO'}
                                 </span>
                             </div>
 
