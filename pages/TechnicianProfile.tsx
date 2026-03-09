@@ -163,6 +163,36 @@ const TechnicianProfile = () => {
         }).length;
     }, [workOrders]);
 
+    const workedHoursThisMonth = useMemo(() => {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const resolvedThisMonth = workOrders.filter(o => {
+            if (o.status !== 'Concluído') return false;
+            const resolvedDate = o.resolved_at ? new Date(o.resolved_at) : new Date(o.created_at);
+            return resolvedDate.getMonth() === currentMonth && resolvedDate.getFullYear() === currentYear;
+        });
+
+        const totalMs = resolvedThisMonth.reduce((sum, o) => {
+            const diff = new Date(o.resolved_at || o.created_at).getTime() - new Date(o.created_at).getTime();
+            return sum + Math.max(diff, 0);
+        }, 0);
+        const hours = (totalMs / 3600000).toFixed(1);
+        return parseFloat(hours);
+    }, [workOrders]);
+
+    const mostFrequentAsset = useMemo(() => {
+        const counts: Record<string, number> = {};
+        const completed = workOrders.filter(o => o.status === 'Concluído');
+        completed.forEach(o => {
+            if (o.asset_name) {
+                counts[o.asset_name] = (counts[o.asset_name] || 0) + 1;
+            }
+        });
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        return sorted.length > 0 ? sorted[0][0] : '—';
+    }, [workOrders]);
+
     const avgRating = useMemo(() => {
         if (ratings.length === 0) return { value: 0, count: 0 };
         const total = ratings.reduce((sum, r) => sum + r.rating, 0);
@@ -181,8 +211,32 @@ const TechnicianProfile = () => {
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <div className="size-12 border-4 border-primary-light/20 border-t-primary-light rounded-full animate-spin"></div>
+            <div className="space-y-6 animate-pulse">
+                <div className="flex flex-col lg:flex-row gap-8">
+                    {/* Skeleton Left Column */}
+                    <div className="lg:w-[320px] shrink-0 space-y-6">
+                        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm flex flex-col items-center">
+                            <div className="size-32 rounded-3xl bg-slate-200 mb-6"></div>
+                            <div className="h-6 w-3/4 bg-slate-200 rounded-lg mb-2"></div>
+                            <div className="h-4 w-1/2 bg-slate-200 rounded-lg mb-6"></div>
+                            <div className="h-10 w-full bg-slate-200 rounded-2xl mb-8"></div>
+                            <div className="w-full space-y-4">
+                                <div className="h-10 w-full bg-slate-100 rounded-xl"></div>
+                                <div className="h-10 w-full bg-slate-100 rounded-xl"></div>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 gap-4">
+                            {[1, 2, 3, 4].map(i => (
+                                <div key={i} className="bg-white rounded-2xl border border-slate-200 p-5 h-24"></div>
+                            ))}
+                        </div>
+                    </div>
+                    {/* Skeleton Right Column */}
+                    <div className="flex-1 space-y-8">
+                        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm h-[500px]"></div>
+                        <div className="bg-white rounded-3xl border border-slate-200 p-8 shadow-sm h-[300px]"></div>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -308,6 +362,25 @@ const TechnicianProfile = () => {
                             <div className="size-10 rounded-xl bg-amber-50 flex items-center justify-center">
                                 <Star size={20} className="text-amber-500" />
                             </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex items-center justify-between shadow-sm">
+                            <div>
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Horas Trabalhadas</p>
+                                <h4 className="text-lg font-black text-slate-900">{workedHoursThisMonth}h</h4>
+                                <p className="text-[10px] text-slate-400 font-semibold">Neste mês corrente</p>
+                            </div>
+                            <div className="size-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                                <Briefcase size={20} className="text-blue-500" />
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-slate-200 p-5 flex flex-col justify-center shadow-sm">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1.5">
+                                <AlertTriangle size={12} className="text-orange-400" /> Calcanhar de Aquiles
+                            </p>
+                            <h4 className="text-sm font-black text-slate-900 line-clamp-2" title={mostFrequentAsset}>{mostFrequentAsset}</h4>
+                            <p className="text-[10px] text-slate-400 font-semibold mt-1">Alvo mais acionado e concluído</p>
                         </div>
                     </div>
                 </div>

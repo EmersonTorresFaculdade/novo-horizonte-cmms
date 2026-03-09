@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase';
 import { useProfile } from '../contexts/ProfileContext';
 
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, BellRing, Smartphone, Settings, SlidersHorizontal, Settings2 } from 'lucide-react';
+import { Eye, EyeOff, BellRing, Smartphone, Settings, SlidersHorizontal, Settings2, Award } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
 import FeedbackModal from '../components/FeedbackModal';
 import { useSettings } from '../contexts/SettingsContext';
@@ -355,9 +355,19 @@ const Profile = () => {
                                 />
                             </div>
 
-                            <h3 className="text-xl font-bold text-slate-900 mt-4">{profileData.name}</h3>
-                            <p className="text-sm text-slate-500">{profileData.position}</p>
-                            <p className="text-xs text-slate-400 mt-1">{profileData.department}</p>
+                            <h3 className="text-xl font-black text-slate-900 mt-4 tracking-tight">{profileData.name}</h3>
+                            <p className="text-sm font-bold text-primary">{profileData.position || 'Colaborador'}</p>
+
+                            <div className="flex flex-wrap items-center justify-center gap-2 mt-3 mb-2">
+                                <span className="px-3 py-1 bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 text-emerald-600 font-black text-[10px] uppercase tracking-widest rounded-full border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] flex items-center gap-1.5">
+                                    <Award size={12} className="text-emerald-500" />
+                                    {profileData.position?.toUpperCase().includes('LÍDER') || profileData.position?.toUpperCase().includes('ENGENHEIRO') || profileData.position?.toUpperCase().includes('COORDENADOR') ? 'LÍDER PREDITIVA' : 'ESPECIALISTA OPERACIONAL'}
+                                </span>
+                                <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-indigo-500/5 text-blue-600 font-black text-[10px] uppercase tracking-widest rounded-full border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] flex items-center gap-1.5">
+                                    <Shield size={12} className="text-blue-500" />
+                                    {profileData.role === 'admin' ? 'ACESSO MASTER' : 'ACESSO TÉCNICO'}
+                                </span>
+                            </div>
 
                             <div className="w-full mt-6 pt-6 border-t border-slate-100 space-y-3">
                                 <div className="flex items-center gap-3 text-sm">
