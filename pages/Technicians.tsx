@@ -346,13 +346,25 @@ const Technicians: React.FC = () => {
 
     const topPerformers = useMemo(() => {
         return [...technicians]
-            .sort((a, b) => (b.completed_orders || 0) - (a.completed_orders || 0))
+            .filter(t => (t.completed_orders || 0) > 0)
+            .sort((a, b) => {
+                const perfA = getPerformancePercentage(a);
+                const perfB = getPerformancePercentage(b);
+                if (perfB !== perfA) return perfB - perfA;
+                return (b.completed_orders || 0) - (a.completed_orders || 0);
+            })
             .slice(0, 5);
     }, [technicians]);
 
     const topCompanies = useMemo(() => {
         return [...thirdPartyCompanies]
-            .sort((a, b) => (b.completed_orders || 0) - (a.completed_orders || 0))
+            .filter(c => (c.completed_orders || 0) > 0)
+            .sort((a, b) => {
+                const perfA = getPerformancePercentage(a);
+                const perfB = getPerformancePercentage(b);
+                if (perfB !== perfA) return perfB - perfA;
+                return (b.completed_orders || 0) - (a.completed_orders || 0);
+            })
             .slice(0, 5);
     }, [thirdPartyCompanies]);
 
@@ -768,45 +780,52 @@ const Technicians: React.FC = () => {
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                            {(mainTab === 'terceirizados' ? topCompanies : topPerformers).map((entity, idx) => {
-                                const name = (entity as any).name;
-                                const avatarColor = getAvatarColor(name);
-                                const perfPercent = getPerformancePercentage(entity);
-                                const isCompany = mainTab === 'terceirizados';
-
-                                return (
-                                    <div key={entity.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: idx === 0 ? '#FFFBEB' : 'transparent', cursor: 'pointer' }}
-                                        onClick={() => navigate(isCompany ? `/parceiros/${entity.id}` : `/technicians/${entity.id}`)}
-                                    >
-                                        {isCompany ? (
-                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
-                                                <Building2 size={16} />
-                                            </div>
-                                        ) : (entity as any).avatar ? (
-                                            <img src={(entity as any).avatar} alt={name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                                        ) : (
-                                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarColor.bg, color: avatarColor.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
-                                                {getInitials(name)}
-                                            </div>
-                                        )}
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                            <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                {name}
-                                            </p>
-                                            <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>
-                                                {perfPercent}% de SLA atendido
-                                            </p>
+                            {(() => {
+                                const list = mainTab === 'terceirizados' ? topCompanies : topPerformers;
+                                if (list.length === 0) {
+                                    return (
+                                        <div className="py-6 text-center text-slate-400">
+                                            <Award size={24} className="mx-auto mb-2 opacity-30 text-primary" />
+                                            <p className="text-xs font-semibold">Nenhuma OS concluída ainda.</p>
                                         </div>
-                                        {idx === 0 && <span style={{ fontSize: '1rem' }}>🥇</span>}
-                                        {idx === 1 && <span style={{ fontSize: '1rem' }}>🥈</span>}
-                                        {idx === 2 && <span style={{ fontSize: '1rem' }}>🥉</span>}
-                                    </div>
-                                );
-                            })}
+                                    );
+                                }
+                                return list.map((entity, idx) => {
+                                    const name = (entity as any).name;
+                                    const avatarColor = getAvatarColor(name);
+                                    const perfPercent = getPerformancePercentage(entity);
+                                    const isCompany = mainTab === 'terceirizados';
 
-                            {(mainTab === 'terceirizados' ? topCompanies : topPerformers).length === 0 && (
-                                <p style={{ fontSize: '0.8125rem', color: '#94A3B8', textAlign: 'center', padding: 12 }}>Sem dados ainda</p>
-                            )}
+                                    return (
+                                        <div key={entity.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 10, background: idx === 0 ? '#FFFBEB' : 'transparent', cursor: 'pointer' }}
+                                            onClick={() => navigate(isCompany ? `/parceiros/${entity.id}` : `/technicians/${entity.id}`)}
+                                        >
+                                            {isCompany ? (
+                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#F1F5F9', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
+                                                    <Building2 size={16} />
+                                                </div>
+                                            ) : (entity as any).avatar ? (
+                                                <img src={(entity as any).avatar} alt={name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <div style={{ width: 32, height: 32, borderRadius: '50%', background: avatarColor.bg, color: avatarColor.text, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: '0.75rem' }}>
+                                                    {getInitials(name)}
+                                                </div>
+                                            )}
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{ margin: 0, fontSize: '0.8125rem', fontWeight: 600, color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                    {name}
+                                                </p>
+                                                <p style={{ margin: 0, fontSize: '0.6875rem', color: '#94A3B8' }}>
+                                                    {perfPercent}% de taxa de resolução
+                                                </p>
+                                            </div>
+                                            {idx === 0 && <span style={{ fontSize: '1rem' }}>🥇</span>}
+                                            {idx === 1 && <span style={{ fontSize: '1rem' }}>🥈</span>}
+                                            {idx === 2 && <span style={{ fontSize: '1rem' }}>🥉</span>}
+                                        </div>
+                                    );
+                                });
+                            })()}
                         </div>
 
                         <div style={{ marginTop: 14, padding: '10px 12px', background: 'rgba(17, 212, 115, 0.05)', borderRadius: 10, border: '1px solid rgba(17, 212, 115, 0.2)' }}>
