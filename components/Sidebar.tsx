@@ -374,7 +374,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
         onClose={() => setShowHelp(false)}
         type="info"
         title="Central de Ajuda"
-        message="Para suporte, entre em contato com o administrador do sistema ou consulte a documentação na intranet.\n\nVersão do Sistema: 1.0.0"
+        message="Para suporte, entre em contato com o administrador do sistema ou consulte a documentação na intranet.\n\nVersão do Sistema: 2.0.0"
       />
     </>
   );
