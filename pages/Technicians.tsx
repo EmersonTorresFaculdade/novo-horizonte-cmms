@@ -444,7 +444,7 @@ const Technicians: React.FC = () => {
 
                             {/* Specialty Filter */}
                             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                {['Todos', 'Máquinas', 'Predial', 'Outros', 'Geral'].map(specialty => (
+                                {['Todos', 'Máquinas', 'Predial', 'Outros'].map(specialty => (
                                     <button
                                         key={specialty}
                                         onClick={() => setActiveTab(specialty)}
@@ -600,7 +600,7 @@ const Technicians: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                {['Todos', 'Máquinas', 'Predial', 'Outros', 'Geral'].map(specialty => (
+                                {['Todos', 'Máquinas', 'Predial', 'Outros'].map(specialty => (
                                     <button
                                         key={specialty}
                                         onClick={() => setActiveTab(specialty)}
