@@ -344,6 +344,12 @@ const Technicians: React.FC = () => {
         });
     }, [thirdPartyCompanies, searchTerm, activeTab]);
 
+    const getPerformancePercentage = (entity: any) => {
+        const total = (entity.completed_orders || 0) + (entity.open_orders || 0);
+        if (total === 0) return 0;
+        return Math.round((entity.completed_orders || 0) / total * 100);
+    };
+
     const topPerformers = useMemo(() => {
         return [...technicians]
             .filter(t => (t.completed_orders || 0) > 0)
@@ -367,12 +373,6 @@ const Technicians: React.FC = () => {
             })
             .slice(0, 5);
     }, [thirdPartyCompanies]);
-
-    const getPerformancePercentage = (entity: any) => {
-        const total = (entity.completed_orders || 0) + (entity.open_orders || 0);
-        if (total === 0) return 0;
-        return Math.round((entity.completed_orders || 0) / total * 100);
-    };
 
     const paginatedTechnicians = filteredTechnicians.slice(
         (currentPage - 1) * itemsPerPage,
