@@ -63,7 +63,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
       let query = supabase
         .from('work_orders')
         .select('*', { count: 'exact', head: true })
-        .in('status', ['Aberto', 'Em Manutenção']);
+        .in('status', ['Aberto', 'Em Manutenção', 'Agendado']);
 
       const isAdminRoot = user?.role === 'admin_root';
       const isCommonAdmin = user?.role === 'admin';

@@ -59,7 +59,7 @@ const WorkOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'maintenance' | 'waiting' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'maintenance' | 'scheduled' | 'completed'>('all');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
     title: string;
@@ -137,7 +137,7 @@ const WorkOrders = () => {
       filterStatus === 'all' ||
       (filterStatus === 'open' && order.status === 'Aberto') ||
       (filterStatus === 'maintenance' && order.status === 'Em Manutenção') ||
-      (filterStatus === 'waiting' && order.status === 'Aguardando Peça') ||
+      (filterStatus === 'scheduled' && order.status === 'Agendado') ||
       (filterStatus === 'completed' && order.status === 'Concluído');
 
     // Search filter
@@ -287,10 +287,10 @@ const WorkOrders = () => {
               Em Manutenção ({orders.filter(o => o.status === 'Em Manutenção').length})
             </button>
             <button
-              onClick={() => setFilterStatus('waiting')}
-              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'waiting' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+              onClick={() => setFilterStatus('scheduled')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'scheduled' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
             >
-              Aguardando Peça ({orders.filter(o => o.status === 'Aguardando Peça').length})
+              Agendado ({orders.filter(o => o.status === 'Agendado').length})
             </button>
             <button
               onClick={() => setFilterStatus('completed')}
@@ -462,7 +462,7 @@ const WorkOrders = () => {
           ) : (
             /* KANBAN VIEW (Simplified for Real Data) */
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
-              {['Aberto', 'Em Manutenção', 'Aguardando Peça', 'Concluído'].map(status => (
+              {['Aberto', 'Em Manutenção', 'Agendado', 'Concluído'].map(status => (
                 <div key={status} className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200">
                   <div className="p-3 border-b border-slate-200 bg-white rounded-t-xl flex items-center justify-between">
                     <h3 className="font-bold text-slate-700 text-sm">{status}</h3>
