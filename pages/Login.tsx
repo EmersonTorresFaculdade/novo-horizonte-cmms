@@ -321,7 +321,7 @@ const Login = () => {
 
           <div className="flex flex-col gap-4 text-center mt-8">
             <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">
-              © {new Date().getFullYear()} Novo Horizonte Alumínios • Versão 1.0.0
+              © {new Date().getFullYear()} Novo Horizonte Alumínios • Versão 2.0.0
             </p>
           </div>
         </div>
