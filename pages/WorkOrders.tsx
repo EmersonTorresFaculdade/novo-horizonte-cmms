@@ -52,7 +52,7 @@ const WorkOrders = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'admin_root';
-  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'kanban'>('kanban');
   const [searchParams] = useSearchParams();
   const initialSearch = searchParams.get('search') || '';
 
