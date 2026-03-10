@@ -59,7 +59,7 @@ const WorkOrders = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState(initialSearch);
-  const [filterStatus, setFilterStatus] = useState<'all' | 'open' | 'maintenance' | 'scheduled' | 'completed'>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'received' | 'open' | 'maintenance' | 'scheduled' | 'completed'>('all');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error' | 'confirm' | 'info';
     title: string;
@@ -135,6 +135,7 @@ const WorkOrders = () => {
     // Status filter
     const matchesStatus =
       filterStatus === 'all' ||
+      (filterStatus === 'received' && order.status === 'Recebido') ||
       (filterStatus === 'open' && order.status === 'Aberto') ||
       (filterStatus === 'maintenance' && order.status === 'Em Manutenção') ||
       (filterStatus === 'scheduled' && order.status === 'Agendado') ||
@@ -273,6 +274,12 @@ const WorkOrders = () => {
               className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'all' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
             >
               Todas ({orders.length})
+            </button>
+            <button
+              onClick={() => setFilterStatus('received')}
+              className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${filterStatus === 'received' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              Recebidos ({orders.filter(o => o.status === 'Recebido').length})
             </button>
             <button
               onClick={() => setFilterStatus('open')}
@@ -461,8 +468,8 @@ const WorkOrders = () => {
             </div>
           ) : (
             /* KANBAN VIEW (Simplified for Real Data) */
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-full">
-              {['Aberto', 'Em Manutenção', 'Agendado', 'Concluído'].map(status => (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 h-full">
+              {['Recebido', 'Aberto', 'Em Manutenção', 'Agendado', 'Concluído'].map(status => (
                 <div key={status} className="flex flex-col h-full bg-slate-50/50 rounded-xl border border-slate-200">
                   <div className="p-3 border-b border-slate-200 bg-white rounded-t-xl flex items-center justify-between">
                     <h3 className="font-bold text-slate-700 text-sm">{status}</h3>
