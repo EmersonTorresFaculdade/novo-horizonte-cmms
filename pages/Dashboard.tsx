@@ -475,12 +475,19 @@ const Dashboard = () => {
         <div>
           <div className="flex items-center gap-3 mb-1">
             <span className="text-2xl">{getGreetingEmoji()}</span>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">
-              {isAdmin ? 'Controle de Manutenção' : `${getGreeting()}, ${user?.name?.split(' ')[0] || 'Usuário'}`}
-            </h1>
+            <div className="flex flex-col">
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none">
+                {`${getGreeting()}, ${user?.name?.split(' ')[0] || 'Usuário'}`}
+              </h1>
+              <span className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mt-1 pl-0.5">
+                {user?.role === 'admin_root' ? 'Admin Root' :
+                  user?.role === 'admin' ? 'Administrador de OS' :
+                    'Usuário / Solicitante'}
+              </span>
+            </div>
           </div>
           <p className="text-slate-500 text-sm font-medium pl-10">
-            {isAdmin ? 'Visão estratégica da planta em tempo real.' : 'Acompanhe suas solicitações e suporte.'}
+            {isAdmin ? 'Sua visão estratégica da planta em tempo real.' : 'Acompanhe suas solicitações e suporte.'}
           </p>
         </div>
         <div className="flex items-center gap-3">
