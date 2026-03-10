@@ -107,6 +107,25 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
         }
     };
 
+    const formatPhone = (value: string) => {
+        if (!value) return value;
+        const phoneNumber = value.replace(/\D/g, '');
+        const phoneNumberLength = phoneNumber.length;
+        if (phoneNumberLength <= 2) return phoneNumber;
+        if (phoneNumberLength <= 6) {
+            return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
+        }
+        if (phoneNumberLength <= 10) {
+            return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 6)}-${phoneNumber.slice(6, 10)}`;
+        }
+        return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
+    };
+
+    const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const formattedValue = formatPhone(e.target.value);
+        setFormData({ ...formData, contact: formattedValue });
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -201,7 +220,6 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                     <option value="Máquinas">Máquinas</option>
                                     <option value="Predial">Predial</option>
                                     <option value="Outros">Outros</option>
-                                    <option value="Geral">Geral</option>
                                 </select>
                                 {errors.specialty && (
                                     <p className="text-sm text-brand-alert mt-1">{errors.specialty}</p>
@@ -233,10 +251,11 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                             <input
                                 type="tel"
                                 value={formData.contact}
-                                onChange={(e) => setFormData({ ...formData, contact: e.target.value })}
+                                onChange={handlePhoneChange}
                                 className={`w-full px-4 py-3 rounded-lg border ${errors.contact ? 'border-red-300 bg-red-50' : 'border-slate-200'
                                     } focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all`}
-                                placeholder="(11) 99999-9999"
+                                placeholder="(00) 0000-0000 ou (00) 00000-0000"
+                                maxLength={15}
                             />
                             {errors.contact && (
                                 <p className="text-sm text-brand-alert mt-1">{errors.contact}</p>

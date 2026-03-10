@@ -100,6 +100,31 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         }
     };
 
+    const formatPhone = (value: string) => {
+        if (!value) return value;
+        const phoneNumber = value.replace(/\D/g, '');
+        const phoneNumberLength = phoneNumber.length;
+        if (phoneNumberLength <= 2) return phoneNumber;
+        if (phoneNumberLength <= 6) {
+            return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2)}`;
+        }
+        if (phoneNumberLength <= 10) {
+            return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 6)}-${phoneNumber.slice(6, 10)}`;
+        }
+        return `(${phoneNumber.slice(0, 2)}) ${phoneNumber.slice(2, 7)}-${phoneNumber.slice(7, 11)}`;
+    };
+
+    const formatCNPJ = (value: string) => {
+        const cnpj = value.replace(/\D/g, '');
+        if (cnpj.length <= 2) return cnpj;
+        if (cnpj.length <= 5) return `${cnpj.slice(0, 2)}.${cnpj.slice(2)}`;
+        if (cnpj.length <= 8) return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5)}`;
+        if (cnpj.length <= 12) return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8)}`;
+        return `${cnpj.slice(0, 2)}.${cnpj.slice(2, 5)}.${cnpj.slice(5, 8)}/${cnpj.slice(8, 12)}-${cnpj.slice(12, 14)}`;
+    };
+
+    if (!isOpen) return null;
+
     return (
         <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
             <div className="bg-white rounded-2xl w-full max-w-lg shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
@@ -198,9 +223,10 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                     <input
                                         type="text"
                                         value={formData.cnpj || ''}
-                                        onChange={e => setFormData({ ...formData, cnpj: e.target.value })}
+                                        onChange={e => setFormData({ ...formData, cnpj: formatCNPJ(e.target.value) })}
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
                                         placeholder="00.000.000/0000-00"
+                                        maxLength={18}
                                     />
                                 </div>
                             </div>
@@ -229,9 +255,10 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                     <input
                                         type="text"
                                         value={formData.phone}
-                                        onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                        onChange={e => setFormData({ ...formData, phone: formatPhone(e.target.value) })}
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
-                                        placeholder="(11) 99999-9999"
+                                        placeholder="(00) 00000-0000"
+                                        maxLength={15}
                                     />
                                 </div>
                             </div>
@@ -268,7 +295,6 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         <option value="Máquinas">Máquinas</option>
                                         <option value="Predial">Predial</option>
                                         <option value="Outros">Outros</option>
-                                        <option value="Geral">Geral</option>
                                     </select>
                                 </div>
                             </div>
