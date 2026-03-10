@@ -271,38 +271,42 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 <span className="text-sm font-medium">Relatórios</span>
               </NavLink>
 
-              <NavLink
-                to="/settings"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                <Settings size={20} />
-                <span className="text-sm font-medium">Configurações</span>
-              </NavLink>
+              {user?.role === 'admin_root' && (
+                <>
+                  <NavLink
+                    to="/settings"
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <Settings size={20} />
+                    <span className="text-sm font-medium">Configurações</span>
+                  </NavLink>
 
-              <NavLink
-                to="/users"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                <Users size={20} />
-                <span className="text-sm font-medium">Gestão de Usuários</span>
-              </NavLink>
+                  <NavLink
+                    to="/users"
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <Users size={20} />
+                    <span className="text-sm font-medium">Gestão de Usuários</span>
+                  </NavLink>
 
-              <NavLink
-                to="/users/pending"
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                  }`
-                }
-              >
-                <Clock size={20} />
-                <span className="text-sm font-medium">Aprovações</span>
-              </NavLink>
+                  <NavLink
+                    to="/users/pending"
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-4 py-3 rounded-lg transition-all group ${isActive ? 'bg-slate-800/50 text-primary font-semibold' : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <Clock size={20} />
+                    <span className="text-sm font-medium">Aprovações</span>
+                  </NavLink>
+                </>
+              )}
             </>
           )}
         </nav>

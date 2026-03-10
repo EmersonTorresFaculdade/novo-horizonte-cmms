@@ -93,22 +93,22 @@ const App = () => {
                     </ProtectedRoute>
                   } />
                   <Route path="/settings" element={
-                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                    <ProtectedRoute requiredRoles={['admin_root']}>
                       <Settings />
                     </ProtectedRoute>
                   } />
                   <Route path="/users/pending" element={
-                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                    <ProtectedRoute requiredRoles={['admin_root']}>
                       <UsersPending />
                     </ProtectedRoute>
                   } />
                   <Route path="/users" element={
-                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                    <ProtectedRoute requiredRoles={['admin_root']}>
                       <UsersManagement />
                     </ProtectedRoute>
                   } />
                   <Route path="/users/pending/:id" element={
-                    <ProtectedRoute requiredRoles={['admin', 'admin_root']}>
+                    <ProtectedRoute requiredRoles={['admin_root']}>
                       <UsersPending />
                     </ProtectedRoute>
                   } />
