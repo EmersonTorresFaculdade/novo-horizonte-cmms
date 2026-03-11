@@ -98,13 +98,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
     };
 
-    const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    const login = async (loginIdentifier: string, password: string): Promise<{ success: boolean; error?: string }> => {
         try {
-            // Buscar usuário por email OU username
+            const trimmedIdentifier = loginIdentifier.trim();
+
+            // Buscar usuário por email OU username (nunca por nome completo, conforme solicitado)
             const { data: userData, error: userError } = await supabase
                 .from('users')
                 .select('*')
-                .or(`email.eq.${email},username.eq.${email}`)
+                .or(`email.eq.${trimmedIdentifier},username.eq.${trimmedIdentifier}`)
                 .single();
 
             if (userError || !userData) {
@@ -210,15 +212,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 return { success: false, error: 'Erro ao criar conta. Tente novamente.' };
             }
 
-            // Notificar registro realizado (aguardando aprovação)
-            await NotificationService.notifyUserRegistered({
-                id: newUser.id,
-                name: newUser.name,
-                email: newUser.email,
-                phone: newUser.phone,
-                role: newUser.role,
-                status: newUser.status
-            });
+            // Notificar registro realizado de forma assíncrona para não travar o cadastro (evita que o usuário não veja o popup de sucesso caso a mensageria falhe)
+            try {
+                await NotificationService.notifyUserRegistered({
+                    id: newUser.id,
+                    name: newUser.name,
+                    email: newUser.email,
+                    phone: newUser.phone,
+                    role: newUser.role,
+                    status: newUser.status
+                });
+            } catch (notifyErr) {
+                console.warn('Erro não crítico ao notificar administradores:', notifyErr);
+            }
 
             return { success: true };
         } catch (error) {
