@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LogIn, Factory, Mail, Lock, Eye, EyeOff, AlertCircle, UserPlus, X, User, Phone, Shield, AlertTriangle, Wrench, Component, Construction, Loader2, Zap, CheckCircle2, RotateCcw } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
-import { IMAGES } from '../constants';
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
+import FeedbackModal from '../components/FeedbackModal';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -36,6 +36,19 @@ const Login = () => {
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [resetError, setResetError] = useState('');
+
+  // Estado para feedback modal
+  const [feedback, setFeedback] = useState<{
+    isOpen: boolean;
+    type: 'success' | 'error' | 'info' | 'confirm';
+    title: string;
+    message: string;
+  }>({
+    isOpen: false,
+    type: 'info',
+    title: '',
+    message: ''
+  });
 
   const { requestPasswordReset } = useAuth();
 
@@ -87,7 +100,13 @@ const Login = () => {
       const result = await register(registerName, registerUsername, registerEmail, registerPassword, registerRole, registerPhone);
 
       if (result.success) {
-        setRegisterSuccess(true);
+        setFeedback({
+          isOpen: true,
+          type: 'success',
+          title: 'Conta Criada!',
+          message: 'Sua solicitação de acesso foi enviada com sucesso e está aguardando aprovação.'
+        });
+
         // Limpar formulário
         setRegisterName('');
         setRegisterUsername('');
@@ -95,12 +114,16 @@ const Login = () => {
         setRegisterPassword('');
         setRegisterPhone('');
         setRegisterRole('user');
-        // Fechar modal após 4 segundos
-        setTimeout(() => {
-          setShowRegisterModal(false);
-          setRegisterSuccess(false);
-        }, 4000);
+
+        // Fechar modal
+        setShowRegisterModal(false);
       } else {
+        setFeedback({
+          isOpen: true,
+          type: 'error',
+          title: 'Erro ao Criar Conta',
+          message: result.error || 'Não foi possível enviar a solicitação. Tente novamente.'
+        });
         setRegisterError(result.error || 'Erro ao criar conta');
       }
     } catch (err) {
@@ -235,7 +258,7 @@ const Login = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin ou nome@empresa.com.br"
+                  placeholder="Ex: joaosilva ou nome@empresa.com.br"
                   className="block w-full rounded-lg border-0 py-3 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-primary sm:text-sm sm:leading-6 outline-none"
                 />
               </div>
@@ -354,234 +377,57 @@ const Login = () => {
             </div>
 
             <div className="p-6">
-              {registerSuccess ? (
-                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-8 text-center space-y-4">
-                  <div className="h-16 w-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={32} />
+              <form onSubmit={handleRegister} className="space-y-5">
+                {registerError && (
+                  <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center gap-3 text-red-700">
+                    <AlertCircle size={20} className="shrink-0" />
+                    <span className="text-sm font-bold">{registerError}</span>
                   </div>
-                  <h4 className="text-lg font-black text-emerald-950">Solicitação Enviada!</h4>
-                  <p className="text-sm font-medium text-emerald-700 leading-relaxed">
-                    Sua conta foi criada e está aguardando aprovação dos administradores.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleRegister} className="space-y-5">
-                  {registerError && (
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-4 flex items-center gap-3 text-red-700">
-                      <AlertCircle size={20} className="shrink-0" />
-                      <span className="text-sm font-bold">{registerError}</span>
-                    </div>
-                  )}
+                )}
 
-                  <div className="space-y-4">
-                    <div>
-                      <label htmlFor="registerName" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        Nome Completo
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <User size={18} />
-                        </div>
-                        <input
-                          id="registerName"
-                          type="text"
-                          required
-                          value={registerName}
-                          onChange={(e) => setRegisterName(e.target.value)}
-                          placeholder="Ex: João da Silva"
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
-                        />
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="registerName" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                      Nome Completo
+                    </label>
+                    <div className="relative group">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <User size={18} />
                       </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="registerUsername" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        Usuário
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <User size={18} />
-                        </div>
-                        <input
-                          id="registerUsername"
-                          type="text"
-                          required
-                          value={registerUsername}
-                          onChange={(e) => setRegisterUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
-                          placeholder="joaosilva"
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="registerEmail" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        E-mail Corporativo
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <Mail size={18} />
-                        </div>
-                        <input
-                          id="registerEmail"
-                          type="email"
-                          required
-                          value={registerEmail}
-                          onChange={(e) => setRegisterEmail(e.target.value)}
-                          placeholder="nome@novohorizonte.com.br"
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="registerPhone" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        WhatsApp
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <WhatsappIcon size={18} />
-                        </div>
-                        <input
-                          id="registerPhone"
-                          type="tel"
-                          required
-                          value={registerPhone}
-                          onChange={(e) => setRegisterPhone(applyPhoneMask(e.target.value))}
-                          onFocus={(e) => {
-                            if (!e.target.value) setRegisterPhone('55');
-                          }}
-                          placeholder="5543999999999"
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label htmlFor="registerRole" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        Tipo de Acesso Desejado
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <Shield size={18} />
-                        </div>
-                        <select
-                          id="registerRole"
-                          required
-                          value={registerRole}
-                          onChange={(e) => setRegisterRole(e.target.value as any)}
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold focus:border-primary focus:bg-white transition-all outline-none appearance-none"
-                        >
-                          <option value="user">Técnico / Requerente</option>
-                          <option value="admin">Administrador de OS</option>
-                        </select>
-                      </div>
-                      <p className="mt-1.5 text-[10px] text-slate-500 font-medium px-1">
-                        {registerRole === 'admin'
-                          ? '⚡ Requer aprovação do Gerente de Manutenção'
-                          : '👥 Requer aprovação de qualquer administrador'}
-                      </p>
-                    </div>
-
-                    <div>
-                      <label htmlFor="registerPassword" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
-                        Senha
-                      </label>
-                      <div className="relative group">
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
-                          <Lock size={18} />
-                        </div>
-                        <input
-                          id="registerPassword"
-                          type="password"
-                          required
-                          value={registerPassword}
-                          onChange={(e) => setRegisterPassword(e.target.value)}
-                          placeholder="••••••••"
-                          minLength={6}
-                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
-                        />
-                      </div>
+                      <input
+                        id="registerName"
+                        type="text"
+                        required
+                        value={registerName}
+                        onChange={(e) => setRegisterName(e.target.value)}
+                        placeholder="Ex: João da Silva"
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
+                      />
                     </div>
                   </div>
-
-                  <div className="pt-4">
-                    <button
-                      type="submit"
-                      disabled={registerLoading}
-                      className="w-full flex justify-center items-center gap-3 bg-primary text-white py-4 rounded-xl font-black uppercase tracking-wide shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {registerLoading ? (
-                        <>
-                          <Loader2 className="animate-spin" size={20} />
-                          <span>Solicitando...</span>
-                        </>
-                      ) : (
-                        <>
-                          <UserPlus size={20} />
-                          <span>Criar Conta</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Recuperação de Senha */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
-                  <RotateCcw size={22} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-950 tracking-tight">Recuperar Senha</h3>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowResetModal(false);
-                  setResetError('');
-                  setResetSuccess(false);
-                }}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <div className="p-6">
-              {resetSuccess ? (
-                <div className="text-center space-y-4 py-4">
-                  <div className="h-14 w-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 size={28} />
-                  </div>
-                  <h4 className="text-base font-bold text-emerald-950">Solicitação Enviada!</h4>
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Se o email estiver cadastrado, você receberá um link em instantes para criar sua nova senha. Verifique também sua caixa de spam.
-                  </p>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword} className="space-y-5">
-                  <p className="text-xs text-slate-500 leading-relaxed">
-                    Informe seu e-mail cadastrado no sistema. Se o e-mail existir, enviaremos um link de recuperação para você criar uma nova senha.
-                  </p>
-
-                  {resetError && (
-                    <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-center gap-2 text-red-700">
-                      <AlertCircle size={16} />
-                      <span className="text-xs font-bold">{resetError}</span>
-                    </div>
-                  )}
 
                   <div>
-                    <label htmlFor="resetEmail" className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                    <label htmlFor="registerUsername" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                      Usuário
+                    </label>
+                    <div className="relative group">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <User size={18} />
+                      </div>
+                      <input
+                        id="registerUsername"
+                        type="text"
+                        required
+                        value={registerUsername}
+                        onChange={(e) => setRegisterUsername(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                        placeholder="joaosilva"
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="registerEmail" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
                       E-mail Corporativo
                     </label>
                     <div className="relative group">
@@ -589,38 +435,213 @@ const Login = () => {
                         <Mail size={18} />
                       </div>
                       <input
-                        id="resetEmail"
+                        id="registerEmail"
                         type="email"
                         required
-                        value={resetEmail}
-                        onChange={(e) => setResetEmail(e.target.value)}
-                        placeholder="Ex: joao@novohorizonte.com.br"
-                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none text-sm"
+                        value={registerEmail}
+                        onChange={(e) => setRegisterEmail(e.target.value)}
+                        placeholder="nome@novohorizonte.com.br"
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
                       />
                     </div>
                   </div>
 
+                  <div>
+                    <label htmlFor="registerPhone" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                      WhatsApp
+                    </label>
+                    <div className="relative group">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <WhatsappIcon size={18} />
+                      </div>
+                      <input
+                        id="registerPhone"
+                        type="tel"
+                        required
+                        value={registerPhone}
+                        onChange={(e) => setRegisterPhone(applyPhoneMask(e.target.value))}
+                        onFocus={(e) => {
+                          if (!e.target.value) setRegisterPhone('55');
+                        }}
+                        placeholder="5543999999999"
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="registerRole" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                      Tipo de Acesso Desejado
+                    </label>
+                    <div className="relative group">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <Shield size={18} />
+                      </div>
+                      <select
+                        id="registerRole"
+                        required
+                        value={registerRole}
+                        onChange={(e) => setRegisterRole(e.target.value as any)}
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold focus:border-primary focus:bg-white transition-all outline-none appearance-none"
+                      >
+                        <option value="user">Técnico / Requerente</option>
+                        <option value="admin">Administrador de OS</option>
+                      </select>
+                    </div>
+                    <p className="mt-1.5 text-[10px] text-slate-500 font-medium px-1">
+                      {registerRole === 'admin'
+                        ? '⚡ Requer aprovação do Gerente de Manutenção'
+                        : '👥 Requer aprovação de qualquer administrador'}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="registerPassword" className="block text-xs font-black uppercase tracking-widest text-slate-500 mb-2">
+                      Senha
+                    </label>
+                    <div className="relative group">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                        <Lock size={18} />
+                      </div>
+                      <input
+                        id="registerPassword"
+                        type="password"
+                        required
+                        value={registerPassword}
+                        onChange={(e) => setRegisterPassword(e.target.value)}
+                        placeholder="••••••••"
+                        minLength={6}
+                        className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-4">
                   <button
                     type="submit"
-                    disabled={resetLoading}
-                    className="w-full flex justify-center items-center gap-2 bg-primary text-white py-4 rounded-xl font-black uppercase tracking-wide shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 text-sm"
+                    disabled={registerLoading}
+                    className="w-full flex justify-center items-center gap-3 bg-primary text-white py-4 rounded-xl font-black uppercase tracking-wide shadow-xl shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {resetLoading ? (
+                    {registerLoading ? (
                       <>
-                        <Loader2 className="animate-spin" size={18} />
-                        <span>Recuperando...</span>
+                        <Loader2 className="animate-spin" size={20} />
+                        <span>Solicitando...</span>
                       </>
                     ) : (
-                      <span>Recuperar Senha</span>
+                      <>
+                        <UserPlus size={20} />
+                        <span>Criar Conta</span>
+                      </>
                     )}
                   </button>
-                </form>
-              )}
+                </div>
+              </form>
             </div>
           </div>
         </div>
       )}
-    </div>
+
+      {/* Modal de Recuperação de Senha */}
+      {
+        showResetModal && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden transform transition-all">
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-primary/10 rounded-xl text-primary">
+                    <RotateCcw size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-slate-950 tracking-tight">Recuperar Senha</h3>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowResetModal(false);
+                    setResetError('');
+                    setResetSuccess(false);
+                  }}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-6">
+                {resetSuccess ? (
+                  <div className="text-center space-y-4 py-4">
+                    <div className="h-14 w-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <CheckCircle2 size={28} />
+                    </div>
+                    <h4 className="text-base font-bold text-emerald-950">Solicitação Enviada!</h4>
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Se o email estiver cadastrado, você receberá um link em instantes para criar sua nova senha. Verifique também sua caixa de spam.
+                    </p>
+                  </div>
+                ) : (
+                  <form onSubmit={handleResetPassword} className="space-y-5">
+                    <p className="text-xs text-slate-500 leading-relaxed">
+                      Informe seu e-mail cadastrado no sistema. Se o e-mail existir, enviaremos um link de recuperação para você criar uma nova senha.
+                    </p>
+
+                    {resetError && (
+                      <div className="bg-red-50 border border-red-100 rounded-xl p-3 flex items-center gap-2 text-red-700">
+                        <AlertCircle size={16} />
+                        <span className="text-xs font-bold">{resetError}</span>
+                      </div>
+                    )}
+
+                    <div>
+                      <label htmlFor="resetEmail" className="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">
+                        E-mail Corporativo
+                      </label>
+                      <div className="relative group">
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-4 text-slate-400 group-focus-within:text-primary transition-colors">
+                          <Mail size={18} />
+                        </div>
+                        <input
+                          id="resetEmail"
+                          type="email"
+                          required
+                          value={resetEmail}
+                          onChange={(e) => setResetEmail(e.target.value)}
+                          placeholder="Ex: joao@novohorizonte.com.br"
+                          className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold placeholder:text-slate-400 focus:border-primary focus:bg-white transition-all outline-none text-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={resetLoading}
+                      className="w-full flex justify-center items-center gap-2 bg-primary text-white py-4 rounded-xl font-black uppercase tracking-wide shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all disabled:opacity-50 text-sm"
+                    >
+                      {resetLoading ? (
+                        <>
+                          <Loader2 className="animate-spin" size={18} />
+                          <span>Recuperando...</span>
+                        </>
+                      ) : (
+                        <span>Recuperar Senha</span>
+                      )}
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
+      {/* Modal de Feedback Global para Login */}
+      <FeedbackModal
+        isOpen={feedback.isOpen}
+        onClose={() => setFeedback({ ...feedback, isOpen: false })}
+        type={feedback.type}
+        title={feedback.title}
+        message={feedback.message}
+      />
+    </div >
   );
 };
 

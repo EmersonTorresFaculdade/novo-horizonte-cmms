@@ -141,6 +141,9 @@ serve(async (req: Request) => {
                     // Filter user_registered to only notify admin_root
                     if (event === 'user_registered' && user.role !== 'admin_root') return;
 
+                    // Do not notify admins when a user is approved or rejected (only notify the user)
+                    if (event === 'user_approved' || event === 'user_rejected') return;
+
                     let hasCategoryPermission = false;
 
                     if (isUserEvent || event === 'test_notification') {

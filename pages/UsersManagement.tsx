@@ -205,8 +205,11 @@ const UsersManagement = () => {
         if (!userToDelete) return;
         try {
             setIsSaving(true);
-            const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+            const { error, data } = await supabase.functions.invoke('delete-user', {
+                body: { userId: userToDelete.id }
+            });
             if (error) throw error;
+            if (data?.error) throw new Error(data.error);
 
             setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
             setFeedback({
