@@ -16,7 +16,8 @@ import {
     Loader2,
     Lock,
     Eye,
-    EyeOff
+    EyeOff,
+    Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,6 +40,10 @@ const UsersManagement = () => {
     // Modal Edit state
     const [editingUser, setEditingUser] = useState<any>(null);
     const [showEditModal, setShowEditModal] = useState(false);
+
+    // Modal Delete state
+    const [userToDelete, setUserToDelete] = useState<any>(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const [feedback, setFeedback] = useState<{
         isOpen: boolean;
@@ -191,6 +196,40 @@ const UsersManagement = () => {
         }
     };
 
+    const confirmDelete = (user: any) => {
+        setUserToDelete(user);
+        setShowDeleteConfirm(true);
+    };
+
+    const handleDeleteUser = async () => {
+        if (!userToDelete) return;
+        try {
+            setIsSaving(true);
+            const { error } = await supabase.from('users').delete().eq('id', userToDelete.id);
+            if (error) throw error;
+
+            setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
+            setFeedback({
+                isOpen: true,
+                type: 'success',
+                title: 'Usuário Removido',
+                message: 'O usuário foi excluído com sucesso.'
+            });
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            setFeedback({
+                isOpen: true,
+                type: 'error',
+                title: 'Erro ao Remover',
+                message: 'Não foi possível excluir o usuário. Verifique se ele não possui vínculos com OS.'
+            });
+        } finally {
+            setIsSaving(false);
+            setShowDeleteConfirm(false);
+            setUserToDelete(null);
+        }
+    };
+
     const getStatusBadge = (status: string) => {
         switch (status) {
             case 'active': return 'bg-emerald-100 text-emerald-700';
@@ -311,12 +350,22 @@ const UsersManagement = () => {
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => handleEditUser(u)}
-                                            className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
-                                        >
-                                            <Settings size={20} />
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2">
+                                            <button
+                                                onClick={() => handleEditUser(u)}
+                                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                                                title="Configurar Usuário"
+                                            >
+                                                <Settings size={20} />
+                                            </button>
+                                            <button
+                                                onClick={() => confirmDelete(u)}
+                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                title="Rejeitar / Excluir permanentemente"
+                                            >
+                                                <Trash2 size={20} />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -479,6 +528,41 @@ const UsersManagement = () => {
                                 {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
                                 {isSaving ? 'Salvando...' : 'Salvar Configurações'}
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Modal */}
+            {showDeleteConfirm && userToDelete && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                        <div className="p-6 text-center">
+                            <div className="mx-auto size-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-4">
+                                <Trash2 size={32} />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight mb-2">Excluir Usuário?</h3>
+                            <p className="text-sm text-slate-500 mb-6">
+                                Tem certeza que deseja excluir o usuário <strong className="text-slate-800">{userToDelete.name}</strong>? Esta ação não poderá ser desfeita.
+                            </p>
+
+                            <div className="flex gap-3 w-full">
+                                <button
+                                    onClick={() => setShowDeleteConfirm(false)}
+                                    disabled={isSaving}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors disabled:opacity-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleDeleteUser}
+                                    disabled={isSaving}
+                                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-red-500/30 flex items-center justify-center gap-2 disabled:opacity-50"
+                                >
+                                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />}
+                                    {isSaving ? 'Excluindo...' : 'Excluir'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
