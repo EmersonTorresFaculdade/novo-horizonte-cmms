@@ -52,6 +52,30 @@ export const NotificationService = {
         await this.sendUserWebhook('user_rejected', user);
     },
 
+    async notifyPasswordResetRequest(user: UserPayload, resetToken: string) {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const resetUrl = `${window.location.origin}/#/reset-password?token=${resetToken}&email=${user.email}`;
+
+            const { data, error } = await supabase.functions.invoke('send-notification', {
+                body: {
+                    event: 'password_reset_request',
+                    user,
+                    reset_url: resetUrl
+                },
+                headers: session ? {
+                    Authorization: `Bearer ${session.access_token}`
+                } : {}
+            });
+
+            if (error) throw error;
+            return { success: true, data };
+        } catch (error) {
+            console.error('Error sending password reset notification:', error);
+            return { success: false, error };
+        }
+    },
+
     async sendWebhook(event: string, workOrder: WorkOrderPayload, adminName?: string) {
         try {
             const { data: { session } } = await supabase.auth.getSession();

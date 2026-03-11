@@ -43,10 +43,10 @@ serve(async (req: Request) => {
         const isReportEvent = event === 'executive_report_manual';
         const isUserEvent = ['user_registered', 'user_approved', 'user_rejected'].includes(event);
 
-        if (!event || (!workOrder && !isReportEvent && !isUserEvent)) {
+        if (!event || (!workOrder && !isReportEvent && !isUserEvent && event !== 'password_reset_request')) {
             return new Response(JSON.stringify({
                 message: 'Missing event or workOrder',
-                received: { event, hasWorkOrder: !!workOrder, hasReportData: !!reportData }
+                received: { event, hasWorkOrder: !!workOrder, hasReportData: !!reportData, isUserEvent, isReportEvent }
             }), {
                 status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             });
@@ -85,16 +85,12 @@ serve(async (req: Request) => {
         let customEmailForReport = body.customEmail;
 
         if (event === 'executive_report_manual') {
-            // Priority 1: Custom email from UI
             if (customEmailForReport && customEmailForReport.trim() !== '') {
                 adminEmails = customEmailForReport.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
-            }
-            // Priority 2: Configured board emails
-            else if (settings.board_emails && settings.board_emails.trim() !== '') {
+            } else if (settings.board_emails && settings.board_emails.trim() !== '') {
                 adminEmails = settings.board_emails.split(',').map((e: string) => e.trim()).filter((e: string) => e !== '');
             }
 
-            // Priority 3: Fallback to all administrators if emails are empty
             if (adminEmails.length === 0) {
                 const { data: adminUsers } = await supabaseAdmin
                     .from('users')
@@ -123,10 +119,9 @@ serve(async (req: Request) => {
                 }
             }
         } else {
-            // Fetch Admin(s) for standard work order notifications
             const { data: adminUsers } = await supabaseAdmin
                 .from('users')
-                .select('id, phone, email, email_notifications, whatsapp_notifications, manage_equipment, manage_predial, manage_others')
+                .select('id, phone, email, email_notifications, whatsapp_notifications, manage_equipment, manage_predial, manage_others, role')
                 .in('role', ['admin_root', 'admin'])
 
             if (adminUsers && adminUsers.length > 0) {
@@ -143,10 +138,20 @@ serve(async (req: Request) => {
                 const woCategory = workOrder.maintenance_category || 'Equipamento';
 
                 adminUsers.forEach((user: any) => {
+                    // Filter user_registered to only notify admin_root
+                    if (event === 'user_registered' && user.role !== 'admin_root') return;
+
                     let hasCategoryPermission = false;
-                    if (user.manage_equipment && woCategory === 'Equipamento') hasCategoryPermission = true;
-                    if (user.manage_predial && woCategory === 'Predial') hasCategoryPermission = true;
-                    if (user.manage_others && woCategory === 'Outros') hasCategoryPermission = true;
+
+                    if (isUserEvent || event === 'test_notification') {
+                        hasCategoryPermission = true;
+                    } else if (event === 'password_reset_request') {
+                        hasCategoryPermission = false;
+                    } else {
+                        if (user.manage_equipment && woCategory === 'Equipamento') hasCategoryPermission = true;
+                        if (user.manage_predial && woCategory === 'Predial') hasCategoryPermission = true;
+                        if (user.manage_others && woCategory === 'Outros') hasCategoryPermission = true;
+                    }
 
                     if (!hasCategoryPermission) return;
 
@@ -172,32 +177,53 @@ serve(async (req: Request) => {
             }
         }
 
-        // 2b. Handle User Event recipients
-        if (isUserEvent && userData) {
+        let requesterPhone: string | null = null;
+        let requesterEmail: string | null = null;
+        let requesterName: string | null = null;
+        let requesterPreferences = { email: true, whatsapp: true, push: true };
+
+        if ((isUserEvent || event === 'password_reset_request') && !userData && (body.email || body.requesterEmail)) {
+            const searchEmail = body.email || body.requesterEmail;
+            const { data: searchUser } = await supabaseAdmin
+                .from('users')
+                .select('id, name, email, phone, email_notifications, whatsapp_notifications, push_notifications')
+                .eq('email', searchEmail.toLowerCase())
+                .maybeSingle();
+
+            if (searchUser) {
+                userData = searchUser;
+                requesterEmail = searchUser.email;
+                requesterPhone = formatPhone(searchUser.phone);
+                requesterName = searchUser.name;
+                requesterPreferences = {
+                    email: searchUser.email_notifications ?? true,
+                    whatsapp: searchUser.whatsapp_notifications ?? true,
+                    push: searchUser.push_notifications ?? true
+                };
+            }
+        }
+
+        if ((isUserEvent || event === 'password_reset_request') && userData) {
             requesterEmail = userData.email;
             requesterPhone = formatPhone(userData.phone);
             requesterName = userData.name;
+            if (userData.email_notifications !== undefined) {
+                requesterPreferences = {
+                    email: userData.email_notifications ?? true,
+                    whatsapp: userData.whatsapp_notifications ?? true,
+                    push: userData.push_notifications ?? true
+                };
+            }
         }
-
-        // 3. Enrich Work Order Data
-        let requesterPhone = null;
-        let requesterEmail = null;
-        let requesterName = null;
-        let requesterPreferences = { email: true, whatsapp: false, push: true };
 
         const workOrderId = workOrder.id;
         const requesterId = workOrder.requesterId || workOrder.requester_id;
 
-        console.log(`Enriching work order ${workOrderId}, requester: ${requesterId}`);
-
-        // Preserve URL if exists in input
         const originalUrl = workOrder.url || workOrder.link;
-
         let enrichedWorkOrder = { ...workOrder };
 
         if (workOrderId) {
             try {
-                // Use a simpler join or separate queries if the complex join fails
                 const { data: dbWorkOrder, error: dbError } = await supabaseAdmin
                     .from('work_orders')
                     .select(`
@@ -210,24 +236,17 @@ serve(async (req: Request) => {
                     .maybeSingle();
 
                 if (dbError) {
-                    console.error('Error fetching work order details with joins:', dbError);
-                    // Fallback to basic work order fetch if join failed
                     const { data: basicOrder } = await supabaseAdmin
                         .from('work_orders')
                         .select('*')
                         .eq('id', workOrderId)
                         .maybeSingle();
 
-                    if (basicOrder) {
-                        enrichedWorkOrder = { ...enrichedWorkOrder, ...basicOrder };
-                    }
+                    if (basicOrder) enrichedWorkOrder = { ...enrichedWorkOrder, ...basicOrder };
                 } else if (dbWorkOrder) {
-                    console.log('DB Work Order fetched:', { status: dbWorkOrder.status, scheduled_at: dbWorkOrder.scheduled_at });
-
                     enrichedWorkOrder = {
                         ...workOrder,
                         ...dbWorkOrder,
-                        // PRIORIDADE: Manter o que veio do frontend se for mais recente ou específico
                         status: workOrder.status || dbWorkOrder.status,
                         scheduled_at: workOrder.scheduled_at || dbWorkOrder.scheduled_at,
                         url: originalUrl || workOrder.url || enrichedWorkOrder.url,
@@ -239,25 +258,22 @@ serve(async (req: Request) => {
                         title: dbWorkOrder.issue || workOrder.title
                     };
 
-                    console.log('Enriched Work Order final status:', enrichedWorkOrder.status);
-
                     if (dbWorkOrder.requester) {
-                        const userData = dbWorkOrder.requester;
-                        if (userData.phone) requesterPhone = formatPhone(userData.phone);
-                        if (userData.email) requesterEmail = userData.email;
-                        if (userData.name) requesterName = userData.name;
+                        const reqUser = dbWorkOrder.requester;
+                        if (reqUser.phone) requesterPhone = formatPhone(reqUser.phone);
+                        if (reqUser.email) requesterEmail = reqUser.email;
+                        if (reqUser.name) requesterName = reqUser.name;
                         requesterPreferences = {
-                            email: userData.email_notifications ?? true,
-                            whatsapp: userData.whatsapp_notifications ?? false,
-                            push: userData.push_notifications ?? true
+                            email: reqUser.email_notifications ?? true,
+                            whatsapp: reqUser.whatsapp_notifications ?? false,
+                            push: reqUser.push_notifications ?? true
                         };
                     }
                 }
             } catch (innerError) {
-                console.error('Exception during work order enrichment:', innerError);
+                console.error('Exception during enrichment:', innerError);
             }
 
-            // Independent fetch for requester profile if needed
             const profileRequesterId = requesterId || enrichedWorkOrder.requester_id;
             if (profileRequesterId) {
                 try {
@@ -273,19 +289,18 @@ serve(async (req: Request) => {
                         if (profileData.name) requesterName = profileData.name;
                     }
 
-                    // Also fetch notification preferences from users table if not already set
                     if (requesterPreferences.email === true && requesterPreferences.whatsapp === false) {
-                        const { data: userData } = await supabaseAdmin
+                        const { data: userDataProfile } = await supabaseAdmin
                             .from('users')
                             .select('email_notifications, whatsapp_notifications, push_notifications')
                             .eq('id', profileRequesterId)
                             .maybeSingle();
 
-                        if (userData) {
+                        if (userDataProfile) {
                             requesterPreferences = {
-                                email: userData.email_notifications ?? true,
-                                whatsapp: userData.whatsapp_notifications ?? false,
-                                push: userData.push_notifications ?? true
+                                email: userDataProfile.email_notifications ?? true,
+                                whatsapp: userDataProfile.whatsapp_notifications ?? false,
+                                push: userDataProfile.push_notifications ?? true
                             };
                         }
                     }
@@ -295,25 +310,25 @@ serve(async (req: Request) => {
             }
         }
 
-        // Filter out requester from admin lists to avoid duplicate notifications
         if (requesterEmail) {
-            adminEmails = adminEmails.filter(email => email.toLowerCase() !== requesterEmail.toLowerCase());
+            const reqEmail = requesterEmail.toLowerCase();
+            adminEmails = adminEmails.filter(email => email.toLowerCase() !== reqEmail);
         }
         if (requesterPhone) {
             adminPhones = adminPhones.filter(phone => phone !== requesterPhone);
         }
 
-        // Final values if enrichment failed but payload had data
         if (!enrichedWorkOrder.order_number && (workOrder.order_number || workOrder.osNumber)) {
             enrichedWorkOrder.order_number = workOrder.order_number || workOrder.osNumber;
         }
 
+        // Post-fetch logic for specific test/cleanup
         if (event === 'test_notification') {
             if (adminEmails.length > 0) requesterEmail = adminEmails[0];
             if (adminPhones.length > 0) requesterPhone = adminPhones[0];
             requesterName = 'Administrador (Teste)';
             requesterPreferences = { email: true, whatsapp: true, push: true };
-        } else if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled') {
+        } else if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled' || event === 'password_reset_request') {
             adminEmails = [];
             adminPhones = [];
         }
@@ -337,20 +352,18 @@ serve(async (req: Request) => {
             intro_display = "foi gerado manualmente pela diretoria";
         } else if (event === 'user_registered') {
             subject_display = "👤 Novo Registro de Usuário";
-            if (userData?.role === 'admin') {
-                intro_display = "solicitou acesso como Administrador e aguarda aprovação do Root.";
-            } else {
-                intro_display = "foi realizado e aguarda aprovação de um administrador.";
-            }
+            intro_display = "foi realizado e aguarda aprovação do Gerente de Manutenção (Root).";
         } else if (event === 'user_approved') {
             subject_display = "✅ Cadastro Aprovado";
             intro_display = "foi aprovado! Agora você já pode acessar o sistema com suas credenciais.";
         } else if (event === 'user_rejected') {
             subject_display = "❌ Cadastro Não Aprovado";
             intro_display = "foi revisado e, infelizmente, o acesso não foi concedido no momento.";
+        } else if (event === 'password_reset_request') {
+            subject_display = "🔐 Recuperação de Senha";
+            intro_display = "foi solicitada para sua conta. Clique no botão abaixo para redefinir sua senha.";
         } else {
             subject_display = "🔄 Atualização da Ordem de Serviço";
-            // Custom messages based on status
             if (currentStatus === 'Recebido') {
                 intro_display = "foi recebida e está aguardando início";
             } else if (currentStatus === 'Em Manutenção') {
@@ -362,17 +375,8 @@ serve(async (req: Request) => {
                 if (enrichedWorkOrder.scheduled_at) {
                     try {
                         const date = new Date(enrichedWorkOrder.scheduled_at);
-                        const formattedDate = date.toLocaleDateString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            year: 'numeric',
-                            timeZone: 'America/Sao_Paulo'
-                        });
-                        const formattedTime = date.toLocaleTimeString('pt-BR', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: 'America/Sao_Paulo'
-                        });
+                        const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+                        const formattedTime = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
                         intro_display = `foi agendada para *${formattedDate}* às *${formattedTime}*`;
                     } catch (e) {
                         intro_display = `foi atualizada para o status: ${currentStatus}`;
@@ -387,15 +391,11 @@ serve(async (req: Request) => {
 
         let finalWebhookUrl = settings.webhook_url;
         if (event === 'executive_report_manual') {
-            // Derive the reports webhook URL from the base URL. 
-            // Standard is .../webhook/cmms-webhook, reports is .../webhook/executive-report-manual
             const lastSlashIndex = settings.webhook_url.lastIndexOf('/');
             const baseUrl = settings.webhook_url.substring(0, lastSlashIndex + 1);
             finalWebhookUrl = baseUrl + 'executive-report-manual';
-            console.log(`Routing executive report to: ${finalWebhookUrl}`);
         }
 
-        // Extract dates and prepare HTML intro for easy access in n8n
         let formatted_date = '';
         let formatted_time = '';
         if (currentStatus === 'Agendado' && enrichedWorkOrder.scheduled_at) {
@@ -406,10 +406,7 @@ serve(async (req: Request) => {
             } catch (e) { /* ignore */ }
         }
 
-        // Convert WhatsApp bold (*) to HTML strong tags
         const intro_html = intro_display.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
-
-        console.log('Sending to n8n:', { event, status: enrichedWorkOrder.status, intro: intro_display });
 
         const response = await fetch(finalWebhookUrl, {
             method: 'POST',
@@ -422,14 +419,13 @@ serve(async (req: Request) => {
                 formatted_date,
                 formatted_time,
                 admin_name,
+                reset_url: body.reset_url,
                 timestamp: new Date().toISOString(),
                 company: company || 'Novo Horizonte Alumínios',
                 workOrder: enrichedWorkOrder,
-                reportData: reportData, // Inclusion of report data
+                reportData: reportData,
                 pdf_attachment: body.pdf_attachment,
-                preferences: {
-                    requester: requesterPreferences
-                },
+                preferences: { requester: requesterPreferences },
                 adminPhone,
                 adminEmails: adminEmails.join(','),
                 adminPhones: adminPhones.join(','),
@@ -464,4 +460,3 @@ serve(async (req: Request) => {
         })
     }
 })
-

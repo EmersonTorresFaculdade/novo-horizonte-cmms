@@ -379,15 +379,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             // 1. Verificar se o usuário existe
             const { data: userData, error: userError } = await supabase
                 .from('users')
-                .select('id, name')
+                .select('id, name, phone')
                 .eq('email', email)
                 .maybeSingle();
 
             if (userError) throw userError;
 
             if (!userData) {
-                // Por segurança, não confirmamos explicitamente que o email não existe
-                return { success: true };
+                return { success: false, error: 'Este e-mail não está cadastrado em nossa base.' };
             }
 
             // 2. Gerar Token de Reset
@@ -405,27 +404,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
             if (updateError) throw updateError;
 
-            // 3. Notificar via n8n (Integração que o usuário pediu)
-            // Vamos buscar a URL do webhook nas configurações
-            const { data: settings } = await supabase.from('app_settings').select('webhook_url').single();
-
-            if (settings?.webhook_url) {
-                try {
-                    await fetch(settings.webhook_url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            event: 'password_reset_request',
-                            name: userData.name,
-                            email: email,
-                            token: resetToken,
-                            url: `${window.location.origin}/#/reset-password?token=${resetToken}&email=${email}`
-                        })
-                    });
-                } catch (e) {
-                    console.error('Error calling n8n webhook:', e);
-                }
-            }
+            // 3. Notificar via NotificationService (usando Edge Function centralizada)
+            await NotificationService.notifyPasswordResetRequest({
+                id: userData.id,
+                name: userData.name,
+                email: email,
+                phone: userData.phone,
+                role: 'user', // Fallback standard
+                status: 'active'
+            }, resetToken);
 
             // 4. Também cria uma notificação interna para registro
             await supabase
