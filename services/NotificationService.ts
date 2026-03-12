@@ -132,5 +132,9 @@ export const NotificationService = {
             console.error(`[NotificationService] Exception em sendUserWebhook (${event}):`, error);
             return { success: false, error };
         }
+    },
+
+    async notifyPasswordChanged(user: UserPayload) {
+        await this.sendUserWebhook('password_changed', user);
     }
 };

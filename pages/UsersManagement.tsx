@@ -206,6 +206,16 @@ const UsersManagement = () => {
             const { success, error } = await resetUserPassword(editingUser.id, newPassword);
 
             if (success) {
+                // Notificar usuário sobre nova senha
+                await NotificationService.notifyPasswordChanged({
+                    id: editingUser.id,
+                    name: editingUser.name,
+                    email: editingUser.email,
+                    phone: editingUser.phone,
+                    role: editingUser.role,
+                    status: editingUser.status
+                });
+
                 setFeedback({
                     isOpen: true,
                     type: 'success',
@@ -390,7 +400,7 @@ const UsersManagement = () => {
                                             u.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-100' :
                                                 'bg-slate-50 text-slate-600 border-slate-100'
                                             }`}>
-                                            {u.role === 'admin_root' ? 'ADMINISTRADOR ROOT' : u.role === 'admin' ? 'ADMINISTRADOR DE OS' : 'USUÁRIO'}
+                                            {u.role === 'admin_root' ? 'Administrador Root' : u.role === 'admin' ? 'Administrador de OS' : 'Usuário'}
                                         </span>
                                     </td>
                                     <td className="px-8 py-5">
@@ -476,9 +486,9 @@ const UsersManagement = () => {
                                             onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
                                             className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner"
                                         >
-                                            <option value="user">USUÁRIO</option>
-                                            <option value="admin">ADMINISTRADOR DE OS</option>
-                                            <option value="admin_root">ADMINISTRADOR ROOT</option>
+                                            <option value="user">Usuário</option>
+                                            <option value="admin">Administrador de OS</option>
+                                            <option value="admin_root">Administrador Root</option>
                                         </select>
                                         <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 rotate-90 pointer-events-none" size={16} />
                                     </div>
