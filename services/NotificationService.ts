@@ -54,7 +54,7 @@ export const NotificationService = {
 
     async notifyPasswordResetRequest(user: UserPayload, resetToken: string) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const token = localStorage.getItem('auth_token');
             const resetUrl = `${window.location.origin}/#/reset-password?token=${resetToken}&email=${user.email}`;
 
             const { data, error } = await supabase.functions.invoke('send-notification', {
@@ -63,8 +63,8 @@ export const NotificationService = {
                     user,
                     reset_url: resetUrl
                 },
-                headers: session ? {
-                    Authorization: `Bearer ${session.access_token}`
+                headers: token ? {
+                    Authorization: `Bearer ${token}`
                 } : {}
             });
 
@@ -78,7 +78,8 @@ export const NotificationService = {
 
     async sendWebhook(event: string, workOrder: WorkOrderPayload, adminName?: string) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const token = localStorage.getItem('auth_token');
+            console.log(`[NotificationService] Enviando webhook: ${event} para OS ${workOrder.id}`);
 
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
@@ -89,37 +90,46 @@ export const NotificationService = {
                         url: `${window.location.origin}/#/work-orders/${workOrder.id}`
                     },
                 },
-                headers: session ? {
-                    Authorization: `Bearer ${session.access_token}`
+                headers: token ? {
+                    Authorization: `Bearer ${token}`
                 } : {}
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error(`[NotificationService] Erro invoke send-notification (${event}):`, error);
+                throw error;
+            }
+            console.log(`[NotificationService] Resposta do webhook (${event}):`, data);
             return { success: true, data };
         } catch (error) {
-            console.error('Error sending notification webhook:', error);
+            console.error(`[NotificationService] Exception em sendWebhook (${event}):`, error);
             return { success: false, error };
         }
     },
 
     async sendUserWebhook(event: string, user: UserPayload) {
         try {
-            const { data: { session } } = await supabase.auth.getSession();
+            const token = localStorage.getItem('auth_token');
+            console.log(`[NotificationService] Enviando webhook de usuário: ${event} para ${user.email}`);
 
             const { data, error } = await supabase.functions.invoke('send-notification', {
                 body: {
                     event,
                     user,
                 },
-                headers: session ? {
-                    Authorization: `Bearer ${session.access_token}`
+                headers: token ? {
+                    Authorization: `Bearer ${token}`
                 } : {}
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error(`[NotificationService] Erro invoke send-notification (${event}):`, error);
+                throw error;
+            }
+            console.log(`[NotificationService] Resposta do webhook de usuário (${event}):`, data);
             return { success: true, data };
         } catch (error) {
-            console.error('Error sending user notification webhook:', error);
+            console.error(`[NotificationService] Exception em sendUserWebhook (${event}):`, error);
             return { success: false, error };
         }
     }

@@ -67,8 +67,9 @@ const NewWorkOrder = () => {
 
   // Upload state
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url: string }[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<{ name: string; url: string; type: 'file' | 'url' }[]>([]);
   const [uploading, setUploading] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState('');
 
   // Quick Asset Registration State
   const [showQuickAdd, setShowQuickAdd] = useState(false);
@@ -184,17 +185,24 @@ const NewWorkOrder = () => {
           description: 'criou o chamado'
         });
 
-        await NotificationService.notifyWorkOrderCreated({
-          id: newOrder.id,
-          title: `Nova OS: ${newOrder.order_number}`,
-          description: issueDescription,
-          priority: priority,
-          status: 'Aberto',
-          assetId: selectedAssetId || undefined,
-          locationId: '',
-          assignedTo: null,
-          requesterId: user?.id
-        });
+        // Notificar (assíncrono e não bloqueante para o sucesso da OS)
+        try {
+          console.log('Enviando notificação de criação para OS:', newOrder.id);
+          await NotificationService.notifyWorkOrderCreated({
+            id: newOrder.id,
+            title: `Nova OS: ${newOrder.order_number}`,
+            description: issueDescription,
+            priority: priority,
+            status: 'Aberto',
+            assetId: selectedAssetId || undefined,
+            locationId: '',
+            assignedTo: null,
+            requesterId: user?.id
+          });
+          console.log('Notificação enviada com sucesso');
+        } catch (notifyErr) {
+          console.warn('Erro ao enviar notificação (não crítico):', notifyErr);
+        }
       }
 
       setFeedback({
@@ -221,14 +229,10 @@ const NewWorkOrder = () => {
   };
 
   const categoryIcons = [
-    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-emerald-50/50', border: 'border-primary/30', text: 'text-slate-900', iconColor: 'text-primary', permission: 'manage_equipment' },
-    { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary', permission: 'manage_predial' },
-    { id: 'Outros', icon: Box, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary', permission: 'manage_others' }
-  ].filter(cat => {
-    // Verifica permissão específica do perfil (incluindo administradores)
-    const permKey = cat.permission as keyof typeof user;
-    return user ? !!user[permKey] : true;
-  });
+    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-emerald-50/50', border: 'border-primary/30', text: 'text-slate-900', iconColor: 'text-primary' },
+    { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' },
+    { id: 'Outros', icon: Box, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' }
+  ];
 
   // Ajustar categoria inicial se a padrão (Equipamento) não estiver disponível
   useEffect(() => {
@@ -301,9 +305,17 @@ const NewWorkOrder = () => {
 
   const filteredAssets = assets
     .filter(asset => {
-      if (maintenanceCategory === 'Equipamento') return asset.category === 'Máquina';
-      if (maintenanceCategory === 'Predial') return asset.category === 'Predial';
-      if (maintenanceCategory === 'Outros') return asset.category === 'Outros';
+      const normCat = (asset.category || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+      
+      if (maintenanceCategory === 'Equipamento') {
+        return ['MÁQUINA', 'MAQUINA', 'MECÂNICA', 'MECANICA', 'EQUIPAMENTO', 'INDUSTRIAL'].includes(normCat);
+      }
+      if (maintenanceCategory === 'Predial') {
+        return ['PREDIAL', 'INFRAESTRUTURA', 'PREDIO', 'EDIFICAÇÃO', 'EDIFICACAO'].includes(normCat);
+      }
+      if (maintenanceCategory === 'Outros') {
+        return normCat === 'OUTROS';
+      }
       return false;
     })
     .filter(asset =>
@@ -392,148 +404,150 @@ const NewWorkOrder = () => {
           </div>
 
           {/* Section: Localização & Ativo */}
-          <div className={`bg-white rounded-[2.5rem] shadow-sm border border-slate-200 group/card transition-all hover:shadow-md ${!isAssetSelectorOpen ? 'overflow-hidden' : 'z-[50]'}`}>
-            <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
-              <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.15em] flex items-center gap-4">
-                <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
-                  <MapPin size={20} strokeWidth={2.5} />
-                </div>
-                Localização & Ativo
-              </h3>
-              <button
-                type="button"
-                onClick={() => setShowQuickAdd(!showQuickAdd)}
-                className="text-[10px] font-black text-primary hover:text-slate-900 flex items-center gap-2 transition-all bg-primary/10 px-4 py-2.5 rounded-full border border-primary/20 shadow-sm hover:shadow-black/10 active:scale-95"
-              >
-                {showQuickAdd ? <X size={12} /> : <Plus size={12} />}
-                {showQuickAdd ? 'CANCELAR' : 'CADASTRAR NOVO ATIVO'}
-              </button>
-            </div>
+          {maintenanceCategory !== 'Outros' && (
+            <div className={`bg-white rounded-[2.5rem] shadow-sm border border-slate-200 group/card transition-all hover:shadow-md ${!isAssetSelectorOpen ? 'overflow-hidden' : 'z-[50]'}`}>
+              <div className="px-10 py-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/20">
+                <h3 className="text-sm font-black text-slate-900 uppercase tracking-[0.15em] flex items-center gap-4">
+                  <div className="size-10 bg-primary/10 rounded-2xl flex items-center justify-center text-primary shadow-[inset_0_1px_2px_rgba(0,0,0,0.05)]">
+                    <MapPin size={20} strokeWidth={2.5} />
+                  </div>
+                  Localização & Ativo
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowQuickAdd(!showQuickAdd)}
+                  className="text-[10px] font-black text-primary hover:text-slate-900 flex items-center gap-2 transition-all bg-primary/10 px-4 py-2.5 rounded-full border border-primary/20 shadow-sm hover:shadow-black/10 active:scale-95"
+                >
+                  {showQuickAdd ? <X size={12} /> : <Plus size={12} />}
+                  {showQuickAdd ? 'CANCELAR' : 'CADASTRAR NOVO ATIVO'}
+                </button>
+              </div>
 
-            <div className="p-10 space-y-8">
-              {!showQuickAdd ? (
-                <div className="space-y-6">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Vínculo do Chamado <span className="text-brand-alert">*</span></label>
-                  <div className={`relative ${isAssetSelectorOpen ? 'z-[100]' : ''}`}>
-                    <button
-                      type="button"
-                      onClick={() => setIsAssetSelectorOpen(!isAssetSelectorOpen)}
-                      className="w-full px-8 py-6 bg-white border-2 border-slate-100 rounded-[1.5rem] text-sm outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary/30 transition-all font-bold flex items-center justify-between cursor-pointer group/btn"
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${selectedAssetId ? 'bg-primary text-slate-900 shadow-lg shadow-primary/20 scale-110' : 'bg-slate-100 text-slate-400'}`}>
-                          <Box size={20} />
-                        </div>
-                        <div className="text-left">
-                          <span className={`block text-sm font-black ${selectedAssetId ? 'text-slate-900' : 'text-slate-400'}`}>
-                            {selectedAsset ? selectedAsset.name : 'Selecione o equipamento...'}
-                          </span>
-                          {selectedAsset && (
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
-                              Código Interno: {selectedAsset.code}
+              <div className="p-10 space-y-8">
+                {!showQuickAdd ? (
+                  <div className="space-y-6">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] ml-1">Vínculo do Chamado <span className="text-brand-alert">*</span></label>
+                    <div className={`relative ${isAssetSelectorOpen ? 'z-[100]' : ''}`}>
+                      <button
+                        type="button"
+                        onClick={() => setIsAssetSelectorOpen(!isAssetSelectorOpen)}
+                        className="w-full px-8 py-6 bg-white border-2 border-slate-100 rounded-[1.5rem] text-sm outline-none focus:ring-8 focus:ring-primary/5 focus:border-primary/30 transition-all font-bold flex items-center justify-between cursor-pointer group/btn"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className={`size-10 rounded-xl flex items-center justify-center transition-all ${selectedAssetId ? 'bg-primary text-slate-900 shadow-lg shadow-primary/20 scale-110' : 'bg-slate-100 text-slate-400'}`}>
+                            <Box size={20} />
+                          </div>
+                          <div className="text-left">
+                            <span className={`block text-sm font-black ${selectedAssetId ? 'text-slate-900' : 'text-slate-400'}`}>
+                              {selectedAsset ? selectedAsset.name : 'Selecione o equipamento...'}
                             </span>
-                          )}
-                        </div>
-                      </div>
-                      <ChevronDown size={22} className={`text-slate-300 transition-transform duration-500 ${isAssetSelectorOpen ? 'rotate-180 text-primary' : ''}`} />
-                    </button>
-
-                    {isAssetSelectorOpen && (
-                      <div className="absolute z-[100] w-full mt-2 bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 ring-1 ring-slate-900/5">
-                        <div className="p-4 border-b border-slate-100 bg-white">
-                          <div className="relative">
-                            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
-                            <input
-                              type="text"
-                              placeholder="Filtre por nome, código ou setor..."
-                              value={assetSearchTerm}
-                              onChange={(e) => setAssetSearchTerm(e.target.value)}
-                              autoFocus
-                              className="w-full pl-12 pr-6 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-primary/40 font-bold transition-all"
-                            />
+                            {selectedAsset && (
+                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+                                Código Interno: {selectedAsset.code}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <div className="max-h-[320px] overflow-y-auto p-2 space-y-1">
-                          {filteredAssets.length > 0 ? (
-                            filteredAssets.map(asset => (
-                              <button
-                                type="button"
-                                key={asset.id}
-                                onClick={() => {
-                                  setSelectedAssetId(asset.id);
-                                  setIsAssetSelectorOpen(false);
-                                  setAssetSearchTerm('');
-                                }}
-                                className={`w-full text-left px-5 py-4 rounded-xl transition-all duration-200 group/item ${selectedAssetId === asset.id ? 'bg-primary text-slate-900 shadow-md' : 'hover:bg-slate-50 text-slate-700'}`}
-                              >
-                                <div className={`text-sm font-black uppercase tracking-tight mb-1 ${selectedAssetId === asset.id ? 'text-slate-900' : 'text-slate-900'}`}>{asset.name}</div>
-                                <div className={`text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-3 ${selectedAssetId === asset.id ? 'text-slate-600' : 'text-slate-400'}`}>
-                                  <span className="flex items-center gap-1.5"><Hash size={12} /> {asset.code}</span>
-                                  <span className="opacity-30">|</span>
-                                  <span className="flex items-center gap-1.5"><MapPin size={12} /> {asset.sector}</span>
-                                </div>
-                              </button>
-                            ))
-                          ) : (
-                            <div className="py-12 text-center">
-                              <Box size={40} className="mx-auto text-slate-200 mb-4 opacity-50" />
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Nenhum ativo localizado</p>
+                        <ChevronDown size={22} className={`text-slate-300 transition-transform duration-500 ${isAssetSelectorOpen ? 'rotate-180 text-primary' : ''}`} />
+                      </button>
+
+                      {isAssetSelectorOpen && (
+                        <div className="absolute z-[100] w-full mt-2 bg-white border border-slate-200 rounded-3xl shadow-2xl shadow-black/10 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300 ring-1 ring-slate-900/5">
+                          <div className="p-4 border-b border-slate-100 bg-white">
+                            <div className="relative">
+                              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                              <input
+                                type="text"
+                                placeholder="Filtre por nome, código ou setor..."
+                                value={assetSearchTerm}
+                                onChange={(e) => setAssetSearchTerm(e.target.value)}
+                                autoFocus
+                                className="w-full pl-12 pr-6 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:bg-white focus:border-primary/40 font-bold transition-all"
+                              />
                             </div>
-                          )}
+                          </div>
+                          <div className="max-h-[320px] overflow-y-auto p-2 space-y-1">
+                            {filteredAssets.length > 0 ? (
+                              filteredAssets.map(asset => (
+                                <button
+                                  type="button"
+                                  key={asset.id}
+                                  onClick={() => {
+                                    setSelectedAssetId(asset.id);
+                                    setIsAssetSelectorOpen(false);
+                                    setAssetSearchTerm('');
+                                  }}
+                                  className={`w-full text-left px-5 py-4 rounded-xl transition-all duration-200 group/item ${selectedAssetId === asset.id ? 'bg-primary text-slate-900 shadow-md' : 'hover:bg-slate-50 text-slate-700'}`}
+                                >
+                                  <div className={`text-sm font-black uppercase tracking-tight mb-1 ${selectedAssetId === asset.id ? 'text-slate-900' : 'text-slate-900'}`}>{asset.name}</div>
+                                  <div className={`text-[10px] font-bold uppercase tracking-[0.1em] flex items-center gap-3 ${selectedAssetId === asset.id ? 'text-slate-600' : 'text-slate-400'}`}>
+                                    <span className="flex items-center gap-1.5"><Hash size={12} /> {asset.code}</span>
+                                    <span className="opacity-30">|</span>
+                                    <span className="flex items-center gap-1.5"><MapPin size={12} /> {asset.sector}</span>
+                                  </div>
+                                </button>
+                              ))
+                            ) : (
+                              <div className="py-12 text-center">
+                                <Box size={40} className="mx-auto text-slate-200 mb-4 opacity-50" />
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Nenhum ativo localizado</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-primary/5 border-2 border-primary/20 rounded-[2.5rem] p-10 space-y-8 animate-in zoom-in-95 duration-500">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Identificação do Ativo</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Torno CNC Mazak"
+                          value={quickAssetData.name}
+                          onChange={(e) => setQuickAssetData({ ...quickAssetData, name: e.target.value })}
+                          className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
+                        />
                       </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-primary/5 border-2 border-primary/20 rounded-[2.5rem] p-10 space-y-8 animate-in zoom-in-95 duration-500">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Localização Técnica</label>
+                        <input
+                          type="text"
+                          placeholder="Ex: Usinagem - Galpão 02"
+                          value={quickAssetData.sector}
+                          onChange={(e) => setQuickAssetData({ ...quickAssetData, sector: e.target.value })}
+                          className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
+                        />
+                      </div>
+                    </div>
                     <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Identificação do Ativo</label>
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Documentação Fotográfica (URL)</label>
                       <input
                         type="text"
-                        placeholder="Ex: Torno CNC Mazak"
-                        value={quickAssetData.name}
-                        onChange={(e) => setQuickAssetData({ ...quickAssetData, name: e.target.value })}
+                        placeholder="https://cloud.com/maquina.jpg"
+                        value={quickAssetData.image_url}
+                        onChange={(e) => setQuickAssetData({ ...quickAssetData, image_url: e.target.value })}
                         className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
                       />
                     </div>
-                    <div className="space-y-3">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Localização Técnica</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Usinagem - Galpão 02"
-                        value={quickAssetData.sector}
-                        onChange={(e) => setQuickAssetData({ ...quickAssetData, sector: e.target.value })}
-                        className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
-                      />
+                    <div className="flex justify-end pt-4">
+                      <button
+                        type="button"
+                        onClick={handleQuickAddAsset}
+                        disabled={loading}
+                        className="px-10 py-5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.25em] rounded-2xl hover:bg-black transition-all flex items-center gap-3 shadow-xl shadow-black/20 disabled:opacity-50"
+                      >
+                        {loading ? <Loader2 size={18} className="animate-spin text-primary" /> : <Save size={18} className="text-primary" />}
+                        Efetivar Cadastro
+                      </button>
                     </div>
                   </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Documentação Fotográfica (URL)</label>
-                    <input
-                      type="text"
-                      placeholder="https://cloud.com/maquina.jpg"
-                      value={quickAssetData.image_url}
-                      onChange={(e) => setQuickAssetData({ ...quickAssetData, image_url: e.target.value })}
-                      className="w-full px-6 py-4 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
-                    />
-                  </div>
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="button"
-                      onClick={handleQuickAddAsset}
-                      disabled={loading}
-                      className="px-10 py-5 bg-slate-900 text-white text-[10px] font-black uppercase tracking-[0.25em] rounded-2xl hover:bg-black transition-all flex items-center gap-3 shadow-xl shadow-black/20 disabled:opacity-50"
-                    >
-                      {loading ? <Loader2 size={18} className="animate-spin text-primary" /> : <Save size={18} className="text-primary" />}
-                      Efetivar Cadastro
-                    </button>
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Section: Escopo & Evidências */}
           <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden group/card transition-all hover:shadow-md">
@@ -563,43 +577,33 @@ const NewWorkOrder = () => {
                   <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">{uploadedFiles.length}/4 Arquivos</span>
                 </div>
 
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={async (e) => {
-                    const files = e.target.files;
-                    if (!files || files.length === 0) return;
-                    setUploading(true);
-                    try {
-                      for (let i = 0; i < files.length; i++) {
-                        const file = files[i];
-                        const ext = file.name.split('.').pop();
-                        const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
-                        const filePath = `work-orders/${fileName}`;
-                        const { error: uploadError } = await supabase.storage
-                          .from('evidencias')
-                          .upload(filePath, file);
-                        if (uploadError) throw uploadError;
-                        const { data: urlData } = supabase.storage
-                          .from('evidencias')
-                          .getPublicUrl(filePath);
-                        setUploadedFiles(prev => [...prev, { name: file.name, url: urlData.publicUrl }]);
+                <div className="flex gap-4">
+                  <div className="flex-1 relative group">
+                    <div className="absolute inset-y-0 left-4 flex items-center text-slate-400">
+                      <Image size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="Colar link da imagem (URL)..."
+                      value={photoUrl}
+                      onChange={(e) => setPhotoUrl(e.target.value)}
+                      className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary/40 font-bold transition-all"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (photoUrl && uploadedFiles.length < 4) {
+                        setUploadedFiles(prev => [...prev, { name: 'URL Photo', url: photoUrl, type: 'url' }]);
+                        setPhotoUrl('');
                       }
-                    } catch (err: any) {
-                      setFeedback({
-                        type: 'error',
-                        title: 'Erro no Upload',
-                        message: err.message || 'Falha ao processar imagens.'
-                      });
-                    } finally {
-                      setUploading(false);
-                      if (fileInputRef.current) fileInputRef.current.value = '';
-                    }
-                  }}
-                />
+                    }}
+                    disabled={!photoUrl || uploadedFiles.length >= 4}
+                    className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all disabled:opacity-30 disabled:cursor-not-allowed shadow-lg shadow-black/10"
+                  >
+                    ADICIONAR URL
+                  </button>
+                </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
                   <button
@@ -616,12 +620,51 @@ const NewWorkOrder = () => {
                           <UploadCloud size={24} />
                         </div>
                         <div className="text-center">
-                          <span className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover/upload:text-primary">Anexar</span>
-                          <span className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover/upload:text-primary">Evidências</span>
+                          <span className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover/upload:text-primary">Upload</span>
+                          <span className="block text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] group-hover/upload:text-primary">Local</span>
                         </div>
                       </>
                     )}
                   </button>
+
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={async (e) => {
+                      const files = e.target.files;
+                      if (!files || files.length === 0) return;
+                      setUploading(true);
+                      try {
+                        for (let i = 0; i < files.length; i++) {
+                          const file = files[i];
+                          if (uploadedFiles.length + i >= 4) break;
+                          const ext = file.name.split('.').pop();
+                          const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${ext}`;
+                          const filePath = `work-orders/${fileName}`;
+                          const { error: uploadError } = await supabase.storage
+                            .from('evidencias')
+                            .upload(filePath, file);
+                          if (uploadError) throw uploadError;
+                          const { data: urlData } = supabase.storage
+                            .from('evidencias')
+                            .getPublicUrl(filePath);
+                          setUploadedFiles(prev => [...prev, { name: file.name, url: urlData.publicUrl, type: 'file' }]);
+                        }
+                      } catch (err: any) {
+                        setFeedback({
+                          type: 'error',
+                          title: 'Erro no Upload',
+                          message: err.message || 'Falha ao processar imagens.'
+                        });
+                      } finally {
+                        setUploading(false);
+                        if (fileInputRef.current) fileInputRef.current.value = '';
+                      }
+                    }}
+                  />
 
                   {uploadedFiles.map((file, idx) => (
                     <div key={idx} className="relative aspect-square rounded-[2rem] overflow-hidden border-2 border-slate-100 group/thumb shadow-sm hover:shadow-xl transition-all duration-500">
@@ -630,6 +673,11 @@ const NewWorkOrder = () => {
                         alt={file.name}
                         className="w-full h-full object-cover transition-transform duration-1000 group-hover/thumb:scale-125"
                       />
+                      <div className="absolute top-2 right-2 z-10">
+                        <span className="px-2 py-0.5 bg-slate-900/80 backdrop-blur-md text-[8px] text-white font-black uppercase tracking-widest rounded-full border border-white/20">
+                          {file.type}
+                        </span>
+                      </div>
                       <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-[2px] opacity-0 group-hover/thumb:opacity-100 transition-all flex items-center justify-center">
                         <button
                           type="button"

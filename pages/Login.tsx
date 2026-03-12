@@ -5,9 +5,11 @@ import { WhatsappIcon } from '../components/WhatsappIcon';
 import { useAuth, UserRole } from '../contexts/AuthContext';
 import { useSettings } from '../contexts/SettingsContext';
 import FeedbackModal from '../components/FeedbackModal';
+import { IMAGES } from '../constants';
 
 const Login = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, register } = useAuth();
   const { settings } = useSettings();
 
@@ -161,7 +163,7 @@ const Login = () => {
     if (registerRole === 'user') {
       return '👥 Qualquer Administrador de OS pode aprovar usuários comuns e técnicos';
     } else {
-      return '⚡ Apenas o Admin Root (Super Administrador) pode aprovar novos Administradores de OS';
+      return '⚡ Apenas o Administrador Root pode aprovar novos Administradores de OS';
     }
   };
 
@@ -484,8 +486,8 @@ const Login = () => {
                         onChange={(e) => setRegisterRole(e.target.value as any)}
                         className="block w-full rounded-xl border-2 border-slate-100 bg-slate-50 py-3.5 pl-11 text-slate-900 font-bold focus:border-primary focus:bg-white transition-all outline-none appearance-none"
                       >
-                        <option value="user">Técnico / Requerente</option>
-                        <option value="admin">Administrador de OS</option>
+                        <option value="user">USUÁRIO</option>
+                        <option value="admin">ADMINISTRADOR DE OS</option>
                       </select>
                     </div>
                     <p className="mt-1.5 text-[10px] text-slate-500 font-medium px-1">

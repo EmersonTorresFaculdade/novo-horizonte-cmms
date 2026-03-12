@@ -229,12 +229,7 @@ serve(async (req: Request) => {
             try {
                 const { data: dbWorkOrder, error: dbError } = await supabaseAdmin
                     .from('work_orders')
-                    .select(`
-                        *,
-                        asset:assets(name, code),
-                        technician:technicians!technician_id(name),
-                        requester:users!requester_id(name, email, phone, email_notifications, whatsapp_notifications, push_notifications)
-                    `)
+                    .select('*, asset:assets(name, code), technician:technicians!technician_id(name), requester:users!requester_id(name, email, phone, email_notifications, whatsapp_notifications, push_notifications)')
                     .eq('id', workOrderId)
                     .maybeSingle();
 

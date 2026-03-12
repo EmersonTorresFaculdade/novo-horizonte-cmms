@@ -27,13 +27,23 @@ Deno.serve(async (req) => {
         }
 
         const token = authHeader.replace(/^Bearer\s+/i, '')
-        const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token)
-        if (authError || !user) {
-            return new Response(JSON.stringify({ error: 'Unauthorized caller' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+
+        // CUSTOM SESSION VERIFICATION
+        const { data: sessionData, error: sessionError } = await supabaseAdmin
+            .from('user_sessions')
+            .select('user_id')
+            .eq('token', token)
+            .gt('expires_at', new Date().toISOString())
+            .maybeSingle()
+
+        if (sessionError || !sessionData) {
+            return new Response(JSON.stringify({ error: 'Unauthorized caller: invalid or expired session' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
+        const callerId = sessionData.user_id
+
         // Verify caller role in users table
-        const { data: callerData } = await supabaseAdmin.from('users').select('role').eq('id', user.id).single()
+        const { data: callerData } = await supabaseAdmin.from('users').select('role').eq('id', callerId).single()
         if (!callerData || (callerData.role !== 'admin' && callerData.role !== 'admin_root')) {
             return new Response(JSON.stringify({ error: 'Forbidden: caller is not admin' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
@@ -44,10 +54,9 @@ Deno.serve(async (req) => {
             return new Response(JSON.stringify({ error: 'Missing userId to delete' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
         }
 
-        // First delete from Auth
+        // First delete from Auth (if it exists there)
         const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(userId)
         if (deleteAuthError) {
-            // It might not exist in Auth, let's proceed to public anyway just in case
             console.log('Error deleting from auth.users (might not exist):', deleteAuthError)
         }
 

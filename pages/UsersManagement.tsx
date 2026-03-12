@@ -22,6 +22,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import FeedbackModal from '../components/FeedbackModal';
+import { NotificationService } from '../services/NotificationService';
 
 const UsersManagement = () => {
     const { isAdmin, resetUserPassword } = useAuth();
@@ -39,6 +40,7 @@ const UsersManagement = () => {
 
     // Modal Edit state
     const [editingUser, setEditingUser] = useState<any>(null);
+    const [originalUser, setOriginalUser] = useState<any>(null);
     const [showEditModal, setShowEditModal] = useState(false);
 
     // Modal Delete state
@@ -120,6 +122,7 @@ const UsersManagement = () => {
 
     const handleEditUser = (user: any) => {
         setEditingUser({ ...user });
+        setOriginalUser({ ...user });
         setShowEditModal(true);
     };
 
@@ -141,6 +144,36 @@ const UsersManagement = () => {
 
             if (error) throw error;
 
+            // Lógica de Notificação: Disparar quando o status muda de algo não-ativo para 'active'
+            // ou de algo não-bloqueado para 'blocked' (se original for pendente)
+            if (originalUser && originalUser.status !== editingUser.status) {
+                try {
+                    if (editingUser.status === 'active' && originalUser.status !== 'active') {
+                        console.log('Disparando notificação de aprovação para:', editingUser.email);
+                        await NotificationService.notifyUserApproved({
+                            id: editingUser.id,
+                            name: editingUser.name,
+                            email: editingUser.email,
+                            phone: editingUser.phone,
+                            role: editingUser.role,
+                            status: editingUser.status
+                        });
+                    } else if (editingUser.status === 'blocked' && originalUser.status === 'pending') {
+                        console.log('Disparando notificação de rejeição para:', editingUser.email);
+                        await NotificationService.notifyUserRejected({
+                            id: editingUser.id,
+                            name: editingUser.name,
+                            email: editingUser.email,
+                            phone: editingUser.phone,
+                            role: editingUser.role,
+                            status: editingUser.status
+                        });
+                    }
+                } catch (notifyErr) {
+                    console.warn('Erro ao enviar notificação de status:', notifyErr);
+                }
+            }
+
             setFeedback({
                 isOpen: true,
                 type: 'success',
@@ -151,6 +184,7 @@ const UsersManagement = () => {
             // Refresh local list
             setUsers(prev => prev.map(u => u.id === editingUser.id ? editingUser : u));
             setShowEditModal(false);
+            setOriginalUser(null);
         } catch (error) {
             console.error('Error updating user:', error);
             setFeedback({
@@ -206,7 +240,10 @@ const UsersManagement = () => {
         try {
             setIsSaving(true);
             const { error, data } = await supabase.functions.invoke('delete-user', {
-                body: { userId: userToDelete.id }
+                body: { userId: userToDelete.id },
+                headers: {
+                    Authorization: `Bearer ${localStorage.getItem('auth_token')}`
+                }
             });
             if (error) throw error;
             if (data?.error) throw new Error(data.error);
@@ -218,13 +255,23 @@ const UsersManagement = () => {
                 title: 'Usuário Removido',
                 message: 'O usuário foi excluído com sucesso.'
             });
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error deleting user:', error);
+
+            let errorMessage = 'Não foi possível excluir o usuário.';
+            if (error.status === 401) {
+                errorMessage = 'Sua sessão expirou para esta ação sensível. Por favor, saia e entre novamente no sistema.';
+            } else if (error.message?.includes('vínculos')) {
+                errorMessage = 'O usuário possui vínculos com Ordens de Serviço e não pode ser removido por segurança.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+
             setFeedback({
                 isOpen: true,
                 type: 'error',
                 title: 'Erro ao Remover',
-                message: 'Não foi possível excluir o usuário. Verifique se ele não possui vínculos com OS.'
+                message: errorMessage
             });
         } finally {
             setIsSaving(false);
@@ -251,120 +298,126 @@ const UsersManagement = () => {
     }
 
     return (
-        <div className="space-y-6">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-3">
-                        <Users className="text-primary" size={32} />
-                        Gestão de Usuários
-                    </h1>
-                    <p className="text-slate-500 mt-1">Gerencie permissões, setores e acessos dos usuários do sistema.</p>
-                </div>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Header com efeito Glassmorphism */}
+            <header className="relative p-8 rounded-3xl bg-white/40 backdrop-blur-md border border-white/20 shadow-xl overflow-hidden group">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl transition-all duration-1000 group-hover:bg-primary/10"></div>
+                <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/5 rounded-full -ml-24 -mb-24 blur-3xl transition-all duration-1000 group-hover:bg-blue-500/10"></div>
 
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input
-                            type="text"
-                            placeholder="Buscar por nome ou email..."
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                            className="pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all w-64 text-sm"
-                        />
+                <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div>
+                        <div className="flex items-center gap-4 mb-2">
+                            <div className="p-3 bg-primary/10 rounded-2xl">
+                                <Users className="text-primary" size={32} />
+                            </div>
+                            <h1 className="text-4xl font-black text-slate-900 tracking-tight">
+                                Gestão de Usuários
+                            </h1>
+                        </div>
+                        <p className="text-slate-500 font-medium">Controle total sobre acessos, permissões e segurança operacional.</p>
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                        <div className="relative group/search">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within/search:text-primary" size={20} />
+                            <input
+                                type="text"
+                                placeholder="Buscar colaborador..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                className="pl-12 pr-6 py-3 bg-white/80 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all w-72 text-sm font-medium shadow-sm"
+                            />
+                        </div>
                     </div>
                 </div>
             </header>
 
-            <div className="bg-white rounded-xl border border-slate-100 shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-slate-100 flex items-center gap-4 overflow-x-auto">
-                    <button
-                        onClick={() => setFilterStatus('all')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'all' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        Todos
-                    </button>
-                    <button
-                        onClick={() => setFilterStatus('active')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'active' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        Ativos
-                    </button>
-                    <button
-                        onClick={() => setFilterStatus('pending')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'pending' ? 'bg-amber-500 text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        Pendentes
-                    </button>
-                    <button
-                        onClick={() => setFilterStatus('blocked')}
-                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${filterStatus === 'blocked' ? 'bg-brand-alert text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'}`}
-                    >
-                        Bloqueados
-                    </button>
+            {/* Listagem Premium */}
+            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-2xl overflow-hidden">
+                <div className="p-6 border-b border-slate-100 flex items-center gap-3 overflow-x-auto bg-slate-50/50">
+                    {[
+                        { id: 'all', label: 'Todos', activeClass: 'bg-slate-900 text-white shadow-slate-900/20' },
+                        { id: 'active', label: 'Ativos', activeClass: 'bg-emerald-500 text-white shadow-emerald-500/20' },
+                        { id: 'pending', label: 'Pendentes', activeClass: 'bg-amber-500 text-white shadow-amber-500/20' },
+                        { id: 'blocked', label: 'Bloqueados', activeClass: 'bg-brand-alert text-white shadow-brand-alert/20' }
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setFilterStatus(tab.id)}
+                            className={`px-6 py-2.5 rounded-xl text-sm font-black transition-all whitespace-nowrap shadow-sm hover:scale-105 active:scale-95 ${filterStatus === tab.id ? tab.activeClass + ' shadow-lg' : 'bg-white text-slate-500 hover:bg-slate-100'}`}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">
-                        <thead className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
+                        <thead className="bg-slate-50/80 text-slate-500 text-[11px] font-black uppercase tracking-[0.2em] border-b border-slate-100">
                             <tr>
-                                <th className="px-6 py-4">Usuário</th>
-                                <th className="px-6 py-4">Função</th>
-                                <th className="px-6 py-4">Setores Permissionados</th>
-                                <th className="px-6 py-4">Status</th>
-                                <th className="px-6 py-4 text-right">Ações</th>
+                                <th className="px-8 py-5">Perfil</th>
+                                <th className="px-8 py-5 text-center">Nível</th>
+                                <th className="px-8 py-5 text-center">Permissões OS</th>
+                                <th className="px-8 py-5 text-center">Status</th>
+                                <th className="px-8 py-5 text-right">Ações</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-50">
-                            {filteredUsers.map(u => (
-                                <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="size-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-600 border border-slate-200 overflow-hidden">
-                                                {u.avatar_url ? (
-                                                    <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
-                                                ) : (
-                                                    u.name.charAt(0).toUpperCase()
-                                                )}
+                            {filteredUsers.map((u, index) => (
+                                <tr key={u.id} className="group/row hover:bg-slate-50/80 transition-all duration-300" style={{ animationDelay: `${index * 50}ms` }}>
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative">
+                                                <div className="size-12 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center font-black text-slate-600 border-2 border-white shadow-inner overflow-hidden transform group-hover/row:scale-110 transition-transform duration-500">
+                                                    {u.avatar_url ? (
+                                                        <img src={u.avatar_url} alt={u.name} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        u.name.charAt(0).toUpperCase()
+                                                    )}
+                                                </div>
+                                                <div className={`absolute -bottom-1 -right-1 size-4 rounded-full border-2 border-white shadow-sm ${u.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300'}`}></div>
                                             </div>
                                             <div>
-                                                <p className="font-bold text-slate-900 leading-none mb-1">{u.name}</p>
-                                                <p className="text-xs text-slate-500 flex items-center gap-1">
-                                                    <Mail size={12} /> {u.email}
+                                                <p className="font-black text-slate-900 leading-tight mb-0.5">{u.name}</p>
+                                                <p className="text-xs text-slate-400 font-medium flex items-center gap-1.5">
+                                                    <Mail size={12} className="opacity-50" /> {u.email}
                                                 </p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className="text-xs font-semibold px-2 py-1 bg-slate-100 rounded text-slate-600">
-                                            {u.role === 'admin_root' ? 'Admin Root' : u.role === 'admin' ? 'Administrador de OS' : 'Usuário / Solicitante'}
+                                    <td className="px-8 py-5 text-center">
+                                        <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border shadow-sm ${u.role === 'admin_root' ? 'bg-indigo-50 text-indigo-700 border-indigo-100' :
+                                            u.role === 'admin' ? 'bg-blue-50 text-blue-700 border-blue-100' :
+                                                'bg-slate-50 text-slate-600 border-slate-100'
+                                            }`}>
+                                            {u.role === 'admin_root' ? 'ADMINISTRADOR ROOT' : u.role === 'admin' ? 'ADMINISTRADOR DE OS' : 'USUÁRIO'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex gap-1">
-                                            {u.manage_equipment && <span className="size-2 rounded-full bg-primary" title="Mecânica"></span>}
-                                            {u.manage_predial && <span className="size-2 rounded-full bg-orange-500" title="Predial"></span>}
-                                            {u.manage_others && <span className="size-2 rounded-full bg-slate-400" title="Outros"></span>}
-                                            {(!u.manage_equipment && !u.manage_predial && !u.manage_others) && <span className="text-[10px] text-slate-400 italic">Nenhum</span>}
+                                    <td className="px-8 py-5">
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_equipment ? 'bg-primary scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Equipamentos"></div>
+                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_predial ? 'bg-orange-500 scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Predial"></div>
+                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_others ? 'bg-slate-500 scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Outros"></div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <span className={`text-[10px] font-black uppercase tracking-wider px-2 py-1 rounded-full ${getStatusBadge(u.status)}`}>
+                                    <td className="px-8 py-5 text-center">
+                                        <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm ${getStatusBadge(u.status)}`}>
                                             {u.status === 'active' ? 'Ativo' : u.status === 'pending' ? 'Pendente' : 'Bloqueado'}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex items-center justify-end gap-2">
+                                    <td className="px-8 py-5 text-right">
+                                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover/row:opacity-100 transition-opacity duration-300">
                                             <button
                                                 onClick={() => handleEditUser(u)}
-                                                className="p-2 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all"
+                                                className="p-2.5 bg-white text-slate-400 hover:text-primary hover:bg-primary/5 rounded-xl border border-slate-100 shadow-sm transition-all active:scale-90"
                                                 title="Configurar Usuário"
                                             >
                                                 <Settings size={20} />
                                             </button>
                                             <button
                                                 onClick={() => confirmDelete(u)}
-                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                title="Rejeitar / Excluir permanentemente"
+                                                className="p-2.5 bg-white text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-xl border border-slate-100 shadow-sm transition-all active:scale-90"
+                                                title="Excluir Colaborador"
                                             >
                                                 <Trash2 size={20} />
                                             </button>
@@ -376,20 +429,25 @@ const UsersManagement = () => {
                     </table>
 
                     {filteredUsers.length === 0 && (
-                        <div className="p-12 text-center text-slate-500 italic">
-                            Nenhum usuário encontrado com os filtros aplicados.
+                        <div className="p-20 text-center">
+                            <div className="size-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-slate-100">
+                                <Search className="text-slate-300" size={32} />
+                            </div>
+                            <h3 className="text-lg font-black text-slate-900 mb-1">Nenhum resultado</h3>
+                            <p className="text-slate-500 font-medium">Não encontramos usuários com os filtros selecionados.</p>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Edit User Modal */}
+            {/* Edit User Modal - Redesigned Premium */}
             {showEditModal && editingUser && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                            <div className="flex items-center gap-4">
-                                <div className="size-12 rounded-full bg-white flex items-center justify-center font-bold text-slate-600 border border-slate-200 overflow-hidden shadow-sm">
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                    <div className="bg-white rounded-[2.5rem] shadow-2xl w-full max-w-xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-300 border border-white/20">
+                        {/* Modal Header */}
+                        <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                            <div className="flex items-center gap-5">
+                                <div className="size-16 rounded-[1.25rem] bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center font-black text-white shadow-xl shadow-primary/30 border-2 border-white overflow-hidden">
                                     {editingUser.avatar_url ? (
                                         <img src={editingUser.avatar_url} alt={editingUser.name} className="w-full h-full object-cover" />
                                     ) : (
@@ -397,139 +455,155 @@ const UsersManagement = () => {
                                     )}
                                 </div>
                                 <div>
-                                    <h3 className="text-xl font-black text-slate-900 tracking-tight">Configurar Usuário</h3>
-                                    <p className="text-sm text-slate-500">{editingUser.name}</p>
+                                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Configurar Acesso</h3>
+                                    <p className="text-slate-500 font-bold">{editingUser.name}</p>
                                 </div>
                             </div>
-                            <button onClick={() => setShowEditModal(false)} className="size-8 flex items-center justify-center rounded-full hover:bg-slate-200 text-slate-400 transition-colors">
+                            <button onClick={() => setShowEditModal(false)} className="size-10 flex items-center justify-center rounded-full bg-white hover:bg-slate-100 text-slate-400 border border-slate-100 transition-all active:scale-90 shadow-sm">
                                 <X size={20} />
                             </button>
                         </div>
 
-                        <div className="p-6 space-y-6 overflow-y-auto max-h-[70vh]">
-                            {/* Role & Status */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Função</label>
-                                    <select
-                                        value={editingUser.role}
-                                        onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700"
-                                    >
-                                        <option value="user">Usuário / Solicitante</option>
-                                        <option value="admin">Administrador de OS</option>
-                                        <option value="admin_root">Admin Root</option>
-                                    </select>
+                        {/* Modal Body */}
+                        <div className="p-8 space-y-8 overflow-y-auto max-h-[60vh] custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Função Hierárquica</label>
+                                    <div className="relative">
+                                        <Shield className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                                        <select
+                                            value={editingUser.role}
+                                            onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner"
+                                        >
+                                            <option value="user">USUÁRIO</option>
+                                            <option value="admin">ADMINISTRADOR DE OS</option>
+                                            <option value="admin_root">ADMINISTRADOR ROOT</option>
+                                        </select>
+                                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 rotate-90 pointer-events-none" size={16} />
+                                    </div>
                                 </div>
-                                <div>
-                                    <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">Status</label>
-                                    <select
-                                        value={editingUser.status}
-                                        onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
-                                        className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all font-medium text-slate-700"
-                                    >
-                                        <option value="active">Ativo</option>
-                                        <option value="pending">Pendente / Aguardando</option>
-                                        <option value="blocked">Bloqueado / Inativo</option>
-                                    </select>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Situação da Conta</label>
+                                    <div className="relative">
+                                        <div className={`absolute left-4 top-1/2 -translate-y-1/2 size-3 rounded-full ${editingUser.status === 'active' ? 'bg-emerald-500' : 'bg-slate-300 shadow-sm'}`}></div>
+                                        <select
+                                            value={editingUser.status}
+                                            onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
+                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner"
+                                        >
+                                            <option value="active">ATIVO</option>
+                                            <option value="pending">PENDENTE</option>
+                                            <option value="blocked">BLOQUEADO</option>
+                                        </select>
+                                        <ChevronRight className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 rotate-90 pointer-events-none" size={16} />
+                                    </div>
                                 </div>
                             </div>
 
-                            <hr className="border-slate-100" />
+                            <div className="space-y-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h4 className="font-black text-slate-900 tracking-tight">Permissões de Abertura (OS)</h4>
+                                    <span className="text-[10px] font-black text-primary px-2 py-1 bg-primary/5 rounded-lg border border-primary/10">ÁREAS DE ATUAÇÃO</span>
+                                </div>
 
-                            {/* Sector Permissions */}
-                            <div>
-                                <h4 className="font-bold text-slate-900 mb-1">Setores Autorizados</h4>
-                                <p className="text-xs text-slate-500 mb-4">Define quais áreas este usuário pode abrirOrdens de Serviço.</p>
-
-                                <div className="space-y-3">
+                                <div className="grid grid-cols-1 gap-3">
                                     {[
-                                        { id: 'manage_equipment', label: 'Mecânica / Equipamentos', desc: 'Permite abrir OS para máquinas industriais' },
-                                        { id: 'manage_predial', label: 'Predial / Infraestrutura', desc: 'Permite abrir OS de manutenção predial' },
-                                        { id: 'manage_others', label: 'Outros / Serviços', desc: 'Permite abrir OS de serviços diversos' }
+                                        { id: 'manage_equipment', label: 'Mecânica & Equipamentos', desc: 'Máquinas Industriais, Pneumática, Elétrica', icon: <Settings size={18} />, color: 'bg-primary' },
+                                        { id: 'manage_predial', label: 'Predial & Infraestrutura', desc: 'Civil, Hidráulica, Ar Condicionado', icon: <Settings size={18} />, color: 'bg-orange-500' },
+                                        { id: 'manage_others', label: 'Diversos & Serviços', desc: 'Pintura, Jardinagem, Zeladoria', icon: <Settings size={18} />, color: 'bg-slate-500' }
                                     ].map((sector) => (
-                                        <div key={sector.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all">
-                                            <div>
-                                                <p className="font-bold text-slate-900 text-sm">{sector.label}</p>
-                                                <p className="text-[10px] text-slate-500">{sector.desc}</p>
+                                        <label key={sector.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50/30 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer group/item">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`p-2.5 rounded-xl ${editingUser[sector.id] ? sector.color + ' text-white shadow-lg' : 'bg-white text-slate-300 border border-slate-100'} transition-all duration-300`}>
+                                                    {sector.icon}
+                                                </div>
+                                                <div>
+                                                    <p className={`font-black text-sm transition-colors ${editingUser[sector.id] ? 'text-slate-900' : 'text-slate-400'}`}>{sector.label}</p>
+                                                    <p className="text-[10px] text-slate-400 font-bold">{sector.desc}</p>
+                                                </div>
                                             </div>
-                                            <label className="relative inline-flex items-center cursor-pointer">
+                                            <div className="relative inline-flex items-center cursor-pointer">
                                                 <input
                                                     type="checkbox"
                                                     checked={editingUser[sector.id] ?? true}
                                                     onChange={e => setEditingUser({ ...editingUser, [sector.id]: e.target.checked })}
                                                     className="sr-only peer"
                                                 />
-                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                                            </label>
-                                        </div>
+                                                <div className="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary shadow-inner"></div>
+                                            </div>
+                                        </label>
                                     ))}
                                 </div>
                             </div>
 
-                            <hr className="border-slate-100" />
+                            {/* Segurança */}
+                            <div className="p-6 bg-slate-900 rounded-3xl space-y-5 shadow-2xl shadow-slate-900/20 relative overflow-hidden group/security">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16 blur-2xl transition-all duration-500 group-hover/security:bg-white/10"></div>
 
-                            {/* Password Reset Section */}
-                            <div className="p-4 bg-slate-50 rounded-xl border border-slate-100 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-slate-900 font-bold">
-                                        <Lock size={18} className="text-primary" />
-                                        <span className="text-sm">Segurança da Conta</span>
+                                <div className="flex items-center justify-between relative">
+                                    <div className="flex items-center gap-3">
+                                        <div className="p-2 bg-white/10 rounded-xl">
+                                            <Lock size={18} className="text-primary" />
+                                        </div>
+                                        <span className="text-sm font-black text-white tracking-wide">Segurança & Redefinição</span>
                                     </div>
                                     <button
                                         type="button"
                                         onClick={() => setShowPasswordField(!showPasswordField)}
-                                        className="text-[10px] font-black uppercase tracking-wider text-primary hover:underline"
+                                        className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg transition-all ${showPasswordField ? 'bg-red-500 text-white' : 'bg-white/10 text-white hover:bg-white/20 border border-white/10'}`}
                                     >
-                                        {showPasswordField ? 'Cancelar' : 'Alterar Senha'}
+                                        {showPasswordField ? 'Cancelar' : 'Nova Senha'}
                                     </button>
                                 </div>
 
                                 {showPasswordField && (
-                                    <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
-                                        <div className="relative">
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4 duration-300 relative">
+                                        <div className="relative group/input">
                                             <input
                                                 type={showPassword ? 'text' : 'password'}
                                                 value={newPassword}
                                                 onChange={e => setNewPassword(e.target.value)}
-                                                placeholder="Digite a nova senha..."
-                                                className="w-full pl-4 pr-10 py-2 bg-white border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-primary/20 transition-all text-sm font-medium"
+                                                placeholder="Digite a nova senha segura..."
+                                                className="w-full pl-5 pr-12 py-3.5 bg-white/5 border border-white/10 rounded-2xl outline-none focus:ring-4 focus:ring-primary/20 focus:border-primary transition-all text-sm font-bold text-white placeholder:text-slate-500"
                                             />
                                             <button
                                                 type="button"
                                                 onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors p-1"
                                             >
-                                                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                             </button>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={handleResetPassword}
                                             disabled={!newPassword || isSaving}
-                                            className="w-full py-2 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50"
+                                            className="w-full py-3.5 bg-primary text-white rounded-2xl text-xs font-black shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                         >
-                                            Confirmar Nova Senha
+                                            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
+                                            REDEFINIR SENHA AGORA
                                         </button>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                        {/* Footer */}
+                        <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-4 shadow-[0_-10px_20px_rgba(0,0,0,0.02)]">
                             <button
                                 onClick={() => setShowEditModal(false)}
-                                className="px-6 py-2.5 text-slate-600 font-bold hover:bg-slate-200 rounded-xl transition-all"
+                                className="px-8 py-3.5 text-slate-500 font-black hover:bg-slate-200 rounded-2xl transition-all active:scale-95"
                             >
-                                Cancelar
+                                DESCARTAR
                             </button>
                             <button
                                 onClick={handleSavePermissions}
                                 disabled={isSaving}
-                                className="px-8 py-2.5 bg-primary text-white font-black rounded-xl hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center gap-2 disabled:opacity-50"
+                                className="px-12 py-3.5 bg-primary text-white font-black rounded-2xl hover:bg-primary-dark transition-all shadow-xl shadow-primary/25 active:scale-95 flex items-center gap-3 disabled:opacity-50"
                             >
                                 {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Check size={20} />}
-                                {isSaving ? 'Salvando...' : 'Salvar Configurações'}
+                                {isSaving ? 'SALVANDO...' : 'CONFIRMAR AJUSTES'}
                             </button>
                         </div>
                     </div>

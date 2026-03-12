@@ -194,10 +194,10 @@ const Dashboard = () => {
           const canManagePred = user?.manage_predial && isCategory(cat, 'PRE');
           const canManageOthers = user?.manage_others && isCategory(cat, 'OTR');
 
-          if (isCommonAdmin) return canManageEquip || canManagePred || canManageOthers;
+          const isManagerOfCat = canManageEquip || canManagePred || canManageOthers;
+          const isRequester = o.requester_id === user?.id;
 
-          // Technical User (Technician/Requester)
-          return o.requester_id === user?.id && (canManageEquip || canManagePred || canManageOthers);
+          return isManagerOfCat || isRequester;
         });
       }
       setOrders(filteredOrders);

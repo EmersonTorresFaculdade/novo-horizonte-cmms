@@ -14,7 +14,8 @@ import {
   Trash2,
   Pencil,
   Search,
-  X
+  X,
+  Image as ImageIcon
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -32,6 +33,7 @@ interface WorkOrder {
   priority: string;
   sector: string;
   date: string;
+  photos?: string[];
   created_at?: string;
   asset_id: string;
   technician_id?: string;
@@ -85,6 +87,7 @@ const WorkOrders = () => {
         .from('work_orders')
         .select(`
                 *,
+                photos,
                 failure_type,
                 maintenance_type,
                 assets (id, name, model, code, sector),
@@ -102,22 +105,16 @@ const WorkOrders = () => {
       if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
 
       if (!isAdminRoot) {
-        if (isCommonAdmin) {
-          // Admin sees all in their managed categories
-          if (managedCats.length > 0) {
-            query = query.in('maintenance_category', managedCats);
-          } else {
-            query = query.eq('maintenance_category', 'NONE');
-          }
-        } else {
-          // Common user sees only their OWN in their managed categories
-          query = query.eq('requester_id', user?.id || '');
-          if (managedCats.length > 0) {
-            query = query.in('maintenance_category', managedCats);
-          } else {
-            query = query.eq('maintenance_category', 'NONE');
-          }
+        // Users see OS they requested OR OS in categories they manage
+        let filterString = `requester_id.eq.${user?.id}`;
+        
+        if (managedCats.length > 0) {
+          // Add managed categories to the OR filter
+          const catList = managedCats.map(c => `"${c}"`).join(',');
+          filterString += `,maintenance_category.in.(${catList})`;
         }
+        
+        query = query.or(filterString);
       }
 
       const { data, error } = await query;
@@ -380,7 +377,12 @@ const WorkOrders = () => {
                     <tbody className="divide-y divide-slate-100">
                       {filteredOrders.map((order) => (
                         <tr key={order.id} onClick={() => navigate(`/work-orders/${order.id}`)} className="group hover:bg-slate-50 transition-colors cursor-pointer">
-                          <td className="p-4 text-sm font-medium text-primary">#{order.order_number}</td>
+                          <td className="p-4 text-sm font-medium text-primary">
+                            <div className="flex items-center gap-2">
+                              #{order.order_number}
+                              {order.photos && order.photos.length > 0 && <ImageIcon size={14} className="text-slate-400" title={`${order.photos.length} foto(s) anexada(s)`} />}
+                            </div>
+                          </td>
                           <td className="p-4">
                             <div className="flex flex-col">
                               <span className="text-sm font-semibold text-slate-900">{order.assets?.name || 'Geral'}</span>
@@ -501,7 +503,10 @@ const WorkOrders = () => {
                             </div>
                           )}
                         </div>
-                        <h4 className="font-bold text-slate-900 text-sm mb-1 mt-1">{order.assets?.name || 'Geral'}</h4>
+                        <div className="flex justify-between items-center mb-1 mt-1">
+                          <h4 className="font-bold text-slate-900 text-sm">{order.assets?.name || 'Geral'}</h4>
+                          {order.photos && order.photos.length > 0 && <ImageIcon size={14} className="text-slate-400" />}
+                        </div>
                         <div className="mb-3 flex items-center gap-2 flex-wrap">
                           <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-md border shadow-sm ${formatCategory(order.maintenance_category) === 'MÁQUINA'
                             ? 'bg-blue-50 text-blue-700 border-blue-200/50'

@@ -38,21 +38,32 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
   const { unreadCount } = useNotifications();
 
   const [openOrdersCount, setOpenOrdersCount] = useState<number>(0);
+  const [pendingUsersCount, setPendingUsersCount] = useState<number>(0);
   const [showHelp, setShowHelp] = useState(false);
 
   React.useEffect(() => {
     fetchOpenOrdersCount();
+    fetchPendingUsersCount();
 
     // Subscribe to changes in work_orders table
-    const channel = supabase
+    const ordersChannel = supabase
       .channel('work_orders_count')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'work_orders' }, () => {
         fetchOpenOrdersCount();
       })
       .subscribe();
 
+    // Subscribe to changes in users table (for approval count)
+    const usersChannel = supabase
+      .channel('users_pending_count')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => {
+        fetchPendingUsersCount();
+      })
+      .subscribe();
+
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(ordersChannel);
+      supabase.removeChannel(usersChannel);
     };
   }, []);
 
@@ -98,6 +109,22 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
       setOpenOrdersCount(count || 0);
     } catch (err) {
       console.error('Error fetching open orders count:', err);
+    }
+  };
+
+  const fetchPendingUsersCount = async () => {
+    try {
+      if (user?.role !== 'admin_root') return;
+
+      const { count, error } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+
+      if (error) throw error;
+      setPendingUsersCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching pending users count:', err);
     }
   };
 
@@ -304,6 +331,11 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                   >
                     <Clock size={20} />
                     <span className="text-sm font-medium">Aprovações</span>
+                    {pendingUsersCount > 0 && (
+                      <span className="ml-auto bg-brand-alert text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center animate-pulse">
+                        {pendingUsersCount}
+                      </span>
+                    )}
                   </NavLink>
                 </>
               )}

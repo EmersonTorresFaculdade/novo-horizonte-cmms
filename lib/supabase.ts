@@ -11,6 +11,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
 const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
 
 // Client sem tipagem para tabelas não geradas (ex: work_order_activities)
-const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey);
+// Desabilitamos o auth aqui para evitar o aviso "Multiple GoTrueClient instances detected"
+const supabaseUntyped = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+        persistSession: false,
+        autoRefreshToken: false,
+        detectSessionInUrl: false
+    }
+});
 
 export { supabase, supabaseUntyped };

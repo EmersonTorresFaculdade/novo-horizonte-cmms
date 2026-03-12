@@ -357,17 +357,17 @@ const Profile = () => {
 
                             <h3 className="text-xl font-black text-slate-900 mt-4 tracking-tight">{profileData.name}</h3>
                             <p className="text-sm font-bold text-primary">
-                                {user?.role === 'admin_root' ? 'Admin Root' :
+                                {user?.role === 'admin_root' ? 'Administrador Root' :
                                     user?.role === 'admin' ? 'Administrador de OS' :
-                                        'Usuário / Solicitante'}
+                                        'Usuário'}
                             </p>
 
                             <div className="flex flex-wrap items-center justify-center gap-2 mt-3 mb-2">
                                 <span className="px-3 py-1 bg-gradient-to-r from-emerald-500/10 to-emerald-500/5 text-emerald-600 font-black text-[10px] uppercase tracking-widest rounded-full border border-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)] flex items-center gap-1.5">
                                     <Award size={12} className="text-emerald-500" />
-                                    {user?.role === 'admin_root' ? 'GESTOR MASTER' :
-                                        user?.role === 'admin' ? 'ESPECIALISTA OPERACIONAL' :
-                                            'COLABORADOR'}
+                                    {user?.role === 'admin_root' ? 'ADMINISTRADOR ROOT' :
+                                        user?.role === 'admin' ? 'ADMINISTRADOR DE OS' :
+                                            'USUÁRIO'}
                                 </span>
                                 <span className="px-3 py-1 bg-gradient-to-r from-blue-500/10 to-indigo-500/5 text-blue-600 font-black text-[10px] uppercase tracking-widest rounded-full border border-blue-500/20 shadow-[0_0_15px_rgba(59,130,246,0.15)] flex items-center gap-1.5">
                                     <Shield size={12} className="text-blue-500" />

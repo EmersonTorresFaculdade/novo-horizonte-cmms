@@ -59,6 +59,7 @@ interface WorkOrder {
    hourly_rate?: number;
    created_at: string;
    updated_at: string;
+   photos?: string[];
    asset_id?: string;
    third_party_company_id?: string | null;
    maintenance_category?: string;
@@ -354,6 +355,7 @@ const WorkOrderDetails = () => {
             .from('work_orders')
             .select(`
                 *,
+                photos,
                 assets (name, sector, category, model, manufacturer, code, warranty_expires_at, image_url),
                 technicians (name),
                 third_party_companies (name),
@@ -361,11 +363,21 @@ const WorkOrderDetails = () => {
             `)
             .eq('id', id);
 
-         if (!isAdmin && user?.id) {
-            query = query.eq('requester_id', user.id);
-         }
+          if (user?.role !== 'admin_root') {
+            const managedCats: string[] = [];
+            if (user?.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA');
+            if (user?.manage_predial) managedCats.push('Predial', 'PREDIAL');
+            if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
+            
+            let filterString = `requester_id.eq.${user?.id}`;
+            if (managedCats.length > 0) {
+              const catList = managedCats.map(c => `"${c}"`).join(',');
+              filterString += `,maintenance_category.in.(${catList})`;
+            }
+            query = query.or(filterString);
+          }
 
-         const { data, error } = await query.single();
+          const { data, error } = await query.single();
 
          if (error) throw error;
          console.log('DEBUG: Raw Supabase Data:', data);
@@ -624,8 +636,11 @@ const WorkOrderDetails = () => {
             await logActivity('assignment', `designou ${currentTechName || 'Nenhum'}`);
          }
 
-         // Notificar sobre atualização - Agora dispara se status mudou OU se o agendamento mudou (para Agendado)
-         if (workOrder && (isStatusChanged || (isScheduleChanged && finalStatus === 'Agendado'))) {
+         // Notificar sobre atualização - Agora dispara se status mudou, agendamento mudou, relatório mudou ou técnico mudou
+         const isReportChanged = workOrder?.technical_report !== report;
+         const isTechChanged = workOrder?.technician_id !== selectedTechId;
+
+         if (workOrder && (isStatusChanged || isScheduleChanged || isReportChanged || isTechChanged)) {
             await NotificationService.notifyWorkOrderUpdated({
                id: workOrder.id,
                title: `Atualização OS: ${workOrder.order_number}`,
@@ -899,6 +914,29 @@ const WorkOrderDetails = () => {
                                  "{workOrder.issue}"
                               </div>
                            </div>
+
+                           {workOrder.photos && workOrder.photos.length > 0 && (
+                              <div className="space-y-4 pt-6 mt-6 border-t border-slate-100">
+                                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3 ml-1">Galeria de Evidências</p>
+                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                                    {workOrder.photos.map((photo, idx) => (
+                                       <a
+                                          key={idx}
+                                          href={photo}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="aspect-square rounded-2xl overflow-hidden border-2 border-slate-100 group/photo hover:border-primary/50 transition-all shadow-sm"
+                                       >
+                                          <img
+                                             src={photo}
+                                             alt={`Evidência ${idx + 1}`}
+                                             className="w-full h-full object-cover group-hover/photo:scale-110 transition-transform duration-700"
+                                          />
+                                       </a>
+                                    ))}
+                                 </div>
+                              </div>
+                           )}
                         </div>
                      </div>
 

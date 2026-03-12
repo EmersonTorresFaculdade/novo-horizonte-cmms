@@ -5,7 +5,7 @@ import { NotificationService } from '../services/NotificationService';
 
 // Tipos
 export type UserRole = 'admin_root' | 'admin' | 'user';
-export type UserStatus = 'pending' | 'active' | 'inactive';
+export type UserStatus = 'pending' | 'active' | 'blocked';
 
 export interface User {
     id: string;
@@ -82,7 +82,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .select('*, users(*)')
                 .eq('token', token)
                 .gt('expires_at', new Date().toISOString())
-                .single();
+                .maybeSingle();
 
             if (error || !session) {
                 localStorage.removeItem('auth_token');
@@ -107,7 +107,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .from('users')
                 .select('*')
                 .or(`email.eq.${trimmedIdentifier},username.eq.${trimmedIdentifier}`)
-                .single();
+                .maybeSingle();
 
             if (userError || !userData) {
                 return { success: false, error: 'Usuário ou senha inválidos' };
@@ -205,7 +205,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                     daily_report: true
                 })
                 .select()
-                .single();
+                .maybeSingle();
 
             if (insertError || !newUser) {
                 console.error('Insert error:', insertError);
@@ -307,14 +307,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .single();
 
             if (finalUser) {
-                await NotificationService.notifyUserApproved({
-                    id: finalUser.id,
-                    name: finalUser.name,
-                    email: finalUser.email,
-                    phone: finalUser.phone,
-                    role: finalUser.role,
-                    status: finalUser.status
-                });
+                try {
+                    await NotificationService.notifyUserApproved({
+                        id: finalUser.id,
+                        name: finalUser.name,
+                        email: finalUser.email,
+                        phone: finalUser.phone,
+                        role: finalUser.role,
+                        status: finalUser.status
+                    });
+                } catch (notifyErr) {
+                    console.warn('Erro ao notificar aprovação:', notifyErr);
+                }
             }
 
             return { success: true };
@@ -329,7 +333,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             const { error } = await supabase
                 .from('users')
                 .update({
-                    status: 'inactive',
+                    status: 'blocked',
                     approved_at: new Date().toISOString(),
                     approved_by: user?.id
                 })
@@ -345,14 +349,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 .single();
 
             if (finalUser) {
-                await NotificationService.notifyUserRejected({
-                    id: finalUser.id,
-                    name: finalUser.name,
-                    email: finalUser.email,
-                    phone: finalUser.phone,
-                    role: finalUser.role,
-                    status: finalUser.status
-                });
+                try {
+                    await NotificationService.notifyUserRejected({
+                        id: finalUser.id,
+                        name: finalUser.name,
+                        email: finalUser.email,
+                        phone: finalUser.phone,
+                        role: finalUser.role,
+                        status: finalUser.status
+                    });
+                } catch (notifyErr) {
+                    console.warn('Erro ao notificar rejeição:', notifyErr);
+                }
             }
 
             return { success: true };
