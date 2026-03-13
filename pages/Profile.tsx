@@ -20,7 +20,7 @@ import { supabase } from '../lib/supabase';
 import { useProfile } from '../contexts/ProfileContext';
 
 import { useAuth } from '../contexts/AuthContext';
-import { Eye, EyeOff, BellRing, Smartphone, Settings, SlidersHorizontal, Settings2, Award } from 'lucide-react';
+import { Eye, EyeOff, BellRing, Smartphone, Settings, SlidersHorizontal, Settings2, Award, Wrench, Building2, LayoutGrid } from 'lucide-react';
 import { WhatsappIcon } from '../components/WhatsappIcon';
 import FeedbackModal from '../components/FeedbackModal';
 import { useSettings } from '../contexts/SettingsContext';
@@ -865,14 +865,19 @@ const Profile = () => {
                                 <p className="text-sm text-slate-500">Selecione quais setores você gerencia. Ao ativar um setor, você terá acesso à gestão de suas Ordens de Serviço, Ativos correspondentes, e será notificado sobre as atividades deste setor.</p>
                                 <div className="space-y-2 mt-4">
                                     {[
-                                        { id: 'manageEquipment', label: 'Máquinas', color: 'bg-primary' },
-                                        { id: 'managePredial', label: 'Predial', color: 'bg-indigo-500' },
-                                        { id: 'manageOthers', label: 'Outros', color: 'bg-slate-500' }
+                                        { id: 'manageEquipment', label: 'Mecânica & Equipamentos', desc: 'Máquinas Industriais, Pneumática, Elétrica', icon: <Wrench size={18} />, color: 'bg-primary' },
+                                        { id: 'managePredial', label: 'Predial & Infraestrutura', desc: 'Civil, Hidráulica, Ar Condicionado', icon: <Building2 size={18} />, color: 'bg-indigo-500' },
+                                        { id: 'manageOthers', label: 'Diversos & Serviços', desc: 'Pintura, Jardinagem, Zeladoria', icon: <LayoutGrid size={18} />, color: 'bg-slate-500' }
                                     ].map((s) => (
-                                        <div key={s.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all font-medium text-sm">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`size-2 rounded-full ${s.color}`} />
-                                                <span className="text-slate-700">{s.label}</span>
+                                        <div key={s.id} className="flex items-center justify-between p-4 rounded-xl border border-slate-100 hover:bg-slate-50 transition-all">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`p-2.5 rounded-xl ${(notificationSettings as any)[s.id] ? s.color + ' text-white shadow-lg' : 'bg-white text-slate-300 border border-slate-100'} transition-all duration-300`}>
+                                                    {s.icon}
+                                                </div>
+                                                <div>
+                                                    <p className={`font-black text-sm transition-colors ${(notificationSettings as any)[s.id] ? 'text-slate-900' : 'text-slate-400'}`}>{s.label}</p>
+                                                    <p className="text-[10px] text-slate-400 font-bold">{s.desc}</p>
+                                                </div>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">
                                                 <input

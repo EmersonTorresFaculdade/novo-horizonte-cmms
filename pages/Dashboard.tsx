@@ -26,7 +26,9 @@ import {
   Shield,
   BookOpen,
   FileSearch,
-  LifeBuoy
+  LifeBuoy,
+  Building2,
+  LayoutGrid
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, Legend } from 'recharts';
 import { supabase } from '../lib/supabase';
@@ -668,10 +670,16 @@ const Dashboard = () => {
                   {supportAdmins.length > 0 ? (
                     supportAdmins.map((adm) => (
                       <div key={adm.id} className="space-y-6 pt-4 first:pt-0 border-t first:border-0 border-slate-50">
-                        <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-3 mb-2">
                           <span className="text-[10px] font-black text-primary uppercase tracking-widest bg-primary/5 px-2 py-0.5 rounded-md">
                             {adm.name}
                           </span>
+                          <div className="flex items-center gap-1.5 opacity-60">
+                            {adm.role === 'admin_root' && <Shield size={12} className="text-secondary" title="Diretoria" />}
+                            {adm.manage_equipment && <Wrench size={12} className="text-primary" title="Mecânica" />}
+                            {adm.manage_predial && <Building2 size={12} className="text-indigo-500" title="Predial" />}
+                            {adm.manage_others && <LayoutGrid size={12} className="text-slate-500" title="Outros" />}
+                          </div>
                         </div>
                         {adm.phone && (
                           <a href={`https://wa.me/${adm.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-5 group cursor-pointer no-underline">

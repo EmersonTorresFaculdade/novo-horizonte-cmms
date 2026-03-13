@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Users,
     Search,
@@ -17,7 +17,11 @@ import {
     Lock,
     Eye,
     EyeOff,
-    Trash2
+    Trash2,
+    Wrench,
+    Building2,
+    LayoutGrid,
+    Camera
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -26,6 +30,7 @@ import { NotificationService } from '../services/NotificationService';
 
 const UsersManagement = () => {
     const { isAdmin, resetUserPassword } = useAuth();
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<any[]>([]);
     const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
@@ -90,8 +95,8 @@ const UsersManagement = () => {
             // Mesclar as fotos nos usuários
             const mergedUsers = (usersData || []).map(u => ({
                 ...u,
-                // Prioriza o avatar do perfil, se existir, senão usa avatar_url da tabela users
-                avatar_url: profilesData?.find(p => p.id === u.id)?.avatar || u.avatar_url
+                // Prioriza o avatar salvo na tabela user_profiles (base64), senão usa avatar_url legada da tabela users
+                avatar_url: (profilesData?.find(p => p.id === u.id) as any)?.avatar || (u as any).avatar_url
             }));
 
             setUsers(mergedUsers);
@@ -126,12 +131,24 @@ const UsersManagement = () => {
         setShowEditModal(true);
     };
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && editingUser) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setEditingUser({ ...editingUser, avatar_url: reader.result as string, avatar_changed: true });
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     const handleSavePermissions = async () => {
         if (!editingUser) return;
 
         try {
             setIsSaving(true);
-            const { error } = await supabase
+            // 1. Atualizar dados básicos e permissões na tabela 'users'
+            const { error: usersError } = await supabase
                 .from('users')
                 .update({
                     manage_equipment: editingUser.manage_equipment,
@@ -142,7 +159,21 @@ const UsersManagement = () => {
                 })
                 .eq('id', editingUser.id);
 
-            if (error) throw error;
+            if (usersError) throw usersError;
+
+            // 2. Atualizar avatar na tabela 'user_profiles' se houver alteração
+            if (editingUser.avatar_changed) {
+                const { error: profileError } = await supabase
+                    .from('user_profiles')
+                    .upsert({
+                        id: editingUser.id,
+                        avatar: editingUser.avatar_url,
+                        name: editingUser.name, // Manter nome sincronizado
+                        email: editingUser.email
+                    });
+                
+                if (profileError) console.error('Erro ao salvar avatar:', profileError);
+            }
 
             // Lógica de Notificação: Disparar quando o status muda de algo não-ativo para 'active'
             // ou de algo não-bloqueado para 'blocked' (se original for pendente)
@@ -404,10 +435,10 @@ const UsersManagement = () => {
                                         </span>
                                     </td>
                                     <td className="px-8 py-5">
-                                        <div className="flex items-center justify-center gap-1.5">
-                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_equipment ? 'bg-primary scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Equipamentos"></div>
-                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_predial ? 'bg-orange-500 scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Predial"></div>
-                                            <div className={`size-3 rounded-full shadow-sm transition-all ${u.manage_others ? 'bg-slate-500 scale-110' : 'bg-slate-100 border border-slate-200'}`} title="Outros"></div>
+                                        <div className="flex items-center justify-center gap-3">
+                                            <Wrench size={14} className={`transition-all ${u.manage_equipment ? 'text-primary' : 'text-slate-200'}`} title="Equipamentos" />
+                                            <Building2 size={14} className={`transition-all ${u.manage_predial ? 'text-orange-500' : 'text-slate-200'}`} title="Predial" />
+                                            <LayoutGrid size={14} className={`transition-all ${u.manage_others ? 'text-slate-500' : 'text-slate-200'}`} title="Outros" />
                                         </div>
                                     </td>
                                     <td className="px-8 py-5 text-center">
@@ -457,12 +488,25 @@ const UsersManagement = () => {
                         {/* Modal Header */}
                         <div className="p-8 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                             <div className="flex items-center gap-5">
-                                <div className="size-16 rounded-[1.25rem] bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center font-black text-white shadow-xl shadow-primary/30 border-2 border-white overflow-hidden">
+                                <div 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="size-20 rounded-[1.5rem] bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center font-black text-white shadow-xl shadow-primary/30 border-2 border-white overflow-hidden cursor-pointer relative group"
+                                >
                                     {editingUser.avatar_url ? (
-                                        <img src={editingUser.avatar_url} alt={editingUser.name} className="w-full h-full object-cover" />
+                                        <img src={editingUser.avatar_url} alt={editingUser.name} className="w-full h-full object-cover group-hover:opacity-50 transition-opacity" />
                                     ) : (
-                                        editingUser.name.charAt(0).toUpperCase()
+                                        <span className="text-2xl">{editingUser.name.charAt(0).toUpperCase()}</span>
                                     )}
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
+                                        <Camera size={24} className="text-white" />
+                                    </div>
+                                    <input 
+                                        type="file" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        accept="image/*" 
+                                        onChange={handleFileChange} 
+                                    />
                                 </div>
                                 <div>
                                     <h3 className="text-2xl font-black text-slate-900 tracking-tight">Configurar Acesso</h3>
@@ -519,9 +563,9 @@ const UsersManagement = () => {
 
                                 <div className="grid grid-cols-1 gap-3">
                                     {[
-                                        { id: 'manage_equipment', label: 'Mecânica & Equipamentos', desc: 'Máquinas Industriais, Pneumática, Elétrica', icon: <Settings size={18} />, color: 'bg-primary' },
-                                        { id: 'manage_predial', label: 'Predial & Infraestrutura', desc: 'Civil, Hidráulica, Ar Condicionado', icon: <Settings size={18} />, color: 'bg-orange-500' },
-                                        { id: 'manage_others', label: 'Diversos & Serviços', desc: 'Pintura, Jardinagem, Zeladoria', icon: <Settings size={18} />, color: 'bg-slate-500' }
+                                        { id: 'manage_equipment', label: 'Mecânica & Equipamentos', desc: 'Máquinas Industriais, Pneumática, Elétrica', icon: <Wrench size={18} />, color: 'bg-primary' },
+                                        { id: 'manage_predial', label: 'Predial & Infraestrutura', desc: 'Civil, Hidráulica, Ar Condicionado', icon: <Building2 size={18} />, color: 'bg-orange-500' },
+                                        { id: 'manage_others', label: 'Diversos & Serviços', desc: 'Pintura, Jardinagem, Zeladoria', icon: <LayoutGrid size={18} />, color: 'bg-slate-500' }
                                     ].map((sector) => (
                                         <label key={sector.id} className="flex items-center justify-between p-4 rounded-2xl border border-slate-100 bg-slate-50/30 hover:bg-slate-50 hover:border-slate-200 transition-all cursor-pointer group/item">
                                             <div className="flex items-center gap-4">
