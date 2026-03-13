@@ -161,17 +161,33 @@ const Dashboard = () => {
       setLoading(true);
       const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
 
+      let ordersQuery = supabase.from('work_orders')
+        .select(`
+          *,
+          assets (*),
+          technicians (name),
+          third_party_companies (name)
+        `)
+        .gte('created_at', sixMonthsAgo)
+        .order('date', { ascending: false });
+
+      if (user?.role !== 'admin_root') {
+        const managedCats: string[] = [];
+        if (user?.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA', 'INDUSTRIAL', 'MECÂNICA', 'EQUIPAMENTO', 'MAQUINA');
+        if (user?.manage_predial) managedCats.push('Predial', 'PREDIAL', 'INFRAESTRUTURA', 'PRÉDIO', 'PREDIO');
+        if (user?.manage_others) managedCats.push('Outros', 'OUTROS');
+        
+        let filterString = `requester_id.eq.${user?.id}`;
+        if (managedCats.length > 0) {
+          const catList = managedCats.map(c => `"${c}"`).join(',');
+          filterString += `,maintenance_category.in.(${catList})`;
+        }
+        ordersQuery = ordersQuery.or(filterString);
+      }
+
       const [{ data: assetsData }, { data: allOrders }] = await Promise.all([
         supabase.from('assets').select('*'),
-        supabase.from('work_orders')
-          .select(`
-            *,
-            assets (*),
-            technicians (name),
-            third_party_companies (name)
-          `)
-          .gte('created_at', sixMonthsAgo)
-          .order('date', { ascending: false })
+        ordersQuery
       ]);
 
       if (!allOrders) return;
@@ -361,17 +377,25 @@ const Dashboard = () => {
       const { data: adminList } = await supabase
         .from('users')
         .select('*')
-        .eq('role', 'admin')
+        .in('role', ['admin', 'admin_root'])
         .eq('status', 'active');
 
       if (adminList) {
-        const matchingAdmins = adminList.filter(adm => {
+        let matchingAdmins = adminList.filter(adm => {
           if (user?.manage_equipment && adm.manage_equipment) return true;
           if (user?.manage_predial && adm.manage_predial) return true;
           if (user?.manage_others && adm.manage_others) return true;
           return false;
         });
+
+        // Se não encontrar nenhum específico, inclui os Admin Root como suporte geral
+        if (matchingAdmins.length === 0) {
+          matchingAdmins = adminList.filter(adm => adm.role === 'admin_root');
+        }
+
         setSupportAdmins(matchingAdmins);
+      } else {
+        setSupportAdmins([]);
       }
 
       // --- Predictive Analysis Logic ---
@@ -686,15 +710,24 @@ const Dashboard = () => {
                 </div>
                 <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest mb-8 border-b border-slate-100 pb-4">Centro de Excelência</h4>
                 <div className="grid grid-cols-2 gap-4">
-                  <button className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group">
+                  <button 
+                    onClick={() => navigate('/knowledge')}
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group"
+                  >
                     <BookOpen size={32} className="text-primary mb-3 group-hover:scale-110 transition-transform" />
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Manuais</span>
                   </button>
-                  <button className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group">
+                  <button 
+                    onClick={() => navigate('/knowledge')}
+                    className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-2xl border border-slate-100 hover:bg-primary/5 hover:border-primary/20 transition-all group"
+                  >
                     <FileSearch size={32} className="text-blue-500 mb-3 group-hover:scale-110 transition-transform" />
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">POPs</span>
                   </button>
-                  <button className="col-span-2 flex items-center justify-center gap-4 p-5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-md group">
+                  <button 
+                    onClick={() => navigate('/knowledge')}
+                    className="col-span-2 flex items-center justify-center gap-4 p-5 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition-all shadow-md group"
+                  >
                     <LifeBuoy size={24} className="text-primary group-hover:rotate-45 transition-transform" />
                     <span className="text-xs font-black uppercase tracking-widest">Base de Conhecimento FAQ</span>
                   </button>

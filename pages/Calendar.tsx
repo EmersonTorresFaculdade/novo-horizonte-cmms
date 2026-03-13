@@ -124,6 +124,8 @@ const Calendar = () => {
   const fetchEvents = async () => {
     setLoading(true);
     try {
+      if (!user) return;
+
       let query = supabase
         .from('work_orders')
         .select(`
@@ -134,8 +136,19 @@ const Calendar = () => {
             `)
         .order('date', { ascending: true });
 
-      if (!isAdmin && user?.id) {
-        query = query.eq('requester_id', user.id);
+      if (user.role !== 'admin_root') {
+        const managedCats: string[] = [];
+        // Normalizamos as categorias conforme o padrão do sistema
+        if (user.manage_equipment) managedCats.push('Equipamento', 'MÁQUINA', 'INDUSTRIAL', 'MECÂNICA');
+        if (user.manage_predial) managedCats.push('Predial', 'PREDIAL', 'INFRAESTRUTURA', 'PRÉDIO');
+        if (user.manage_others) managedCats.push('Outros', 'OUTROS');
+        
+        let filterString = `requester_id.eq.${user.id}`;
+        if (managedCats.length > 0) {
+          const catList = managedCats.map(c => `"${c}"`).join(',');
+          filterString += `,maintenance_category.in.(${catList})`;
+        }
+        query = query.or(filterString);
       }
 
       const { data, error } = await query;
@@ -211,14 +224,30 @@ const Calendar = () => {
     return days;
   };
 
+  // Helper for category matching with normalization
+  const isCategoryMatch = (catName: string, type: 'IND' | 'PRE' | 'OTR') => {
+    const norm = (catName || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+    if (type === 'IND') return ['EQUIPAMENTO', 'MAQUINA', 'INDUSTRIAL', 'MECANICA'].includes(norm);
+    if (type === 'PRE') return ['PREDIAL', 'INFRAESTRUTURA', 'PREDIO'].includes(norm);
+    if (type === 'OTR') return norm === 'OUTROS';
+    return false;
+  };
+
   // 1. First filter by permission (global for this user)
   const permittedEvents = events.filter(e => {
-    const allowedCategories: string[] = [];
-    if (user?.manage_equipment) allowedCategories.push('Equipamento');
-    if (user?.manage_predial) allowedCategories.push('Predial');
-    if (user?.manage_others) allowedCategories.push('Outros');
+    // Admin Root sees everything
+    if (user?.role === 'admin_root') return true;
 
-    return allowedCategories.includes(e.maintenance_category || 'Equipamento');
+    // Others see if they are the requester
+    if (e.requester_id === user?.id) return true;
+
+    // Or if they have permission for the category
+    const cat = e.maintenance_category || 'Equipamento';
+    const canManageEquip = user?.manage_equipment && isCategoryMatch(cat, 'IND');
+    const canManagePred = user?.manage_predial && isCategoryMatch(cat, 'PRE');
+    const canManageOthers = user?.manage_others && isCategoryMatch(cat, 'OTR');
+
+    return canManageEquip || canManagePred || canManageOthers;
   });
 
   // 2. Then apply UI filters (search, status, etc) for the Agenda/List view

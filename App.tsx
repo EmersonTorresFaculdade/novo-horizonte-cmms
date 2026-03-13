@@ -26,6 +26,7 @@ import { NotificationsProvider } from './contexts/NotificationsContext';
 import { SettingsProvider } from './contexts/SettingsContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import ResetPassword from './pages/ResetPassword';
+import KnowledgeHub from './pages/KnowledgeHub';
 
 const App = () => {
   return (
@@ -59,6 +60,7 @@ const App = () => {
                   <Route path="/profile" element={<Profile />} />
                   <Route path="/calendar" element={<Calendar />} />
                   <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/knowledge" element={<KnowledgeHub />} />
 
                   {/* Admin Only Routes */}
                   <Route path="/assets" element={
