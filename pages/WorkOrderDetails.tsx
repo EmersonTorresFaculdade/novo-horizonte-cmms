@@ -159,6 +159,9 @@ const WorkOrderDetails = () => {
    const [extraCosts, setExtraCosts] = useState<{ type: 'part' | 'labor' | 'other'; invoice: string; amount: number; description?: string }[]>([]);
    const [showExtraCosts, setShowExtraCosts] = useState(false);
    const [manualPartsCost, setManualPartsCost] = useState<number>(0);
+   const [isManualMode, setIsManualMode] = useState(false);
+   const [manualPartDescription, setManualPartDescription] = useState('');
+   const [manualPartValue, setManualPartValue] = useState(0);
 
    // Funções Auxiliares
    const formatToLocalISO = (dateStr: string) => {
@@ -685,50 +688,100 @@ const WorkOrderDetails = () => {
    };
 
    const handleAddPart = async () => {
-      // Se não tem item selecionado mas tem texto na busca, adicionar como custo extra manual
-      if (!selectedPartId && partSearch.trim()) {
-         try {
-            const newItem = {
-               id: crypto.randomUUID(),
-               type: 'Material',
-               description: partSearch.trim(),
-               amount: 0, // Será editado pelo usuário depois se necessário
-               invoice: 'Manual (OS)',
-               date: new Date().toISOString()
-            };
+      // Se não tem item selecionado mas tem texto na busca, e não estamos em modo manual ainda
+      if (!selectedPartId && partSearch.trim() && !isManualMode) {
+         setIsManualMode(true);
+         setManualPartDescription(partSearch.trim());
+         setManualPartValue(0);
+         return;
+      }
 
-            const updatedExtraCosts = [...extraCosts, newItem];
-            
-            const { error } = await supabase
-               .from('work_orders')
-               .update({ 
-                  extra_costs: updatedExtraCosts,
-                  updated_at: new Date().toISOString()
-               })
-               .eq('id', id);
-
-            if (error) throw error;
-
-            setExtraCosts(updatedExtraCosts);
-            setPartSearch('');
-            setPartQuantity(1);
-            
-            setFeedback({
-               type: 'success',
-               title: 'Material Adicionado',
-               message: `"${newItem.description}" foi adicionado aos custos extras da OS.`
-            });
-            
-            return;
-         } catch (error) {
-            console.error('Error adding manual part:', error);
-            setFeedback({
-               type: 'error',
-               title: 'Erro',
-               message: 'Não foi possível adicionar o material manual.'
-            });
+      // Se estamos em modo manual, criar o item no inventário e adicionar na OS
+      if (isManualMode) {
+         if (!manualPartDescription.trim()) {
+            setFeedback({ type: 'error', title: 'Erro', message: 'A descrição é obrigatória.' });
             return;
          }
+
+         try {
+            setSaving(true);
+            
+            // 1. Gerar SKU automático
+            const prefix = 'MAT-';
+            const { data: lastItems } = await supabase
+               .from('inventory_items')
+               .select('sku')
+               .ilike('sku', `${prefix}%`)
+               .order('sku', { ascending: false })
+               .limit(1);
+
+            let nextNum = 1;
+            if (lastItems && lastItems.length > 0) {
+               const lastSku = lastItems[0].sku;
+               const match = lastSku.match(/\d+/);
+               const num = match ? parseInt(match[0], 10) : 0;
+               nextNum = num + 1;
+            }
+            const autoSku = `${prefix}${nextNum.toString().padStart(4, '0')}`;
+
+            // 2. Criar no inventário
+            const { data: newItem, error: invError } = await supabase
+               .from('inventory_items')
+               .insert({
+                  name: manualPartDescription.trim(),
+                  sku: autoSku,
+                  unit_value: manualPartValue,
+                  quantity: 0,
+                  status: 'Ativo'
+               })
+               .select()
+               .single();
+
+            if (invError) throw invError;
+
+            // 3. Adicionar na OS
+            const { error: partError } = await supabase
+               .from('work_order_parts')
+               .insert({
+                  work_order_id: id,
+                  item_id: newItem.id,
+                  quantity: partQuantity
+               });
+
+            if (partError) throw partError;
+
+            // Registrar atividade
+            await supabase.from('work_order_activities').insert({
+               work_order_id: id,
+               user_id: user?.id,
+               user_name: user?.name || 'Sistema',
+               activity_type: 'parts',
+               description: `inseriu ${manualPartDescription} (${partQuantity}un) - Código: ${autoSku}`
+            });
+
+            await fetchOrderDetails();
+            await fetchParts();
+            
+            setIsManualMode(false);
+            setPartSearch('');
+            setSelectedPartId('');
+            setPartQuantity(1);
+            setManualPartDescription('');
+            setManualPartValue(0);
+
+            setFeedback({
+               type: 'success',
+               title: 'Item Cadastrado!',
+               message: `"${manualPartDescription}" foi adicionado ao sistema e à OS.`
+            });
+
+         } catch (error) {
+            console.error('Error in manual part addition:', error);
+            setFeedback({ type: 'error', title: 'Erro', message: 'Falha ao cadastrar material.' });
+         } finally {
+            setSaving(false);
+         }
+         return;
       }
 
       if (!selectedPartId) return;
@@ -1327,71 +1380,125 @@ const WorkOrderDetails = () => {
                               </div>
 
                               {showAddPart && (
-                                 <div className="p-4 bg-slate-50/50 rounded-2xl border border-slate-100 flex flex-wrap gap-4 items-end animate-in fade-in slide-in-from-top-2 duration-400 shadow-sm">
-                                    <div className="flex-1 min-w-[240px] space-y-2">
-                                       <div className="flex justify-between items-center ml-1">
-                                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Buscar Material</label>
-                                          {partSearch && (
-                                             <span className="text-[9px] font-bold text-primary/60 bg-primary/5 px-2 py-0.5 rounded-full animate-in fade-in zoom-in duration-300">
-                                                {filteredParts.length} {filteredParts.length === 1 ? 'item' : 'itens'}
-                                             </span>
-                                          )}
-                                       </div>
-                                       <div className="relative group">
-                                          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
-                                          <input
-                                             type="text"
-                                             placeholder="Digitar nome da peça ou código..."
-                                             value={partSearch}
-                                             onChange={(e) => setPartSearch(e.target.value)}
-                                             className="w-full pl-9 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all shadow-sm"
-                                          />
-                                          {partSearch && (
-                                             <button
-                                                onClick={() => setPartSearch('')}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-red-400 transition-colors"
+                                 <div className="p-6 bg-slate-50 border border-slate-200 rounded-[2rem] shadow-sm space-y-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                                    {!isManualMode ? (
+                                       <div className="flex flex-wrap gap-4 items-end">
+                                          <div className="flex-1 min-w-[240px] space-y-2">
+                                             <div className="flex justify-between items-center ml-1">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em]">Buscar Material</label>
+                                                {partSearch && (
+                                                   <span className="text-[9px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                                      {filteredParts.length} resultados
+                                                   </span>
+                                                )}
+                                             </div>
+                                             <div className="relative group">
+                                                <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" />
+                                                <input
+                                                   type="text"
+                                                   placeholder="Digitar nome da peça ou código..."
+                                                   value={partSearch}
+                                                   onChange={(e) => setPartSearch(e.target.value)}
+                                                   className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 transition-all font-medium"
+                                                />
+                                             </div>
+                                          </div>
+                                          <div className="flex-[1.5] min-w-[240px] space-y-2">
+                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em] ml-1">Selecionar Resultado</label>
+                                             <select
+                                                value={selectedPartId}
+                                                onChange={(e) => setSelectedPartId(e.target.value)}
+                                                className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all font-bold"
                                              >
-                                                <Plus size={12} className="rotate-45" />
-                                             </button>
-                                          )}
+                                                <option value="">{partSearch ? `Não encontrou? Clique em "Incluir" para cadastrar: "${partSearch}"` : 'Escolha um material...'}</option>
+                                                {filteredParts.slice(0, 50).map(p => (
+                                                   <option key={p.id} value={p.id}>{p.name} [{p.sku || p.code || 'S/ SKU'}]</option>
+                                                ))}
+                                             </select>
+                                          </div>
+                                          <div className="w-24 space-y-2">
+                                             <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em] ml-1">QTD</label>
+                                             <input
+                                                type="number"
+                                                min="1"
+                                                value={partQuantity}
+                                                onChange={(e) => setPartQuantity(Number(e.target.value))}
+                                                className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all text-center font-black"
+                                             />
+                                          </div>
+                                          <button
+                                             onClick={handleAddPart}
+                                             disabled={isConcluded || (!selectedPartId && !partSearch.trim()) || partQuantity <= 0}
+                                             className="px-8 py-3 bg-primary text-slate-900 text-[11px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all disabled:opacity-30 active:scale-95"
+                                          >
+                                             Incluir
+                                          </button>
                                        </div>
-                                    </div>
-                                    <div className="flex-[1.5] min-w-[240px] space-y-2">
-                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1">Selecionar Resultado</label>
-                                       <select
-                                          value={selectedPartId}
-                                          onChange={(e) => setSelectedPartId(e.target.value)}
-                                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all shadow-sm font-medium"
-                                       >
-                                           <option value="">{partSearch ? `Não encontrou? Clique em "Incluir" para adicionar como item manual: "${partSearch}"` : 'Escolha um material...'}</option>
-                                          {filteredParts.slice(0, 100).map(p => (
-                                             <option key={p.id} value={p.id}>
-                                                {p.name} {p.code ? `[${p.code}]` : ''} — Estoque: {p.quantity} {p.unit}
-                                             </option>
-                                          ))}
-                                          {filteredParts.length > 100 && (
-                                             <option disabled>+ {filteredParts.length - 100} itens ocultos... refine sua busca</option>
-                                          )}
-                                       </select>
-                                    </div>
-                                    <div className="w-20 space-y-2">
-                                       <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 text-center block">Qtd</label>
-                                       <input
-                                          type="number"
-                                          min="1"
-                                          value={partQuantity}
-                                          onFocus={(e) => e.target.value === '0' && (e.target.value = '')}
-                                          onChange={(e) => setPartQuantity(Number(e.target.value))}
-                                          className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all shadow-sm text-center font-bold"
-                                       />
-                                    </div>
-                                    <button
-                                       onClick={handleAddPart}
-                                       disabled={isConcluded || (!selectedPartId && !partSearch.trim()) || partQuantity <= 0}
-                                       className="px-6 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all disabled:opacity-30 disabled:grayscale"
-                                    >
-                                       Incluir
-                                    </button>
+                                    ) : (
+                                       <div className="space-y-6 animate-in zoom-in-95 duration-300">
+                                          <div className="flex items-center justify-between border-b border-slate-200 pb-4">
+                                             <h5 className="text-xs font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                                <Plus size={14} className="text-primary" /> Cadastrar Novo Material
+                                             </h5>
+                                             <button 
+                                                onClick={() => setIsManualMode(false)}
+                                                className="text-[10px] font-black text-slate-400 hover:text-red-500 uppercase tracking-widest transition-colors"
+                                             >
+                                                Voltar à busca
+                                             </button>
+                                          </div>
+                                          
+                                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                             <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em] ml-1">Descrição da Peça</label>
+                                                <div className="relative">
+                                                   <Hash size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+                                                   <input
+                                                      type="text"
+                                                      value={manualPartDescription}
+                                                      onChange={(e) => setManualPartDescription(e.target.value)}
+                                                      placeholder="Ex: Rolamento Esférico 20mm Inox"
+                                                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all font-bold"
+                                                   />
+                                                </div>
+                                             </div>
+                                             <div className="space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em] ml-1">Valor Unit. (R$)</label>
+                                                <div className="relative">
+                                                   <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xs">R$</span>
+                                                   <input
+                                                      type="number"
+                                                      step="0.01"
+                                                      value={manualPartValue}
+                                                      onChange={(e) => setManualPartValue(Number(e.target.value))}
+                                                      className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all font-black text-slate-900"
+                                                   />
+                                                </div>
+                                             </div>
+                                          </div>
+
+                                          <div className="flex items-center gap-4 pt-2">
+                                             <div className="w-24 space-y-2">
+                                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-[.15em] ml-1">QTD</label>
+                                                <input
+                                                   type="number"
+                                                   min="1"
+                                                   value={partQuantity}
+                                                   onChange={(e) => setPartQuantity(Number(e.target.value))}
+                                                   className="w-full p-3 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all text-center font-black"
+                                                />
+                                             </div>
+                                             <button
+                                                onClick={handleAddPart}
+                                                disabled={saving || !manualPartDescription.trim()}
+                                                className="flex-1 py-4 bg-primary text-slate-900 text-xs font-black uppercase tracking-[.2em] rounded-xl shadow-xl shadow-primary/20 hover:shadow-primary/40 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                             >
+                                                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                                                Confirmar Cadastro e Incluir na OS
+                                             </button>
+                                          </div>
+                                       </div>
+                                    )}
                                  </div>
                               )}
 
