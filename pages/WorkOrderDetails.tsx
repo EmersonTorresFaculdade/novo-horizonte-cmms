@@ -688,8 +688,8 @@ const WorkOrderDetails = () => {
    };
 
    const handleAddPart = async () => {
-      // Se não tem item selecionado mas tem texto na busca, e não estamos em modo manual ainda
-      if (!selectedPartId && partSearch.trim() && !isManualMode) {
+      // Se não tem item selecionado, e não estamos em modo manual ainda
+      if (!selectedPartId && !isManualMode) {
          setIsManualMode(true);
          setManualPartDescription(partSearch.trim());
          setManualPartValue(0);
@@ -1428,7 +1428,7 @@ const WorkOrderDetails = () => {
                                           </div>
                                           <button
                                              onClick={handleAddPart}
-                                             disabled={isConcluded || (!selectedPartId && !partSearch.trim()) || partQuantity <= 0}
+                                             disabled={isConcluded || partQuantity <= 0}
                                              className="px-8 py-3 bg-primary text-slate-900 text-[11px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/40 transition-all disabled:opacity-30 active:scale-95"
                                           >
                                              Incluir
