@@ -334,40 +334,41 @@ serve(async (req: Request) => {
         let subject_display = "";
         let intro_display = "";
         const admin_name = body.adminName || "";
-        const currentStatus = enrichedWorkOrder.status || 'N/A';
+        const currentStatus = enrichedWorkOrder.status || 'N/A';        const greeting = requesterName ? `Olá, ${requesterName}, ` : "Olá, ";
+        const osRef = "sua OS ";
 
         if (event === 'work_order_created') {
             subject_display = "🆕 Nova Ordem de Serviço";
-            intro_display = "foi criada";
+            intro_display = `${greeting}${osRef}foi criada`;
         } else if (event === 'work_order_reopened') {
             subject_display = "🔄 Ordem de Serviço Reaberta";
-            intro_display = "foi reaberta";
+            intro_display = `${greeting}${osRef}foi reaberta`;
         } else if (event === 'work_order_cancelled') {
             subject_display = "❌ Ordem de Serviço Cancelada";
-            intro_display = `foi cancelada${admin_name ? ` por ${admin_name}` : ''}`;
+            intro_display = `${greeting}${osRef}foi cancelada${admin_name ? ` por ${admin_name}` : ''}`;
         } else if (event === 'executive_report_manual') {
             subject_display = "📊 Relatório Executivo Estratégico";
-            intro_display = "foi gerado manualmente pela diretoria";
+            intro_display = `${greeting}o Relatório Executivo Estratégico foi gerado manualmente pela diretoria`;
         } else if (event === 'user_registered') {
             subject_display = "👤 Novo Registro de Usuário";
-            intro_display = "foi realizado e aguarda aprovação do Gerente de Manutenção (Root).";
+            intro_display = `${greeting}um novo registro de usuário foi realizado e aguarda aprovação do Gerente de Manutenção (Root).`;
         } else if (event === 'user_approved') {
             subject_display = "✅ Cadastro Aprovado";
-            intro_display = "foi aprovado! Agora você já pode acessar o sistema com suas credenciais.";
+            intro_display = `${greeting}seu cadastro foi aprovado! Agora você já pode acessar o sistema com suas credenciais.`;
         } else if (event === 'user_rejected') {
             subject_display = "❌ Cadastro Não Aprovado";
-            intro_display = "foi revisado e, infelizmente, o acesso não foi concedido no momento.";
+            intro_display = `${greeting}seu cadastro foi revisado e, infelizmente, o acesso não foi concedido no momento.`;
         } else if (event === 'password_reset_request') {
             subject_display = "🔐 Recuperação de Senha";
-            intro_display = "foi solicitada para sua conta. Clique no botão abaixo para redefinir sua senha.";
+            intro_display = `${greeting}uma recuperação de senha foi solicitada para sua conta. Clique no botão abaixo para redefinir sua senha.`;
         } else {
             subject_display = "🔄 Atualização da Ordem de Serviço";
             if (currentStatus === 'Recebido') {
-                intro_display = "foi recebida e está aguardando início";
+                intro_display = `${greeting}${osRef}foi recebida e está aguardando início`;
             } else if (currentStatus === 'Em Manutenção') {
-                intro_display = "entrou em manutenção";
+                intro_display = `${greeting}${osRef}entrou em manutenção`;
             } else if (currentStatus === 'Concluído') {
-                intro_display = "foi concluída com sucesso";
+                intro_display = `${greeting}${osRef}foi concluída com sucesso`;
             } else if (currentStatus === 'Agendado') {
                 subject_display = "📅 Agendamento de Manutenção";
                 if (enrichedWorkOrder.scheduled_at) {
@@ -375,15 +376,15 @@ serve(async (req: Request) => {
                         const date = new Date(enrichedWorkOrder.scheduled_at);
                         const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
                         const formattedTime = date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-                        intro_display = `foi agendada para *${formattedDate}* às *${formattedTime}*`;
+                        intro_display = `${greeting}${osRef}foi agendada para *${formattedDate}* às *${formattedTime}*`;
                     } catch (e) {
-                        intro_display = `foi atualizada para o status: ${currentStatus}`;
+                        intro_display = `${greeting}${osRef}foi atualizada para o status: ${currentStatus}`;
                     }
                 } else {
-                    intro_display = "foi marcada como agendada";
+                    intro_display = `${greeting}${osRef}foi marcada como agendada`;
                 }
             } else {
-                intro_display = `foi atualizada para o status: ${currentStatus}`;
+                intro_display = `${greeting}${osRef}foi atualizada para o status: ${currentStatus}`;
             }
         }
 
