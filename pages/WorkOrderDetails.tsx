@@ -685,7 +685,54 @@ const WorkOrderDetails = () => {
    };
 
    const handleAddPart = async () => {
+      // Se não tem item selecionado mas tem texto na busca, adicionar como custo extra manual
+      if (!selectedPartId && partSearch.trim()) {
+         try {
+            const newItem = {
+               id: crypto.randomUUID(),
+               type: 'Material',
+               description: partSearch.trim(),
+               amount: 0, // Será editado pelo usuário depois se necessário
+               invoice: 'Manual (OS)',
+               date: new Date().toISOString()
+            };
+
+            const updatedExtraCosts = [...extraCosts, newItem];
+            
+            const { error } = await supabase
+               .from('work_orders')
+               .update({ 
+                  extra_costs: updatedExtraCosts,
+                  updated_at: new Date().toISOString()
+               })
+               .eq('id', id);
+
+            if (error) throw error;
+
+            setExtraCosts(updatedExtraCosts);
+            setPartSearch('');
+            setPartQuantity(1);
+            
+            setFeedback({
+               type: 'success',
+               title: 'Material Adicionado',
+               message: `"${newItem.description}" foi adicionado aos custos extras da OS.`
+            });
+            
+            return;
+         } catch (error) {
+            console.error('Error adding manual part:', error);
+            setFeedback({
+               type: 'error',
+               title: 'Erro',
+               message: 'Não foi possível adicionar o material manual.'
+            });
+            return;
+         }
+      }
+
       if (!selectedPartId) return;
+
       try {
          const { error } = await supabase
             .from('work_order_parts')
@@ -696,14 +743,34 @@ const WorkOrderDetails = () => {
             });
 
          if (error) throw error;
-         fetchUsedParts();
+
+         // Registrar atividade
+         const actorName = user?.name || 'Administrador';
+         const partName = availableParts.find(p => p.id === selectedPartId)?.name || 'Peça';
+         
+         await supabase.from('work_order_activities').insert({
+            work_order_id: id,
+            user_id: user?.id,
+            user_name: actorName,
+            activity_type: 'parts',
+            description: `adicionou ${partQuantity}un de ${partName}`
+         });
+
+         await fetchOrderDetails();
          setSelectedPartId('');
+         setPartSearch('');
          setPartQuantity(1);
+
+         setFeedback({
+            type: 'success',
+            title: 'Peça Adicionada',
+            message: 'O item foi registrado com sucesso.'
+         });
       } catch (error) {
          console.error('Error adding part:', error);
          setFeedback({
             type: 'error',
-            title: 'Erro na Peça',
+            title: 'Erro na Operação',
             message: 'Não foi possível adicionar a peça ao estoque da Ordem de Serviço.'
          });
       }
@@ -1296,7 +1363,7 @@ const WorkOrderDetails = () => {
                                           onChange={(e) => setSelectedPartId(e.target.value)}
                                           className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-primary transition-all shadow-sm font-medium"
                                        >
-                                          <option value="">{partSearch ? `Resultados para "${partSearch}"...` : 'Escolha um material...'}</option>
+                                           <option value="">{partSearch ? `Não encontrou? Clique em "Incluir" para adicionar como item manual: "${partSearch}"` : 'Escolha um material...'}</option>
                                           {filteredParts.slice(0, 100).map(p => (
                                              <option key={p.id} value={p.id}>
                                                 {p.name} {p.code ? `[${p.code}]` : ''} — Estoque: {p.quantity} {p.unit}
@@ -1320,7 +1387,7 @@ const WorkOrderDetails = () => {
                                     </div>
                                     <button
                                        onClick={handleAddPart}
-                                       disabled={isConcluded || !selectedPartId || partQuantity <= 0}
+                                       disabled={isConcluded || (!selectedPartId && !partSearch.trim()) || partQuantity <= 0}
                                        className="px-6 py-2.5 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all disabled:opacity-30 disabled:grayscale"
                                     >
                                        Incluir
