@@ -2,16 +2,21 @@ import { supabase } from '../lib/supabase';
 
 interface WorkOrderPayload {
     id: string;
+    order_number?: string | number;
     title: string;
     description: string;
     priority: string;
     status: string;
-    assetId: string;
-    locationId: string;
+    maintenance_category?: string;
+    assetId?: string;
+    locationId?: string;
     assignedTo?: string;
     requesterId?: string; // ID of the user who requested the work order
     technical_report?: string;
     technicianName?: string;
+    maintenance_type?: string;
+    estimated_hours?: number;
+    scheduled_at?: string;
 }
 
 interface UserPayload {

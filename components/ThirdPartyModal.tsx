@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Building2, Phone, Mail, FileText, Wrench, Loader2, Camera } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
 import type { ThirdPartyCompany } from '../types';
 
 export type ThirdPartyFormData = Omit<ThirdPartyCompany, 'id' | 'created_at' | 'updated_at'> & { id?: string };
@@ -15,6 +16,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<ThirdPartyFormData>({
         name: '',
+        code: '',
         cnpj: '',
         contact_name: '',
         phone: '',
@@ -25,12 +27,25 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
     });
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const { user } = useAuth();
+
+    const availableSpecialties = React.useMemo(() => {
+        const specs = [
+            { id: 'Máquinas', label: 'Máquinas', permission: user?.manage_equipment },
+            { id: 'Predial', label: 'Predial', permission: user?.manage_predial },
+            { id: 'Outros', label: 'Outros', permission: user?.manage_others }
+        ];
+
+        if (user?.role === 'admin_root') return specs;
+        return specs.filter(s => s.permission);
+    }, [user]);
 
     useEffect(() => {
         if (company) {
             console.log('ThirdPartyModal: Loading company into form:', company);
             setFormData({
                 id: company.id,
+                code: company.code || '',
                 name: company.name || '',
                 cnpj: company.cnpj || '',
                 contact_name: company.contact_name || '',
@@ -43,19 +58,43 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         } else {
             setFormData({
                 name: '',
+                code: '',
                 cnpj: '',
                 contact_name: '',
                 phone: '',
                 email: '',
-                specialty: '',
+                specialty: availableSpecialties.length === 1 ? availableSpecialties[0].id : '',
                 status: 'Ativo',
                 logo_url: ''
             });
         }
         setError('');
-    }, [company, isOpen]);
+    }, [company, isOpen, availableSpecialties]);
 
     if (!isOpen) return null;
+
+    const generateAutoCode = async () => {
+        const { supabase } = await import('../lib/supabase');
+        const prefix = 'EMP-';
+        const { data: existing, error } = await supabase
+            .from('third_party_companies')
+            .select('code')
+            .ilike('code', `${prefix}%`);
+
+        if (error || !existing || existing.length === 0) {
+            return `${prefix}001`;
+        }
+
+        const numbers = existing
+            .map(a => {
+                const parts = (a.code || '').split('-');
+                return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+        return `${prefix}${(maxNumber + 1).toString().padStart(3, '0')}`;
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -72,15 +111,21 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
         e.preventDefault();
         setError('');
 
-        if (!formData.name || !formData.contact_name || !formData.phone || !formData.specialty) {
+        if (!formData.name || !formData.contact_name || !formData.specialty) {
             setError('Por favor, preencha todos os campos obrigatórios.');
             return;
         }
 
         try {
             setIsLoading(true);
+            let finalCode = formData.code;
+            if (!formData.id && !finalCode) {
+                finalCode = await generateAutoCode();
+            }
+
             const payload: ThirdPartyFormData = {
                 id: formData.id,
+                code: finalCode,
                 name: formData.name,
                 cnpj: formData.cnpj || null,
                 contact_name: formData.contact_name,
@@ -248,7 +293,7 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div>
                                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                                    Telefone/WhatsApp *
+                                    Telefone/WhatsApp
                                 </label>
                                 <div className="relative">
                                     <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -292,9 +337,9 @@ const ThirdPartyModal: React.FC<ThirdPartyModalProps> = ({ isOpen, onClose, onSa
                                         className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all appearance-none"
                                     >
                                         <option value="">Selecione...</option>
-                                        <option value="Máquinas">Máquinas</option>
-                                        <option value="Predial">Predial</option>
-                                        <option value="Outros">Outros</option>
+                                        {availableSpecialties.map(spec => (
+                                            <option key={spec.id} value={spec.id}>{spec.label}</option>
+                                        ))}
                                     </select>
                                 </div>
                             </div>

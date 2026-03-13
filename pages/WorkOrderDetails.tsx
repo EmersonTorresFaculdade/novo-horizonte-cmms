@@ -494,6 +494,8 @@ const WorkOrderDetails = () => {
                if (workOrder) {
                   await NotificationService.notifyWorkOrderReopened({
                      id: workOrder.id,
+                     order_number: workOrder.order_number,
+                     maintenance_category: workOrder.maintenance_category,
                      title: `OS REABERTA: ${workOrder.order_number}`,
                      description: editIssue || workOrder.issue,
                      status: 'Aberto',
@@ -646,6 +648,8 @@ const WorkOrderDetails = () => {
          if (workOrder && (isStatusChanged || isScheduleChanged || isReportChanged || isTechChanged)) {
             await NotificationService.notifyWorkOrderUpdated({
                id: workOrder.id,
+               order_number: workOrder.order_number,
+               maintenance_category: editMaintenanceCategory,
                title: `Atualização OS: ${workOrder.order_number}`,
                description: editIssue,
                priority: editPriority,

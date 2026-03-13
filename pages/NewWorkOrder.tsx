@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -190,6 +190,8 @@ const NewWorkOrder = () => {
           console.log('Enviando notificação de criação para OS:', newOrder.id);
           await NotificationService.notifyWorkOrderCreated({
             id: newOrder.id,
+            order_number: newOrder.order_number,
+            maintenance_category: newOrder.maintenance_category,
             title: `Nova OS: ${newOrder.order_number}`,
             description: issueDescription,
             priority: priority,
@@ -228,11 +230,24 @@ const NewWorkOrder = () => {
     }
   };
 
-  const categoryIcons = [
-    { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-emerald-50/50', border: 'border-primary/30', text: 'text-slate-900', iconColor: 'text-primary' },
-    { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' },
-    { id: 'Outros', icon: Box, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' }
-  ];
+  const categoryIcons = useMemo(() => {
+    const allCategories = [
+      { id: 'Equipamento', icon: Settings, label: 'Máquinas', bg: 'bg-emerald-50/50', border: 'border-primary/30', text: 'text-slate-900', iconColor: 'text-primary' },
+      { id: 'Predial', icon: Building2, label: 'Predial', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' },
+      { id: 'Outros', icon: Box, label: 'Outros', bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-900', iconColor: 'text-primary' }
+    ];
+
+    // Administrador Root tem acesso total
+    if (user?.role === 'admin_root') return allCategories;
+
+    // Outros usuários (admin e user) são filtrados pelas suas permissões específicas
+    return allCategories.filter(cat => {
+      if (cat.id === 'Equipamento') return user?.manage_equipment;
+      if (cat.id === 'Predial') return user?.manage_predial;
+      if (cat.id === 'Outros') return user?.manage_others;
+      return false;
+    });
+  }, [user]);
 
   // Ajustar categoria inicial se a padrão (Equipamento) não estiver disponível
   useEffect(() => {

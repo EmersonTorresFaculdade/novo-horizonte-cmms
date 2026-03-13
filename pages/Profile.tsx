@@ -29,7 +29,7 @@ const Profile = () => {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { profile: globalProfile, updateProfile: updateGlobalProfile } = useProfile();
-    const { user, login, isAdmin } = useAuth(); // Usado para reautenticar/verificar senha
+    const { user, login, isAdmin, isAdminRoot } = useAuth(); // Usado para reautenticar/verificar senha
 
     const [profileData, setProfileData] = useState(globalProfile);
     const [isEditing, setIsEditing] = useState(false);
@@ -589,7 +589,7 @@ const Profile = () => {
                                 <ChevronRight size={20} className="text-slate-400 group-hover:text-primary" />
                             </button>
 
-                            {isAdmin() && (
+                            {isAdminRoot() && (
                                 <button
                                     onClick={() => setShowManagementModal(true)}
                                     className="w-full flex items-center justify-between p-4 rounded-lg border border-slate-200 hover:border-primary hover:bg-primary/5 transition-all group"

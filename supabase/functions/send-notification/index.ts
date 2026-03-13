@@ -329,17 +329,19 @@ serve(async (req: Request) => {
         } else if (event === 'work_order_updated' || event === 'work_order_reopened' || event === 'work_order_cancelled' || event === 'password_reset_request') {
             adminEmails = [];
             adminPhones = [];
+            adminPhone = null;
         }
 
         let subject_display = "";
         let intro_display = "";
         const admin_name = body.adminName || "";
-        const currentStatus = enrichedWorkOrder.status || 'N/A';        const greeting = requesterName ? `Olá, ${requesterName}, ` : "Olá, ";
+        const currentStatus = enrichedWorkOrder.status || 'N/A';
+        const greeting = requesterName ? `Olá, *${requesterName}*, ` : "Olá, ";
         const osRef = "sua OS ";
 
         if (event === 'work_order_created') {
             subject_display = "🆕 Nova Ordem de Serviço";
-            intro_display = `${greeting}${osRef}foi criada`;
+            intro_display = `${greeting}sua OS foi aberta com sucesso`;
         } else if (event === 'work_order_reopened') {
             subject_display = "🔄 Ordem de Serviço Reaberta";
             intro_display = `${greeting}${osRef}foi reaberta`;
@@ -351,7 +353,7 @@ serve(async (req: Request) => {
             intro_display = `${greeting}o Relatório Executivo Estratégico foi gerado manualmente pela diretoria`;
         } else if (event === 'user_registered') {
             subject_display = "👤 Novo Registro de Usuário";
-            intro_display = `${greeting}um novo registro de usuário foi realizado e aguarda aprovação do Gerente de Manutenção (Root).`;
+            intro_display = `Olá, um novo registro de usuário foi realizado e aguarda aprovação do Gerente de Manutenção (Root).`;
         } else if (event === 'user_approved') {
             subject_display = "✅ Cadastro Aprovado";
             intro_display = `${greeting}seu cadastro foi aprovado! Agora você já pode acessar o sistema com suas credenciais.`;
@@ -407,37 +409,54 @@ serve(async (req: Request) => {
 
         const intro_html = intro_display.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
 
+        const payload = {
+            event: event,
+            // Root level fields for easier n8n access
+            id: enrichedWorkOrder.id,
+            order_number: enrichedWorkOrder.order_number || enrichedWorkOrder.osNumber || enrichedWorkOrder.orderNumber,
+            maintenance_category: enrichedWorkOrder.maintenance_category || 'Equipamento',
+            status: currentStatus,
+            assetName: enrichedWorkOrder.assetName,
+            technicianName: enrichedWorkOrder.technicianName,
+            requesterName: requesterName,
+            requesterPhone: requesterPhone,
+            requesterEmail: requesterEmail,
+            phone: requesterPhone || adminPhone, // Root generic phone
+            adminPhone: adminPhone,
+            adminEmails: adminEmails.join(','),
+            adminPhones: adminPhones.join(','),
+            
+            // Keep compatibility with existing structure
+            subject_display,
+            intro_display,
+            intro_html,
+            formatted_date,
+            formatted_time,
+            admin_name,
+            reset_url: body.reset_url,
+            timestamp: new Date().toISOString(),
+            company: company || 'Novo Horizonte Alumínios',
+            workOrder: enrichedWorkOrder,
+            reportData: reportData,
+            pdf_attachment: body.pdf_attachment,
+            preferences: { requester: requesterPreferences },
+            maintenance_type: enrichedWorkOrder.maintenance_type || 'Corretiva',
+            technical_report: enrichedWorkOrder.technical_report,
+            description: (enrichedWorkOrder.description || enrichedWorkOrder.issue || '').substring(0, 1000),
+            formatted_blocks: {
+                technical_report_block: enrichedWorkOrder.technical_report ? `📝 Relatório Técnico:\n${enrichedWorkOrder.technical_report}` : '',
+                full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Serviço\n${enrichedWorkOrder.maintenance_type || 'Corretiva'}\n\nDescrição\n${enrichedWorkOrder.description || enrichedWorkOrder.issue || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}${formatted_date ? `\n\n📅 Data do Agendamento\n*${formatted_date} às ${formatted_time}*` : ''}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
+            }
+        };
+
+        console.log('Final Payload sent to n8n:', JSON.stringify(payload));
+
         const response = await fetch(finalWebhookUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                event: event,
-                subject_display,
-                intro_display,
-                intro_html,
-                formatted_date,
-                formatted_time,
-                admin_name,
-                reset_url: body.reset_url,
-                timestamp: new Date().toISOString(),
-                company: company || 'Novo Horizonte Alumínios',
-                workOrder: enrichedWorkOrder,
-                reportData: reportData,
-                pdf_attachment: body.pdf_attachment,
-                preferences: { requester: requesterPreferences },
-                adminPhone,
-                adminEmails: adminEmails.join(','),
-                adminPhones: adminPhones.join(','),
-                requesterPhone,
-                requesterEmail,
-                requesterName,
-                maintenance_type: enrichedWorkOrder.maintenance_type || 'Corretiva',
-                technical_report: enrichedWorkOrder.technical_report,
-                description: enrichedWorkOrder.description || enrichedWorkOrder.issue || '',
-                formatted_blocks: {
-                    technical_report_block: enrichedWorkOrder.technical_report ? `📝 Relatório Técnico:\n${enrichedWorkOrder.technical_report}` : '',
-                    full_body_suggestion: `Olá ${requesterName || 'Ilmo'},\n\nTítulo\n${enrichedWorkOrder.title || enrichedWorkOrder.description}\n\nMáquina\n${enrichedWorkOrder.assetName}\n\nTipo de Serviço\n${enrichedWorkOrder.maintenance_type || 'Corretiva'}\n\nDescrição\n${enrichedWorkOrder.description || enrichedWorkOrder.issue || 'N/A'}\n\nNovo Status\n${enrichedWorkOrder.status}${formatted_date ? `\n\n📅 Data do Agendamento\n*${formatted_date} às ${formatted_time}*` : ''}\n\nSolicitante\n${requesterName || 'N/A'}\n\nTécnico responsável\n${enrichedWorkOrder.technicianName}\n\nRelatório Técnico\n${enrichedWorkOrder.technical_report || 'N/A'}`
-                }
+                ...payload,
+                body: payload // For backward compatibility with n8n nodes using $json.body
             }),
         })
 

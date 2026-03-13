@@ -29,7 +29,7 @@ import FeedbackModal from '../components/FeedbackModal';
 import { NotificationService } from '../services/NotificationService';
 
 const UsersManagement = () => {
-    const { isAdmin, resetUserPassword } = useAuth();
+    const { user, isAdmin, resetUserPassword } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [loading, setLoading] = useState(true);
     const [users, setUsers] = useState<any[]>([]);
@@ -528,7 +528,8 @@ const UsersManagement = () => {
                                         <select
                                             value={editingUser.role}
                                             onChange={e => setEditingUser({ ...editingUser, role: e.target.value })}
-                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner"
+                                            disabled={user?.role !== 'admin_root'}
+                                            className={`w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner ${user?.role !== 'admin_root' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             <option value="user">Usuário</option>
                                             <option value="admin">Administrador de OS</option>
@@ -544,7 +545,8 @@ const UsersManagement = () => {
                                         <select
                                             value={editingUser.status}
                                             onChange={e => setEditingUser({ ...editingUser, status: e.target.value })}
-                                            className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner"
+                                            disabled={user?.role !== 'admin_root'}
+                                            className={`w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:ring-4 focus:ring-primary/10 focus:border-primary transition-all font-black text-slate-700 text-sm appearance-none shadow-inner ${user?.role !== 'admin_root' ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         >
                                             <option value="active">ATIVO</option>
                                             <option value="pending">PENDENTE</option>
@@ -582,9 +584,10 @@ const UsersManagement = () => {
                                                     type="checkbox"
                                                     checked={editingUser[sector.id] ?? true}
                                                     onChange={e => setEditingUser({ ...editingUser, [sector.id]: e.target.checked })}
+                                                    disabled={user?.role !== 'admin_root'}
                                                     className="sr-only peer"
                                                 />
-                                                <div className="w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary shadow-inner"></div>
+                                                <div className={`w-12 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary shadow-inner ${user?.role !== 'admin_root' ? 'opacity-50 cursor-not-allowed' : ''}`}></div>
                                             </div>
                                         </label>
                                     ))}

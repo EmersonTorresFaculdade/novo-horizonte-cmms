@@ -99,13 +99,43 @@ const Inventory = () => {
         return 'Normal';
     };
 
+    const generateAutoSKU = async () => {
+        const prefix = 'PEC-';
+        
+        const { data: existingItems, error } = await supabase
+            .from('inventory_items')
+            .select('sku')
+            .ilike('sku', `${prefix}%`);
+
+        if (error) {
+            console.error('Erro ao buscar SKUs existentes:', error);
+            return `${prefix}001`;
+        }
+
+        if (!existingItems || existingItems.length === 0) {
+            return `${prefix}001`;
+        }
+
+        const numbers = existingItems
+            .map(item => {
+                const parts = item.sku.split('-');
+                return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+        const nextNumber = maxNumber + 1;
+
+        return `${prefix}${nextNumber.toString().padStart(3, '0')}`;
+    };
+
     const handleSave = async () => {
         try {
-            if (!formData.sku || !formData.name) {
+            if (!formData.name) {
                 setFeedback({
                     type: 'error',
-                    title: 'Campos Obrigatórios',
-                    message: 'O SKU e a Descrição da peça são obrigatórios.'
+                    title: 'Campo Obrigatório',
+                    message: 'A Descrição da peça é obrigatória.'
                 });
                 return;
             }
@@ -115,8 +145,14 @@ const Inventory = () => {
             const min = Number(formData.min_stock);
 
             const status = determineStatus(qty, min);
+            
+            let finalSku = formData.sku;
+            if (!isEditing && !finalSku) {
+                finalSku = await generateAutoSKU();
+            }
+
             const payload = {
-                sku: formData.sku,
+                sku: finalSku,
                 name: formData.name,
                 quantity: qty,
                 unit_value: val,
@@ -143,7 +179,7 @@ const Inventory = () => {
                 setFeedback({
                     type: 'success',
                     title: 'Peça Cadastrada',
-                    message: 'A nova peça foi adicionada ao inventário.'
+                    message: `A nova peça foi adicionada com o SKU: ${finalSku}`
                 });
             }
 
@@ -319,7 +355,7 @@ const Inventory = () => {
                             <QrCode size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                             <input
                                 type="text"
-                                placeholder="Ex: P-1023"
+                                placeholder="Automático (ou digite seu SKU)"
                                 value={formData.sku}
                                 onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
                                 className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary"

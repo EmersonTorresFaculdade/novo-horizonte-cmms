@@ -11,9 +11,11 @@ import { Technician, ThirdPartyCompany } from '../types';
 import TechnicianModal from '../components/TechnicianModal';
 import ThirdPartyModal from '../components/ThirdPartyModal';
 import FeedbackModal from '../components/FeedbackModal';
+import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const Technicians: React.FC = () => {
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [mainTab, setMainTab] = useState<'internos' | 'terceirizados'>('internos');
     const [activeTab, setActiveTab] = useState('Todos');
@@ -312,8 +314,32 @@ const Technicians: React.FC = () => {
         return colors[index];
     };
 
+    const availableSpecialties = useMemo(() => {
+        const specs = [
+            { id: 'Todos', label: 'Todos', permission: true },
+            { id: 'Máquinas', label: 'Máquinas', permission: user?.manage_equipment },
+            { id: 'Predial', label: 'Predial', permission: user?.manage_predial },
+            { id: 'Outros', label: 'Outros', permission: user?.manage_others }
+        ];
+
+        if (user?.role === 'admin_root') return specs;
+        return specs.filter(s => s.permission);
+    }, [user]);
+
     const filteredTechnicians = useMemo(() => {
         return technicians.filter(tech => {
+            const spec = (tech.specialty || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const isAdminRoot = user?.role === 'admin_root';
+            let hasPermission = isAdminRoot;
+            
+            if (!isAdminRoot) {
+                if (user?.manage_equipment && spec === 'maquinas') hasPermission = true;
+                if (user?.manage_predial && spec === 'predial') hasPermission = true;
+                if (user?.manage_others && spec === 'outros') hasPermission = true;
+            }
+
+            if (!hasPermission) return false;
+
             const safeName = tech.name || '';
             const safeSpecialty = tech.specialty || '';
             const searchLower = searchTerm.toLowerCase();
@@ -325,10 +351,22 @@ const Technicians: React.FC = () => {
 
             return matchesSearch && matchesTab;
         });
-    }, [technicians, searchTerm, activeTab]);
+    }, [technicians, searchTerm, activeTab, user]);
 
     const filteredThirdParties = useMemo(() => {
         return thirdPartyCompanies.filter(company => {
+            const spec = (company.specialty || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+            const isAdminRoot = user?.role === 'admin_root';
+            let hasPermission = isAdminRoot;
+            
+            if (!isAdminRoot) {
+                if (user?.manage_equipment && spec === 'maquinas') hasPermission = true;
+                if (user?.manage_predial && spec === 'predial') hasPermission = true;
+                if (user?.manage_others && spec === 'outros') hasPermission = true;
+            }
+
+            if (!hasPermission) return false;
+
             const safeName = company.name || '';
             const safeContact = company.contact_name || '';
             const safeSpecialty = company.specialty || '';
@@ -342,7 +380,7 @@ const Technicians: React.FC = () => {
 
             return matchesSearch && matchesTab;
         });
-    }, [thirdPartyCompanies, searchTerm, activeTab]);
+    }, [thirdPartyCompanies, searchTerm, activeTab, user]);
 
     const getPerformancePercentage = (entity: any) => {
         const total = (entity.completed_orders || 0) + (entity.open_orders || 0);
@@ -444,18 +482,18 @@ const Technicians: React.FC = () => {
 
                             {/* Specialty Filter */}
                             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                {['Todos', 'Máquinas', 'Predial', 'Outros'].map(specialty => (
+                                {availableSpecialties.map(spec => (
                                     <button
-                                        key={specialty}
-                                        onClick={() => setActiveTab(specialty)}
+                                        key={spec.id}
+                                        onClick={() => setActiveTab(spec.id)}
                                         style={{
                                             padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s',
-                                            border: `1px solid ${activeTab === specialty ? 'var(--primary-color)' : '#E2E8F0'}`,
-                                            background: activeTab === specialty ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF',
-                                            color: activeTab === specialty ? 'var(--primary-color)' : '#64748B'
+                                            border: `1px solid ${activeTab === spec.id ? 'var(--primary-color)' : '#E2E8F0'}`,
+                                            background: activeTab === spec.id ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF',
+                                            color: activeTab === spec.id ? 'var(--primary-color)' : '#64748B'
                                         }}
                                     >
-                                        {specialty}
+                                        {spec.label}
                                     </button>
                                 ))}
                             </div>
@@ -465,7 +503,18 @@ const Technicians: React.FC = () => {
                                     const avColor = getAvatarColor(tech.name);
                                     return (
                                         <div key={tech.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-primary-light/30 group">
-                                            <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', items: 'center', gap: 8 }}>
+                                            <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                <span style={{
+                                                    padding: '4px 8px',
+                                                    borderRadius: 6,
+                                                    fontSize: '0.625rem',
+                                                    fontWeight: 700,
+                                                    color: '#94A3B8',
+                                                    background: '#F8FAFC',
+                                                    border: '1px solid #E2E8F0'
+                                                }}>
+                                                    {tech.code || '---'}
+                                                </span>
                                                 <span style={{
                                                     padding: '4px 8px',
                                                     borderRadius: 6,
@@ -600,13 +649,13 @@ const Technicians: React.FC = () => {
                             </div>
 
                             <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-                                {['Todos', 'Máquinas', 'Predial', 'Outros'].map(specialty => (
+                                {availableSpecialties.map(spec => (
                                     <button
-                                        key={specialty}
-                                        onClick={() => setActiveTab(specialty)}
-                                        style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s', border: `1px solid ${activeTab === specialty ? 'var(--primary-color)' : '#E2E8F0'}`, background: activeTab === specialty ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF', color: activeTab === specialty ? 'var(--primary-color)' : '#64748B' }}
+                                        key={spec.id}
+                                        onClick={() => setActiveTab(spec.id)}
+                                        style={{ padding: '6px 16px', borderRadius: 20, fontSize: '0.875rem', fontWeight: 500, whiteSpace: 'nowrap', transition: 'all 0.2s', border: `1px solid ${activeTab === spec.id ? 'var(--primary-color)' : '#E2E8F0'}`, background: activeTab === spec.id ? 'rgba(17, 212, 115, 0.1)' : '#FFFFFF', color: activeTab === spec.id ? 'var(--primary-color)' : '#64748B' }}
                                     >
-                                        {specialty}
+                                        {spec.label}
                                     </button>
                                 ))}
                             </div>
@@ -622,6 +671,17 @@ const Technicians: React.FC = () => {
                                             return (
                                                 <div key={company.id} style={{ background: '#FFFFFF', borderRadius: 16, border: '1px solid #E2E8F0', padding: 20, position: 'relative', transition: 'all 0.3s', display: 'flex', flexDirection: 'column' }} className="hover:shadow-md hover:border-primary-light/30 group">
                                                     <div style={{ position: 'absolute', top: 12, right: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                                                        <span style={{
+                                                            padding: '4px 8px',
+                                                            borderRadius: 6,
+                                                            fontSize: '0.625rem',
+                                                            fontWeight: 700,
+                                                            color: '#94A3B8',
+                                                            background: '#F8FAFC',
+                                                            border: '1px solid #E2E8F0'
+                                                        }}>
+                                                            {company.code || '---'}
+                                                        </span>
                                                         <span style={{
                                                             padding: '4px 8px',
                                                             borderRadius: 6,

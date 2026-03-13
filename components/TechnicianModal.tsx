@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Camera, Loader2, User, Briefcase, Phone, DollarSign } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import FeedbackModal from './FeedbackModal';
 
 interface TechnicianModalProps {
@@ -11,6 +13,7 @@ interface TechnicianModalProps {
 
 export interface TechnicianData {
     id?: string;
+    code?: string;
     name: string;
     specialty: string;
     contact: string;
@@ -22,6 +25,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [formData, setFormData] = useState<TechnicianData>({
         name: '',
+        code: '',
         specialty: '',
         contact: '',
         status: 'Ativo',
@@ -29,11 +33,23 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
     });
     const [isSaving, setIsSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const { user } = useAuth();
     const [feedback, setFeedback] = useState<{
         type: 'success' | 'error' | 'confirm' | 'info';
         title: string;
         message: string;
     } | null>(null);
+
+    const availableSpecialties = React.useMemo(() => {
+        const specs = [
+            { id: 'Máquinas', label: 'Máquinas', permission: user?.manage_equipment },
+            { id: 'Predial', label: 'Predial', permission: user?.manage_predial },
+            { id: 'Outros', label: 'Outros', permission: user?.manage_others }
+        ];
+
+        if (user?.role === 'admin_root') return specs;
+        return specs.filter(s => s.permission);
+    }, [user]);
 
     useEffect(() => {
         if (technician) {
@@ -43,14 +59,15 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
         } else {
             setFormData({
                 name: '',
-                specialty: '',
+                code: '',
+                specialty: availableSpecialties.length === 1 ? availableSpecialties[0].id : '',
                 contact: '',
                 status: 'Ativo',
                 avatar: ''
             });
         }
         setErrors({});
-    }, [technician, isOpen]);
+    }, [technician, isOpen, availableSpecialties]);
 
     const handleImageClick = () => {
         fileInputRef.current?.click();
@@ -76,12 +93,31 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
         if (!formData.specialty.trim()) {
             newErrors.specialty = 'Especialidade é obrigatória';
         }
-        if (!formData.contact.trim()) {
-            newErrors.contact = 'Contato é obrigatório';
-        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
+    };
+
+    const generateAutoCode = async () => {
+        const prefix = 'TEC-';
+        const { data: existing, error } = await supabase
+            .from('technicians')
+            .select('code')
+            .ilike('code', `${prefix}%`);
+
+        if (error || !existing || existing.length === 0) {
+            return `${prefix}001`;
+        }
+
+        const numbers = existing
+            .map(a => {
+                const parts = (a.code || '').split('-');
+                return parts.length > 1 ? parseInt(parts[1], 10) : 0;
+            })
+            .filter(n => !isNaN(n));
+
+        const maxNumber = numbers.length > 0 ? Math.max(...numbers) : 0;
+        return `${prefix}${(maxNumber + 1).toString().padStart(3, '0')}`;
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -93,7 +129,12 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
 
         setIsSaving(true);
         try {
-            await onSave(formData);
+            let dataToSave = { ...formData };
+            if (!technician?.id && !dataToSave.code) {
+                const autoCode = await generateAutoCode();
+                dataToSave.code = autoCode;
+            }
+            await onSave(dataToSave);
             onClose();
         } catch (error) {
             console.error('Erro ao salvar técnico:', error);
@@ -217,9 +258,9 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                                         } focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all`}
                                 >
                                     <option value="">Selecione...</option>
-                                    <option value="Máquinas">Máquinas</option>
-                                    <option value="Predial">Predial</option>
-                                    <option value="Outros">Outros</option>
+                                    {availableSpecialties.map(spec => (
+                                        <option key={spec.id} value={spec.id}>{spec.label}</option>
+                                    ))}
                                 </select>
                                 {errors.specialty && (
                                     <p className="text-sm text-brand-alert mt-1">{errors.specialty}</p>
@@ -246,7 +287,7 @@ const TechnicianModal: React.FC<TechnicianModalProps> = ({ isOpen, onClose, onSa
                         <div>
                             <label className="block text-sm font-semibold text-slate-700 mb-2 flex items-center gap-2">
                                 <Phone size={16} />
-                                Contato *
+                                Contato
                             </label>
                             <input
                                 type="tel"

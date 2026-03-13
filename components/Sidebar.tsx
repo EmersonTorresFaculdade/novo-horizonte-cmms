@@ -33,7 +33,7 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
   const navigate = useNavigate();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { profile } = useProfile();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, logout } = useAuth();
   const { settings } = useSettings();
   const { unreadCount } = useNotifications();
 
@@ -388,19 +388,22 @@ const Sidebar = ({ isOpen = false, onClose }: SidebarProps) => {
                 <HelpCircle size={18} />
                 <span className="text-sm font-medium">Ajuda & Suporte</span>
               </button>
-              <div className="h-px bg-slate-700"></div>
-              <button
-                onClick={() => {
-                  setIsProfileOpen(false);
-                  navigate('/');
-                }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-brand-alert/10 hover:text-red-300 transition-colors text-left"
-              >
-                <LogOut size={18} />
-                <span className="text-sm font-medium">Sair da Conta</span>
-              </button>
             </div>
           )}
+        </div>
+
+        {/* Global Action: Logout */}
+        <div className="p-4 border-t border-slate-800/50 mt-auto">
+          <button
+            onClick={async () => {
+              await logout();
+              navigate('/login');
+            }}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg border border-red-500/30 text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all font-semibold text-sm group"
+          >
+            <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
+            Sair do Sistema
+          </button>
         </div>
       </aside>
 

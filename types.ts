@@ -22,6 +22,7 @@ export interface WorkOrder {
 
 export interface Technician {
   id: string;
+  code?: string;
   name: string;
   specialty: string;
   status: 'Ativo' | 'Inativo';
@@ -54,6 +55,7 @@ export interface InventoryItem {
 
 export interface ThirdPartyCompany {
   id: string;
+  code?: string;
   name: string;
   cnpj?: string;
   contact_name: string;

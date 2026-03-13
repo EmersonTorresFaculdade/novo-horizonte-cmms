@@ -106,6 +106,31 @@ const ReportsContent = () => {
     const [period, setPeriod] = useState('month');
     const [categoryFilter, setCategoryFilter] = useState('ALL');
 
+    const availableCategories = React.useMemo(() => {
+        const cats = [
+            { id: 'ALL', label: 'Todas Categorias' },
+            { id: 'Equipamento', label: 'MÁQUINAS', permission: user?.manage_equipment },
+            { id: 'Predial', label: 'PREDIAL', permission: user?.manage_predial },
+            { id: 'Outros', label: 'OUTROS', permission: user?.manage_others }
+        ];
+
+        if (user?.role === 'admin_root') return cats;
+        
+        // Filter out categories without permission
+        const filtered = cats.filter(c => c.id === 'ALL' || c.permission);
+        return filtered;
+    }, [user]);
+
+    // Ensure categoryFilter is valid
+    useEffect(() => {
+        if (!availableCategories.some(c => c.id === categoryFilter)) {
+            if (availableCategories.length > 1) {
+                // If 'ALL' is there, maybe use it, or use the first specific one
+                setCategoryFilter(availableCategories[0].id);
+            }
+        }
+    }, [availableCategories, categoryFilter]);
+
     const periodTranslate: any = {
         'week': 'Semanal',
         'month': 'Mensal',
@@ -785,24 +810,22 @@ const ReportsContent = () => {
 
             const { data: woCurrent } = await (queryCurrent as any);
             const { data: woPrevious } = await (queryPrevious as any);
-            const { data: assets } = await supabase.from('assets').select('*');
-            const { data: technicians } = await supabase.from('technicians').select('*');
+            const { data: assetsRaw } = await supabase.from('assets').select('*');
+            const { data: techniciansRaw } = await supabase.from('technicians').select('*');
 
             // Filter globally canceled/ignored orders
             const currentRaw = (woCurrent as any[] || []).filter(wo => wo.status !== 'Cancelado');
             const prevRaw = (woPrevious as any[] || []).filter(wo => wo.status !== 'Cancelado');
 
             // --- Strict Filtering based on User Roles ---
-            let currentData = currentRaw;
-            let prevData = prevRaw;
             const isAdminRoot = user?.role === 'admin_root';
             const isCommonAdmin = user?.role === 'admin';
 
-            const filterByRole = (raw: any[]) => {
+            const filterOrderByRole = (raw: any[]) => {
                 if (isAdminRoot) return raw;
                 return raw.filter(o => {
                     const cat = o.maintenance_category || 'Equipamento';
-                    const isInd = ['MÁQUINAS', 'EQUIPAMENTOS', 'INDUSTRIAL', 'EQUIPAMENTO'].includes(cat.toUpperCase());
+                    const isInd = ['MÁQUINAS', 'EQUIPAMENTOS', 'INDUSTRIAL', 'EQUIPAMENTO', 'MAQUINA'].includes(cat.toUpperCase());
                     const isPre = cat.toUpperCase() === 'PREDIAL';
                     const isOtr = !isInd && !isPre;
 
@@ -815,11 +838,36 @@ const ReportsContent = () => {
                 });
             };
 
-            currentData = filterByRole(currentData);
-            prevData = filterByRole(prevData);
+            const filterAssetsByRole = (rawArr: any[]) => {
+                if (isAdminRoot) return rawArr;
+                return rawArr.filter(a => {
+                    const cat = (a.category || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase().trim();
+                    const isInd = ['MÁQUINAS', 'EQUIPAMENTOS', 'INDUSTRIAL', 'EQUIPAMENTO', 'MAQUINA'].includes(cat);
+                    const isPre = cat === 'PREDIAL';
+                    const isOtr = !isInd && !isPre;
 
-            const assetData = assets || [];
-            const techData = technicians || [];
+                    if (user?.manage_equipment && isInd) return true;
+                    if (user?.manage_predial && isPre) return true;
+                    if (user?.manage_others && isOtr) return true;
+                    return false;
+                });
+            };
+
+            const filterTechsByRole = (rawArr: any[]) => {
+                if (isAdminRoot) return rawArr;
+                return rawArr.filter(t => {
+                    const spec = (t.specialty || '').normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                    if (user?.manage_equipment && (spec === 'maquinas' || spec === 'máquinas')) return true;
+                    if (user?.manage_predial && spec === 'predial') return true;
+                    if (user?.manage_others && spec === 'outros') return true;
+                    return false;
+                });
+            };
+
+            const currentData = filterOrderByRole(currentRaw);
+            const prevData = filterOrderByRole(prevRaw);
+            const assetData = filterAssetsByRole(assetsRaw || []);
+            const techData = filterTechsByRole(techniciansRaw || []);
 
             const days = Math.ceil(diff / (1000 * 3600 * 24));
 
@@ -944,26 +992,10 @@ const ReportsContent = () => {
                     { name: 'Preventiva', value: currentData.filter((wo: any) => (wo.maintenance_type || '').toLowerCase().includes('preventiva')).length }
                 ],
                 assetsStatus: [],
-                technicianPerformance: (() => {
-                    // Filter technicians by specialty based on categoryFilter
-                    // Filter technicians by user's active keys (chaves ativas)
-                    const filteredTechs = (technicians || []).filter(t => {
-                        const spec = (t.specialty || '').toLowerCase().trim();
-                        // If admin with all keys or no keys set, show all
-                        if (isAdmin && user?.manage_equipment && user?.manage_predial && user?.manage_others) return true;
-                        if (isAdmin && !user?.manage_equipment && !user?.manage_predial && !user?.manage_others) return true;
-
-                        let allowed = false;
-                        if (user?.manage_equipment && (spec === 'máquinas' || spec === 'maquinas')) allowed = true;
-                        if (user?.manage_predial && spec === 'predial') allowed = true;
-                        if (user?.manage_others && spec === 'outros') allowed = true;
-                        return allowed;
-                    });
-                    return filteredTechs.map(t => ({
+                technicianPerformance: techData.map(t => ({
                         name: t.name,
                         completed: currentData.filter(wo => wo.technician_id === t.id && wo.status === 'Concluído').length
-                    })).sort((a, b) => b.completed - a.completed).slice(0, 5);
-                })(),
+                    })).sort((a, b) => b.completed - a.completed).slice(0, 5),
                 topProblematicAssets: problematicAssets,
                 temporalEvolution
             });
@@ -1033,10 +1065,9 @@ const ReportsContent = () => {
                         onChange={(e) => setCategoryFilter(e.target.value)}
                         className="px-3 py-2 bg-slate-100 border-none rounded-xl text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 ring-primary/20"
                     >
-                        <option value="ALL">Todas Categorias</option>
-                        <option value="INDUSTRIAL">MÁQUINAS</option>
-                        <option value="PREDIAL">PREDIAL</option>
-                        <option value="OUTROS">OUTROS</option>
+                        {availableCategories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.label}</option>
+                        ))}
                     </select>
 
                     <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200">
